@@ -65,6 +65,10 @@ struct tok_state {
     const char* enc;        /* Encoding for the current str. */
     const char* str;
     const char* input; /* Tokenizer's newline translated copy of the string. */
+
+    int defstack[MAXINDENT];  // stack if funcs & indents where they were defined
+    int deftypestack[MAXINDENT]; // stack of func types (0 not func; 1: reg; 2: async)
+    int def;
 };
 
 extern struct tok_state *PyTokenizer_FromString(const char *, int);
