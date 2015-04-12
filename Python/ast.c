@@ -219,6 +219,8 @@ validate_expr(expr_ty exp, expr_context_ty ctx)
         return !exp->v.Yield.value || validate_expr(exp->v.Yield.value, Load);
     case YieldFrom_kind:
         return validate_expr(exp->v.YieldFrom.value, Load);
+    case Await_kind:
+        return validate_expr(exp->v.YieldFrom.value, Load);
     case Compare_kind:
         if (!asdl_seq_LEN(exp->v.Compare.comparators)) {
             PyErr_SetString(PyExc_ValueError, "Compare with no comparators");
@@ -941,6 +943,9 @@ set_context(struct compiling *c, expr_ty e, expr_context_ty ctx, const node *n)
         case YieldFrom_kind:
             expr_name = "yield expression";
             break;
+        case Await_kind:
+            expr_name = "await expression";
+            break;
         case ListComp_kind:
             expr_name = "list comprehension";
             break;
@@ -1480,16 +1485,16 @@ ast_for_decorators(struct compiling *c, const node *n)
 }
 
 static stmt_ty
-ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
+_ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq, int is_async)
 {
     /* funcdef: 'def' NAME parameters ['->' test] ':' suite */
+    REQ(n, funcdef);
+
     identifier name;
     arguments_ty args;
     asdl_seq *body;
     expr_ty returns = NULL;
     int name_i = 1;
-
-    REQ(n, funcdef);
 
     name = NEW_IDENTIFIER(CHILD(n, name_i));
     if (!name)
@@ -1509,14 +1514,38 @@ ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
     if (!body)
         return NULL;
 
-    return FunctionDef(name, args, body, decorator_seq, returns, LINENO(n),
+    return FunctionDef(name, args, body, decorator_seq, returns,
+                       is_async,
+                       LINENO(n),
                        n->n_col_offset, c->c_arena);
+
+}
+
+static stmt_ty
+ast_for_async_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
+{
+    /* async_funcdef: ASYNC funcdef */
+
+    REQ(n, async_funcdef);
+    REQ(CHILD(n, 0), ASYNC);
+    REQ(CHILD(n, 1), funcdef);
+
+    return _ast_for_funcdef(c, CHILD(n, 1), decorator_seq,
+                            1 /* is_async */);
+}
+
+static stmt_ty
+ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
+{
+    /* funcdef: 'def' NAME parameters ['->' test] ':' suite */
+    return _ast_for_funcdef(c, n, decorator_seq,
+                            0 /* is_async */);
 }
 
 static stmt_ty
 ast_for_decorated(struct compiling *c, const node *n)
 {
-    /* decorated: decorators (classdef | funcdef) */
+    /* decorated: decorators (classdef | funcdef | async_funcdef) */
     stmt_ty thing = NULL;
     asdl_seq *decorator_seq = NULL;
 
@@ -1527,12 +1556,15 @@ ast_for_decorated(struct compiling *c, const node *n)
       return NULL;
 
     assert(TYPE(CHILD(n, 1)) == funcdef ||
+           TYPE(CHILD(n, 1)) == async_funcdef ||
            TYPE(CHILD(n, 1)) == classdef);
 
     if (TYPE(CHILD(n, 1)) == funcdef) {
       thing = ast_for_funcdef(c, CHILD(n, 1), decorator_seq);
     } else if (TYPE(CHILD(n, 1)) == classdef) {
       thing = ast_for_classdef(c, CHILD(n, 1), decorator_seq);
+    } else if (TYPE(CHILD(n, 1)) == async_funcdef) {
+      thing = ast_for_async_funcdef(c, CHILD(n, 1), decorator_seq);
     }
     /* we count the decorators in when talking about the class' or
      * function's line number */
@@ -2339,6 +2371,8 @@ ast_for_expr(struct compiling *c, const node *n)
        term: factor (('*'|'@'|'/'|'%'|'//') factor)*
        factor: ('+'|'-'|'~') factor | power
        power: atom trailer* ('**' factor)*
+       yield_expr: 'yield' [yield_arg]
+       await_expr: AWAIT test
     */
 
     asdl_seq *seq;
@@ -2467,6 +2501,11 @@ ast_for_expr(struct compiling *c, const node *n)
             if (is_from)
                 return YieldFrom(exp, LINENO(n), n->n_col_offset, c->c_arena);
             return Yield(exp, LINENO(n), n->n_col_offset, c->c_arena);
+        }
+        case await_expr: {
+            expr_ty exp = NULL;
+            exp = ast_for_expr(c, CHILD(n, 1));
+            return Await(exp, LINENO(n), n->n_col_offset, c->c_arena);
         }
         case factor:
             if (NCH(n) == 1) {
@@ -2815,7 +2854,7 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
 {
     /*
       flow_stmt: break_stmt | continue_stmt | return_stmt | raise_stmt
-                 | yield_stmt
+                 | yield_stmt | await_stmt
       break_stmt: 'break'
       continue_stmt: 'continue'
       return_stmt: 'return' [testlist]
@@ -2832,6 +2871,7 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
             return Break(LINENO(n), n->n_col_offset, c->c_arena);
         case continue_stmt:
             return Continue(LINENO(n), n->n_col_offset, c->c_arena);
+        case await_stmt:   /* will reduce to await_expr */
         case yield_stmt: { /* will reduce to yield_expr */
             expr_ty exp = ast_for_expr(c, CHILD(ch, 0));
             if (!exp)
@@ -3714,7 +3754,7 @@ ast_for_stmt(struct compiling *c, const node *n)
     }
     else {
         /* compound_stmt: if_stmt | while_stmt | for_stmt | try_stmt
-                        | funcdef | classdef | decorated
+                        | funcdef | classdef | decorated | async_funcdef
         */
         node *ch = CHILD(n, 0);
         REQ(n, compound_stmt);
@@ -3735,6 +3775,8 @@ ast_for_stmt(struct compiling *c, const node *n)
                 return ast_for_classdef(c, ch, NULL);
             case decorated:
                 return ast_for_decorated(c, ch);
+            case async_funcdef:
+                return ast_for_async_funcdef(c, ch, NULL);
             default:
                 PyErr_Format(PyExc_SystemError,
                              "unhandled small_stmt: TYPE=%d NCH=%d\n",

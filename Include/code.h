@@ -51,6 +51,9 @@ typedef struct {
 */
 #define CO_NOFREE       0x0040
 
+/* The CO_ASYNC flag is set for 'async def' functions */
+#define CO_ASYNC        0x0080
+
 /* These are no longer used. */
 #if 0
 #define CO_GENERATOR_ALLOWED    0x1000

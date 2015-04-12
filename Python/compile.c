@@ -1711,6 +1711,10 @@ compiler_function(struct compiler *c, stmt_ty s)
     Py_DECREF(qualname);
     Py_DECREF(co);
 
+    if (s->v.FunctionDef.is_async) {
+        co->co_flags |= CO_ASYNC;
+    }
+
     /* decorators */
     for (i = 0; i < asdl_seq_LEN(decos); i++) {
         ADDOP_I(c, CALL_FUNCTION, 1);
@@ -3607,6 +3611,14 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
         if (c->u->u_ste->ste_type != FunctionBlock)
             return compiler_error(c, "'yield' outside function");
         VISIT(c, expr, e->v.YieldFrom.value);
+        ADDOP(c, GET_ITER);
+        ADDOP_O(c, LOAD_CONST, Py_None, consts);
+        ADDOP(c, YIELD_FROM);
+        break;
+    case Await_kind:
+        if (c->u->u_ste->ste_type != FunctionBlock)
+            return compiler_error(c, "'await' outside function");
+        VISIT(c, expr, e->v.Await.value);
         ADDOP(c, GET_ITER);
         ADDOP_O(c, LOAD_CONST, Py_None, consts);
         ADDOP(c, YIELD_FROM);

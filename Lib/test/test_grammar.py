@@ -1034,6 +1034,45 @@ class GrammarTests(unittest.TestCase):
         m @= 42
         self.assertEqual(m.other, 42)
 
+    def test_async_await(self):
+        async = 1
+        await = 2
+        self.assertEqual(async, 1)
+
+        def async():
+            nonlocal await
+            await = 10
+        async()
+        self.assertEqual(await, 10)
+
+        self.assertFalse(bool(async.__code__.co_flags & 0x80))
+
+        async def test():
+            def sum():
+                async = 1
+                await = 41
+                return async + await
+
+            if 1:
+                await [1,2,3, sum()] # XXX
+
+        self.assertEqual(test.__name__, 'test')
+        self.assertTrue(bool(test.__code__.co_flags & 0x80))
+
+        # XXX: this test will need to be rewritten
+        self.assertEqual(list(test()), [1, 2, 3, 42])
+
+        def decorator(func):
+            setattr(func, '_marked', True)
+            return func
+
+        @decorator
+        async def test2():
+            return 22
+        self.assertTrue(test2._marked)
+        self.assertEqual(test2.__name__, 'test2')
+        self.assertTrue(bool(test2.__code__.co_flags & 0x80))
+
 
 if __name__ == '__main__':
     unittest.main()

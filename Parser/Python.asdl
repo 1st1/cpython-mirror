@@ -10,7 +10,8 @@ module Python
         | Suite(stmt* body)
 
     stmt = FunctionDef(identifier name, arguments args,
-                           stmt* body, expr* decorator_list, expr? returns)
+                           stmt* body, expr* decorator_list, expr? returns,
+                           int? is_async)
           | ClassDef(identifier name,
              expr* bases,
              keyword* keywords,
@@ -57,6 +58,7 @@ module Python
          | DictComp(expr key, expr value, comprehension* generators)
          | GeneratorExp(expr elt, comprehension* generators)
          -- the grammar constrains where yield expressions can occur
+         | Await(expr value)
          | Yield(expr? value)
          | YieldFrom(expr value)
          -- need sequences for compare to distinguish between

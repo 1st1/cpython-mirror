@@ -1392,6 +1392,10 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
         VISIT(st, expr, e->v.YieldFrom.value);
         st->st_cur->ste_generator = 1;
         break;
+    case Await_kind:
+        VISIT(st, expr, e->v.Await.value);
+        st->st_cur->ste_generator = 1;
+        break;
     case Compare_kind:
         VISIT(st, expr, e->v.Compare.left);
         VISIT_SEQ(st, expr, e->v.Compare.comparators);

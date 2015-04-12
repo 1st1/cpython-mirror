@@ -38,12 +38,14 @@ _Py_IDENTIFIER(name);
 _Py_IDENTIFIER(args);
 _Py_IDENTIFIER(decorator_list);
 _Py_IDENTIFIER(returns);
+_Py_IDENTIFIER(is_async);
 static char *FunctionDef_fields[]={
     "name",
     "args",
     "body",
     "decorator_list",
     "returns",
+    "is_async",
 };
 static PyTypeObject *ClassDef_type;
 _Py_IDENTIFIER(bases);
@@ -227,6 +229,10 @@ static PyTypeObject *GeneratorExp_type;
 static char *GeneratorExp_fields[]={
     "elt",
     "generators",
+};
+static PyTypeObject *Await_type;
+static char *Await_fields[]={
+    "value",
 };
 static PyTypeObject *Yield_type;
 static char *Yield_fields[]={
@@ -804,7 +810,7 @@ static int init_types(void)
     if (!stmt_type) return 0;
     if (!add_attributes(stmt_type, stmt_attributes, 2)) return 0;
     FunctionDef_type = make_type("FunctionDef", stmt_type, FunctionDef_fields,
-                                 5);
+                                 6);
     if (!FunctionDef_type) return 0;
     ClassDef_type = make_type("ClassDef", stmt_type, ClassDef_fields, 5);
     if (!ClassDef_type) return 0;
@@ -872,6 +878,8 @@ static int init_types(void)
     GeneratorExp_type = make_type("GeneratorExp", expr_type,
                                   GeneratorExp_fields, 2);
     if (!GeneratorExp_type) return 0;
+    Await_type = make_type("Await", expr_type, Await_fields, 1);
+    if (!Await_type) return 0;
     Yield_type = make_type("Yield", expr_type, Yield_fields, 1);
     if (!Yield_type) return 0;
     YieldFrom_type = make_type("YieldFrom", expr_type, YieldFrom_fields, 1);
@@ -1172,8 +1180,8 @@ Suite(asdl_seq * body, PyArena *arena)
 
 stmt_ty
 FunctionDef(identifier name, arguments_ty args, asdl_seq * body, asdl_seq *
-            decorator_list, expr_ty returns, int lineno, int col_offset,
-            PyArena *arena)
+            decorator_list, expr_ty returns, int is_async, int lineno, int
+            col_offset, PyArena *arena)
 {
     stmt_ty p;
     if (!name) {
@@ -1195,6 +1203,7 @@ FunctionDef(identifier name, arguments_ty args, asdl_seq * body, asdl_seq *
     p->v.FunctionDef.body = body;
     p->v.FunctionDef.decorator_list = decorator_list;
     p->v.FunctionDef.returns = returns;
+    p->v.FunctionDef.is_async = is_async;
     p->lineno = lineno;
     p->col_offset = col_offset;
     return p;
@@ -1822,6 +1831,25 @@ GeneratorExp(expr_ty elt, asdl_seq * generators, int lineno, int col_offset,
 }
 
 expr_ty
+Await(expr_ty value, int lineno, int col_offset, PyArena *arena)
+{
+    expr_ty p;
+    if (!value) {
+        PyErr_SetString(PyExc_ValueError,
+                        "field value is required for Await");
+        return NULL;
+    }
+    p = (expr_ty)PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = Await_kind;
+    p->v.Await.value = value;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    return p;
+}
+
+expr_ty
 Yield(expr_ty value, int lineno, int col_offset, PyArena *arena)
 {
     expr_ty p;
@@ -2408,6 +2436,11 @@ ast2obj_stmt(void* _o)
         if (_PyObject_SetAttrId(result, &PyId_returns, value) == -1)
             goto failed;
         Py_DECREF(value);
+        value = ast2obj_int(o->v.FunctionDef.is_async);
+        if (!value) goto failed;
+        if (_PyObject_SetAttrId(result, &PyId_is_async, value) == -1)
+            goto failed;
+        Py_DECREF(value);
         break;
     case ClassDef_kind:
         result = PyType_GenericNew(ClassDef_type, NULL, NULL);
@@ -2875,6 +2908,15 @@ ast2obj_expr(void* _o)
                              ast2obj_comprehension);
         if (!value) goto failed;
         if (_PyObject_SetAttrId(result, &PyId_generators, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        break;
+    case Await_kind:
+        result = PyType_GenericNew(Await_type, NULL, NULL);
+        if (!result) goto failed;
+        value = ast2obj_expr(o->v.Await.value);
+        if (!value) goto failed;
+        if (_PyObject_SetAttrId(result, &PyId_value, value) == -1)
             goto failed;
         Py_DECREF(value);
         break;
@@ -3746,6 +3788,7 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
         asdl_seq* body;
         asdl_seq* decorator_list;
         expr_ty returns;
+        int is_async;
 
         if (_PyObject_HasAttrId(obj, &PyId_name)) {
             int res;
@@ -3827,8 +3870,18 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
         } else {
             returns = NULL;
         }
-        *out = FunctionDef(name, args, body, decorator_list, returns, lineno,
-                           col_offset, arena);
+        if (exists_not_none(obj, &PyId_is_async)) {
+            int res;
+            tmp = _PyObject_GetAttrId(obj, &PyId_is_async);
+            if (tmp == NULL) goto failed;
+            res = obj2ast_int(tmp, &is_async, arena);
+            if (res != 0) goto failed;
+            Py_CLEAR(tmp);
+        } else {
+            is_async = 0;
+        }
+        *out = FunctionDef(name, args, body, decorator_list, returns, is_async,
+                           lineno, col_offset, arena);
         if (*out == NULL) goto failed;
         return 0;
     }
@@ -5323,6 +5376,28 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
             return 1;
         }
         *out = GeneratorExp(elt, generators, lineno, col_offset, arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
+    isinstance = PyObject_IsInstance(obj, (PyObject*)Await_type);
+    if (isinstance == -1) {
+        return 1;
+    }
+    if (isinstance) {
+        expr_ty value;
+
+        if (_PyObject_HasAttrId(obj, &PyId_value)) {
+            int res;
+            tmp = _PyObject_GetAttrId(obj, &PyId_value);
+            if (tmp == NULL) goto failed;
+            res = obj2ast_expr(tmp, &value, arena);
+            if (res != 0) goto failed;
+            Py_CLEAR(tmp);
+        } else {
+            PyErr_SetString(PyExc_TypeError, "required field \"value\" missing from Await");
+            return 1;
+        }
+        *out = Await(value, lineno, col_offset, arena);
         if (*out == NULL) goto failed;
         return 0;
     }
@@ -6837,6 +6912,8 @@ PyInit__ast(void)
         return NULL;
     if (PyDict_SetItemString(d, "GeneratorExp", (PyObject*)GeneratorExp_type) <
         0) return NULL;
+    if (PyDict_SetItemString(d, "Await", (PyObject*)Await_type) < 0) return
+        NULL;
     if (PyDict_SetItemString(d, "Yield", (PyObject*)Yield_type) < 0) return
         NULL;
     if (PyDict_SetItemString(d, "YieldFrom", (PyObject*)YieldFrom_type) < 0)

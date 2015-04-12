@@ -78,6 +78,7 @@ struct _stmt {
             asdl_seq *body;
             asdl_seq *decorator_list;
             expr_ty returns;
+            int is_async;
         } FunctionDef;
         
         struct {
@@ -178,11 +179,11 @@ struct _stmt {
 enum _expr_kind {BoolOp_kind=1, BinOp_kind=2, UnaryOp_kind=3, Lambda_kind=4,
                   IfExp_kind=5, Dict_kind=6, Set_kind=7, ListComp_kind=8,
                   SetComp_kind=9, DictComp_kind=10, GeneratorExp_kind=11,
-                  Yield_kind=12, YieldFrom_kind=13, Compare_kind=14,
-                  Call_kind=15, Num_kind=16, Str_kind=17, Bytes_kind=18,
-                  NameConstant_kind=19, Ellipsis_kind=20, Attribute_kind=21,
-                  Subscript_kind=22, Starred_kind=23, Name_kind=24,
-                  List_kind=25, Tuple_kind=26};
+                  Await_kind=12, Yield_kind=13, YieldFrom_kind=14,
+                  Compare_kind=15, Call_kind=16, Num_kind=17, Str_kind=18,
+                  Bytes_kind=19, NameConstant_kind=20, Ellipsis_kind=21,
+                  Attribute_kind=22, Subscript_kind=23, Starred_kind=24,
+                  Name_kind=25, List_kind=26, Tuple_kind=27};
 struct _expr {
     enum _expr_kind kind;
     union {
@@ -242,6 +243,10 @@ struct _expr {
             expr_ty elt;
             asdl_seq *generators;
         } GeneratorExp;
+        
+        struct {
+            expr_ty value;
+        } Await;
         
         struct {
             expr_ty value;
@@ -398,10 +403,10 @@ mod_ty _Py_Interactive(asdl_seq * body, PyArena *arena);
 mod_ty _Py_Expression(expr_ty body, PyArena *arena);
 #define Suite(a0, a1) _Py_Suite(a0, a1)
 mod_ty _Py_Suite(asdl_seq * body, PyArena *arena);
-#define FunctionDef(a0, a1, a2, a3, a4, a5, a6, a7) _Py_FunctionDef(a0, a1, a2, a3, a4, a5, a6, a7)
+#define FunctionDef(a0, a1, a2, a3, a4, a5, a6, a7, a8) _Py_FunctionDef(a0, a1, a2, a3, a4, a5, a6, a7, a8)
 stmt_ty _Py_FunctionDef(identifier name, arguments_ty args, asdl_seq * body,
-                        asdl_seq * decorator_list, expr_ty returns, int lineno,
-                        int col_offset, PyArena *arena);
+                        asdl_seq * decorator_list, expr_ty returns, int
+                        is_async, int lineno, int col_offset, PyArena *arena);
 #define ClassDef(a0, a1, a2, a3, a4, a5, a6, a7) _Py_ClassDef(a0, a1, a2, a3, a4, a5, a6, a7)
 stmt_ty _Py_ClassDef(identifier name, asdl_seq * bases, asdl_seq * keywords,
                      asdl_seq * body, asdl_seq * decorator_list, int lineno,
@@ -491,6 +496,8 @@ expr_ty _Py_DictComp(expr_ty key, expr_ty value, asdl_seq * generators, int
 #define GeneratorExp(a0, a1, a2, a3, a4) _Py_GeneratorExp(a0, a1, a2, a3, a4)
 expr_ty _Py_GeneratorExp(expr_ty elt, asdl_seq * generators, int lineno, int
                          col_offset, PyArena *arena);
+#define Await(a0, a1, a2, a3) _Py_Await(a0, a1, a2, a3)
+expr_ty _Py_Await(expr_ty value, int lineno, int col_offset, PyArena *arena);
 #define Yield(a0, a1, a2, a3) _Py_Yield(a0, a1, a2, a3)
 expr_ty _Py_Yield(expr_ty value, int lineno, int col_offset, PyArena *arena);
 #define YieldFrom(a0, a1, a2, a3) _Py_YieldFrom(a0, a1, a2, a3)
