@@ -195,6 +195,7 @@ frame_setlineno(PyFrameObject *f, PyObject* p_new_lineno)
         case SETUP_LOOP:
         case SETUP_EXCEPT:
         case SETUP_FINALLY:
+        case SETUP_ASYNC_WITH:
         case SETUP_WITH:
             blockstack[blockstack_top++] = addr;
             in_finally[blockstack_top-1] = 0;
@@ -280,6 +281,7 @@ frame_setlineno(PyFrameObject *f, PyObject* p_new_lineno)
         case SETUP_LOOP:
         case SETUP_EXCEPT:
         case SETUP_FINALLY:
+        case SETUP_ASYNC_WITH:
         case SETUP_WITH:
             delta_iblock++;
             break;

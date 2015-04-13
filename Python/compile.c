@@ -193,6 +193,7 @@ static int inplace_binop(struct compiler *, operator_ty);
 static int expr_constant(struct compiler *, expr_ty);
 
 static int compiler_with(struct compiler *, stmt_ty, int);
+static int compiler_async_with(struct compiler *, stmt_ty, int);
 static int compiler_call_helper(struct compiler *c, Py_ssize_t n,
                                 asdl_seq *args,
                                 asdl_seq *keywords,
@@ -927,9 +928,12 @@ PyCompile_OpcodeStackEffect(int opcode, int oparg)
             return -1;
         case BREAK_LOOP:
             return 0;
+        case SETUP_ASYNC_WITH:
         case SETUP_WITH:
             return 7;
-        case WITH_CLEANUP:
+        case WITH_CLEANUP_EXIT:
+            return 1;
+        case WITH_CLEANUP_FINAL:
             return -1; /* XXX Sometimes more */
         case RETURN_VALUE:
             return -1;
@@ -2595,7 +2599,10 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         return compiler_continue(c);
     case With_kind:
         return compiler_with(c, s, 0);
+    case AsyncWith_kind:
+        return compiler_async_with(c, s, 0);
     }
+
     return 1;
 }
 
@@ -3320,6 +3327,100 @@ expr_constant(struct compiler *c, expr_ty e)
     }
 }
 
+
+/*
+   Implements the async with statement.
+
+   The semantics outlined in that PEP are as follows:
+
+   async with EXPR as VAR:
+       BLOCK
+
+   It is implemented roughly as:
+
+   context = EXPR
+   exit = context.__aexit__  # not calling it
+   value = await context.__aenter__()
+   try:
+       VAR = value  # if VAR present in the syntax
+       BLOCK
+   finally:
+       if an exception was raised:
+       exc = copy of (exception, instance, traceback)
+       else:
+       exc = (None, None, None)
+       if not (await exit(*exc)):
+           raise
+ */
+static int
+compiler_async_with(struct compiler *c, stmt_ty s, int pos)
+{
+    basicblock *block, *finally;
+    withitem_ty item = asdl_seq_GET(s->v.AsyncWith.items, pos);
+
+    assert(s->kind == AsyncWith_kind);
+
+    block = compiler_new_block(c);
+    finally = compiler_new_block(c);
+    if (!block || !finally)
+        return 0;
+
+    /* Evaluate EXPR */
+    VISIT(c, expr, item->context_expr);
+    ADDOP_JREL(c, SETUP_ASYNC_WITH, finally);
+
+    /* SETUP_ASYNC_WITH pushes a finally block. */
+    compiler_use_next_block(c, block);
+    if (!compiler_push_fblock(c, FINALLY_TRY, block)) {
+        return 0;
+    }
+
+    ADDOP(c, GET_ITER);
+    ADDOP_O(c, LOAD_CONST, Py_None, consts);
+    ADDOP(c, YIELD_FROM);
+
+    if (item->optional_vars) {
+        VISIT(c, expr, item->optional_vars);
+    }
+    else {
+    /* Discard result from context.__aenter__() */
+        ADDOP(c, POP_TOP);
+    }
+
+    pos++;
+    if (pos == asdl_seq_LEN(s->v.AsyncWith.items))
+        /* BLOCK code */
+        VISIT_SEQ(c, stmt, s->v.AsyncWith.body)
+    else if (!compiler_async_with(c, s, pos))
+            return 0;
+
+    /* End of try block; start the finally block */
+    ADDOP(c, POP_BLOCK);
+    compiler_pop_fblock(c, FINALLY_TRY, block);
+
+    ADDOP_O(c, LOAD_CONST, Py_None, consts);
+    compiler_use_next_block(c, finally);
+    if (!compiler_push_fblock(c, FINALLY_END, finally))
+        return 0;
+
+    /* Finally block starts; context.__exit__ is on the stack under
+       the exception or return information. Just issue our magic
+       opcode. */
+    ADDOP(c, WITH_CLEANUP_EXIT);
+
+    ADDOP(c, GET_ITER);
+    ADDOP_O(c, LOAD_CONST, Py_None, consts);
+    ADDOP(c, YIELD_FROM);
+
+    ADDOP(c, WITH_CLEANUP_FINAL);
+
+    /* Finally block ends. */
+    ADDOP(c, END_FINALLY);
+    compiler_pop_fblock(c, FINALLY_END, finally);
+    return 1;
+}
+
+
 /*
    Implements the with statement from PEP 343.
 
@@ -3393,7 +3494,8 @@ compiler_with(struct compiler *c, stmt_ty s, int pos)
     /* Finally block starts; context.__exit__ is on the stack under
        the exception or return information. Just issue our magic
        opcode. */
-    ADDOP(c, WITH_CLEANUP);
+    ADDOP(c, WITH_CLEANUP_EXIT);
+    ADDOP(c, WITH_CLEANUP_FINAL);
 
     /* Finally block ends. */
     ADDOP(c, END_FINALLY);

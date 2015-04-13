@@ -2705,17 +2705,21 @@ static int
 validate_async_stmt(node *tree)
 {
     int nch = NCH(tree);
-    int res = validate_ntype(tree, async_stmt);
-    if (res) {
-        if (nch == 2) {
-            res = (validate_ntype(CHILD(tree, 0), ASYNC)
-                   && validate_funcdef(CHILD(tree, 1)));
+    int res = (validate_ntype(tree, async_stmt)
+                && validate_ntype(CHILD(tree, 0), ASYNC));
+
+    if (nch != 2) {
+        res = 0;
+        err_string("illegal number of children for async_stmt");
+    } else {
+        if (TYPE(CHILD(tree, 1)) == funcdef) {
+            res = validate_funcdef(CHILD(tree, 1));
         }
-        else {
-            res = 0;
-            err_string("illegal number of children for async_stmt");
+        else if (TYPE(CHILD(tree, 1)) == with_stmt) {
+            res = validate_with_stmt(CHILD(tree, 1));
         }
     }
+
     return res;
 }
 

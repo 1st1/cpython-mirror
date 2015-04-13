@@ -509,6 +509,8 @@ static asdl_seq *ast_for_exprlist(struct compiling *, const node *,
 static expr_ty ast_for_testlist(struct compiling *, const node *);
 static stmt_ty ast_for_classdef(struct compiling *, const node *, asdl_seq *);
 
+static stmt_ty ast_for_with_stmt(struct compiling *, const node *, int);
+
 /* Note different signature for ast_for_call */
 static expr_ty ast_for_call(struct compiling *, const node *, expr_ty);
 
@@ -1545,15 +1547,28 @@ ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
                             0 /* is_async */);
 }
 
+
 static stmt_ty
-ast_for_async_stmt(struct compiling *c, const node *n, asdl_seq *decorator_seq)
+ast_for_async_stmt(struct compiling *c, const node *n)
 {
+    /* async_stmt: ASYNC (funcdef | with_stmt) */
+
     REQ(n, async_stmt);
     REQ(CHILD(n, 0), ASYNC);
-    REQ(CHILD(n, 1), funcdef);
 
-    return _ast_for_funcdef(c, CHILD(n, 1), decorator_seq,
-                            1 /* is_async */);
+    switch (TYPE(CHILD(n, 1))) {
+        case funcdef:
+            return _ast_for_funcdef(c, CHILD(n, 1), NULL,
+                                    1 /* is_async */);
+        case with_stmt:
+            return ast_for_with_stmt(c, CHILD(n, 1), 1);
+
+        default:
+            PyErr_Format(PyExc_SystemError,
+                         "invalid async stament: %s",
+                         STR(CHILD(n, 1)));
+            return NULL;
+    }
 }
 
 static stmt_ty
@@ -3527,7 +3542,7 @@ ast_for_with_item(struct compiling *c, const node *n)
 
 /* with_stmt: 'with' with_item (',' with_item)* ':' suite */
 static stmt_ty
-ast_for_with_stmt(struct compiling *c, const node *n)
+ast_for_with_stmt(struct compiling *c, const node *n, int is_async)
 {
     int i, n_items;
     asdl_seq *items, *body;
@@ -3549,7 +3564,13 @@ ast_for_with_stmt(struct compiling *c, const node *n)
     if (!body)
         return NULL;
 
-    return With(items, body, LINENO(n), n->n_col_offset, c->c_arena);
+    if (is_async) {
+        return AsyncWith(items, body, LINENO(n), n->n_col_offset, c->c_arena);
+    }
+    else {
+        return With(items, body, LINENO(n), n->n_col_offset, c->c_arena);
+    }
+
 }
 
 static stmt_ty
@@ -3671,7 +3692,7 @@ ast_for_stmt(struct compiling *c, const node *n)
             case try_stmt:
                 return ast_for_try_stmt(c, ch);
             case with_stmt:
-                return ast_for_with_stmt(c, ch);
+                return ast_for_with_stmt(c, ch, 0);
             case funcdef:
                 return ast_for_funcdef(c, ch, NULL);
             case classdef:
@@ -3679,7 +3700,7 @@ ast_for_stmt(struct compiling *c, const node *n)
             case decorated:
                 return ast_for_decorated(c, ch);
             case async_stmt:
-                return ast_for_async_stmt(c, ch, NULL);
+                return ast_for_async_stmt(c, ch);
             default:
                 PyErr_Format(PyExc_SystemError,
                              "unhandled small_stmt: TYPE=%d NCH=%d\n",
