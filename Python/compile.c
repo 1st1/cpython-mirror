@@ -1712,6 +1712,7 @@ compiler_function(struct compiler *c, stmt_ty s)
 
     if (s->v.FunctionDef.is_async) {
         co->co_flags |= CO_ASYNC;
+        co->co_flags |= CO_GENERATOR;
     }
 
     /* decorators */
