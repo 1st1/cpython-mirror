@@ -1546,6 +1546,17 @@ ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
 }
 
 static stmt_ty
+ast_for_async_stmt(struct compiling *c, const node *n, asdl_seq *decorator_seq)
+{
+    REQ(n, async_stmt);
+    REQ(CHILD(n, 0), ASYNC);
+    REQ(CHILD(n, 1), funcdef);
+
+    return _ast_for_funcdef(c, CHILD(n, 1), decorator_seq,
+                            1 /* is_async */);
+}
+
+static stmt_ty
 ast_for_decorated(struct compiling *c, const node *n)
 {
     /* decorated: decorators (classdef | funcdef | async_funcdef) */
@@ -3646,7 +3657,7 @@ ast_for_stmt(struct compiling *c, const node *n)
     }
     else {
         /* compound_stmt: if_stmt | while_stmt | for_stmt | try_stmt
-                        | funcdef | classdef | decorated | async_funcdef
+                        | funcdef | classdef | decorated | async_stmt
         */
         node *ch = CHILD(n, 0);
         REQ(n, compound_stmt);
@@ -3667,8 +3678,8 @@ ast_for_stmt(struct compiling *c, const node *n)
                 return ast_for_classdef(c, ch, NULL);
             case decorated:
                 return ast_for_decorated(c, ch);
-            case async_funcdef:
-                return ast_for_async_funcdef(c, ch, NULL);
+            case async_stmt:
+                return ast_for_async_stmt(c, ch, NULL);
             default:
                 PyErr_Format(PyExc_SystemError,
                              "unhandled small_stmt: TYPE=%d NCH=%d\n",
