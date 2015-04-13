@@ -1924,6 +1924,25 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             goto fast_block_end;
         }
 
+        TARGET(VALIDATE_ASYNC) {
+            PyObject *async = TOP();
+
+            if (!PyGen_CheckExact(async) ||
+                    !(
+                        ((PyCodeObject*)
+                            ((PyGenObject*)async)->gi_code)
+                                           ->co_flags & CO_ASYNC))
+            {
+                PyErr_SetString(PyExc_SystemError,
+                                "not an async function");
+
+                // TODO: factor out this functionality
+                goto error;
+            }
+
+            DISPATCH();
+        }
+
         TARGET(YIELD_FROM) {
             PyObject *v = POP();
             PyObject *reciever = TOP();
