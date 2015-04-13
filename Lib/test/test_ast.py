@@ -28,6 +28,8 @@ exec_tests = [
     "None",
     # FunctionDef
     "def f(): pass",
+    # async FunctionDef
+    "async def f():\n await something()",
     # FunctionDef with arg
     "def f(a): pass",
     # FunctionDef with arg and default value
@@ -938,6 +940,7 @@ def main():
 exec_results = [
 ('Module', [('Expr', (1, 0), ('NameConstant', (1, 0), None))]),
 ('Module', [('FunctionDef', (1, 0), 'f', ('arguments', [], None, [], [], None, []), [('Pass', (1, 9))], [], None, False)]),
+('Module', [('FunctionDef', (1, 6), 'f', ('arguments', [], None, [], [], None, []), [('Expr', (2, 1), ('Await', (2, 1), ('Call', (2, 7), ('Name', (2, 7), 'something', ('Load',)), [], [], None, None)))], [], None, True)]),
 ('Module', [('FunctionDef', (1, 0), 'f', ('arguments', [('arg', (1, 6), 'a', None)], None, [], [], None, []), [('Pass', (1, 10))], [], None, False)]),
 ('Module', [('FunctionDef', (1, 0), 'f', ('arguments', [('arg', (1, 6), 'a', None)], None, [], [], None, [('Num', (1, 8), 0)]), [('Pass', (1, 12))], [], None, False)]),
 ('Module', [('FunctionDef', (1, 0), 'f', ('arguments', [], ('arg', (1, 7), 'args', None), [], [], None, []), [('Pass', (1, 14))], [], None, False)]),
