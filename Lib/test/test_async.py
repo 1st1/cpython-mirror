@@ -24,8 +24,24 @@ class AsyncBadSyntaxTest(unittest.TestCase):
             import test.badsyntax_async5
 
 
+class AsyncFunctionTest(unittest.TestCase):
+    def test_func_1(self):
+        async def foo():
+            return 10
+        self.assertTrue(bool(foo.__code__.co_flags & 0x80))
+        self.assertTrue(bool(foo.__code__.co_flags & 0x20))
+        self.assertTrue(bool(foo().gi_code.co_flags & 0x80))
+        self.assertTrue(bool(foo().gi_code.co_flags & 0x20))
+        try:
+            next(foo())
+        except StopIteration as ex:
+            self.assertEqual(ex.args[0], 10)
+        else:
+            self.assertTrue(False)
+
+
 def test_main():
-    support.run_unittest(AsyncBadSyntaxTest)
+    support.run_unittest(AsyncBadSyntaxTest, AsyncFunctionTest)
 
 
 if __name__=="__main__":
