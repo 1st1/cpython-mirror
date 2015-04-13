@@ -1041,6 +1041,8 @@ VALIDATER(testlist_comp);       VALIDATER(yield_expr);
 VALIDATER(or_test);
 VALIDATER(test_nocond);         VALIDATER(lambdef_nocond);
 VALIDATER(yield_arg);
+VALIDATER(await_stmt);          VALIDATER(await_expr);
+VALIDATER(async_funcdef);       VALIDATER(async_stmt);
 
 #undef VALIDATER
 

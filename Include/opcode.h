@@ -46,6 +46,7 @@ extern "C" {
 #define PRINT_EXPR          	70 
 #define LOAD_BUILD_CLASS    	71 
 #define YIELD_FROM          	72 
+#define VALIDATE_ASYNC      	73 
 #define INPLACE_LSHIFT      	75 
 #define INPLACE_RSHIFT      	76 
 #define INPLACE_AND         	77 
