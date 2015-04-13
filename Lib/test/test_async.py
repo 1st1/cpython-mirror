@@ -39,6 +39,39 @@ class AsyncFunctionTest(unittest.TestCase):
         else:
             self.assertTrue(False)
 
+    def test_with_1(self):
+        class Manager:
+            def __init__(self, name):
+                self.name = name
+
+            async def __aenter__(self):
+                yield 'enter-1-' + self.name # xxx
+                yield 'enter-2-' + self.name # xxx
+
+                return self
+
+            async def __aexit__(self, *args):
+                yield 'exit-1-' + self.name # xxx
+                yield 'exit-2-' + self.name # xxx
+
+                if self.name == 'B':
+                    return True
+
+
+        async def foo():
+            async with Manager("A") as a, Manager("B") as b:
+                yield ('managers', a.name, b.name)
+                1/0
+
+        f = foo()
+        result = list(f)
+
+        self.assertEqual(
+            result, ['enter-1-A', 'enter-2-A', 'enter-1-B', 'enter-2-B',
+                     ('managers', 'A', 'B'),
+                     'exit-1-B', 'exit-2-B', 'exit-1-A', 'exit-2-A']
+        )
+
 
 def test_main():
     support.run_unittest(AsyncBadSyntaxTest, AsyncFunctionTest)
