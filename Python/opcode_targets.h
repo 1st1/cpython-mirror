@@ -72,7 +72,7 @@ static void *opcode_targets[256] = {
     &&TARGET_PRINT_EXPR,
     &&TARGET_LOAD_BUILD_CLASS,
     &&TARGET_YIELD_FROM,
-    &&TARGET_VALIDATE_ASYNC,
+    &&TARGET_GET_ASYNC_ITER,
     &&_unknown_opcode,
     &&TARGET_INPLACE_LSHIFT,
     &&TARGET_INPLACE_RSHIFT,

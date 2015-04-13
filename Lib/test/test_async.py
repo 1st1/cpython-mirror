@@ -2,6 +2,16 @@ import unittest
 from test import support
 
 
+class AsyncIter:
+    def __init__(self, obj):
+        self.obj = obj
+
+    def __iter__(self):
+        yield from self.obj
+
+    __iter__.__async__ = True
+
+
 class AsyncBadSyntaxTest(unittest.TestCase):
     def test_badsyntax_1(self):
         with self.assertRaisesRegex(SyntaxError, 'invalid syntax'):
@@ -39,20 +49,40 @@ class AsyncFunctionTest(unittest.TestCase):
         else:
             self.assertTrue(False)
 
+        def bar(): pass
+        self.assertFalse(bool(bar.__code__.co_flags & 0x80))
+
+    def test_await_1(self):
+        async def foo():
+            await 1
+        with self.assertRaisesRegexp(TypeError, 'not iterable'):
+            list(foo())
+
+    def test_await_2(self):
+        async def foo():
+            await []
+        with self.assertRaisesRegexp(SystemError, 'not an async iterable'):
+            list(foo())
+
+    def test_await_3(self):
+        async def foo():
+            await AsyncIter([1, 2, 3])
+
+        self.assertEqual(list(foo()), [1, 2, 3])
+
     def test_with_1(self):
         class Manager:
             def __init__(self, name):
                 self.name = name
 
             async def __aenter__(self):
-                yield 'enter-1-' + self.name # xxx
-                yield 'enter-2-' + self.name # xxx
-
+                await AsyncIter(['enter-1-' + self.name,
+                                 'enter-2-' + self.name])
                 return self
 
             async def __aexit__(self, *args):
-                yield 'exit-1-' + self.name # xxx
-                yield 'exit-2-' + self.name # xxx
+                await AsyncIter(['exit-1-' + self.name,
+                                 'exit-2-' + self.name])
 
                 if self.name == 'B':
                     return True
@@ -60,7 +90,7 @@ class AsyncFunctionTest(unittest.TestCase):
 
         async def foo():
             async with Manager("A") as a, Manager("B") as b:
-                yield ('managers', a.name, b.name)
+                await AsyncIter([('managers', a.name, b.name)])
                 1/0
 
         f = foo()

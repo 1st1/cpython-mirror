@@ -1924,20 +1924,57 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             goto fast_block_end;
         }
 
-        TARGET(VALIDATE_ASYNC) {
-            PyObject *async = TOP();
+        TARGET(GET_ASYNC_ITER) {
+            PyObject *iterable = TOP();
+            PyObject *iter = PyObject_GetIter(iterable);
 
-            if (!PyGen_CheckExact(async) ||
-                    !(
-                        ((PyCodeObject*)
-                            ((PyGenObject*)async)->gi_code)
-                                           ->co_flags & CO_ASYNC))
-            {
-                PyErr_SetString(PyExc_SystemError,
-                                "not an async function");
-
-                // TODO: factor out this functionality
+            SET_TOP(iter);
+            if (iter == NULL) {
+                Py_DECREF(iterable);
                 goto error;
+            }
+
+
+            // TODO: factor out this functionality?
+            int valid = 1;
+            if (!PyGen_CheckExact(iter) ||
+                     !(((PyCodeObject*)
+                            ((PyGenObject*)iter)->gi_code)
+                                    ->co_flags & CO_ASYNC))
+            {
+                // 'iter' is not a generator from an 'async'
+                // function.
+
+                // Let's check if 'iterable.__iter__' has an
+                // __async__ flag.
+
+                PyObject *iter_attr = PyObject_GetAttrString(
+                    iterable, "__iter__");
+
+                assert(iter_attr);
+
+                PyObject *async_attr = PyObject_GetAttrString(
+                    iter_attr, "__async__");
+
+                if (async_attr) {
+                    if (!PyObject_IsTrue(async_attr)) {
+                        valid = 0;
+                    }
+                    Py_DECREF(async_attr);
+                } else {
+                    if (PyErr_ExceptionMatches(PyExc_AttributeError))
+                        PyErr_Clear();
+
+                    valid = 0;
+                }
+
+                Py_DECREF(iter_attr);
+
+                if (!valid) {
+                    PyErr_SetString(PyExc_SystemError,
+                                    "not an async iterable");
+                    goto error;
+                }
             }
 
             DISPATCH();

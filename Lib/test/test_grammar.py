@@ -1050,13 +1050,10 @@ class GrammarTests(unittest.TestCase):
                 return async + await
 
             if 1:
-                await [1,2,3, sum()] # XXX
+                await someobj()
 
         self.assertEqual(test.__name__, 'test')
         self.assertTrue(bool(test.__code__.co_flags & 0x80))
-
-        # XXX: this test will need to be rewritten
-        self.assertEqual(list(test()), [1, 2, 3, 42])
 
         def decorator(func):
             setattr(func, '_marked', True)
