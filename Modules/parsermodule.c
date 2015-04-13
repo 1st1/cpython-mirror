@@ -1608,7 +1608,7 @@ validate_compound_stmt(node *tree)
           || (ntype == try_stmt)
           || (ntype == with_stmt)
           || (ntype == funcdef)
-          || (ntype == async_funcdef)
+          || (ntype == async_stmt)
           || (ntype == classdef)
           || (ntype == decorated))
         res = validate_node(tree);
@@ -2719,6 +2719,28 @@ validate_async_funcdef(node *tree)
 }
 
 
+/* async_stmt: ASYNC (funcdef | with_stmt) */
+
+static int
+validate_async_stmt(node *tree)
+{
+    int nch = NCH(tree);
+    int res = validate_ntype(tree, async_stmt);
+    if (res) {
+        if (nch == 2) {
+            res = (validate_ntype(CHILD(tree, 0), ASYNC)
+                   && validate_funcdef(CHILD(tree, 1)));
+        }
+        else {
+            res = 0;
+            err_string("illegal number of children for async_stmt");
+        }
+    }
+    return res;
+}
+
+
+
 /* decorated
  *   decorators (classdef | funcdef)
  */
@@ -3147,6 +3169,9 @@ validate_node(node *tree)
              */
           case async_funcdef:
             res = validate_async_funcdef(tree);
+            break;
+          case async_stmt:
+            res = validate_async_stmt(tree);
             break;
           case funcdef:
             res = validate_funcdef(tree);
