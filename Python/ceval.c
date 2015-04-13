@@ -2883,6 +2883,34 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
+        TARGET(SETUP_ASYNC_WITH) {
+            _Py_IDENTIFIER(__aexit__);
+            _Py_IDENTIFIER(__aenter__);
+
+            PyObject *mgr = TOP();
+            PyObject *exit = special_lookup(mgr, &PyId___aexit__),
+                     *enter;
+            PyObject *res;
+            if (exit == NULL)
+                goto error;
+            SET_TOP(exit);
+            enter = special_lookup(mgr, &PyId___aenter__);
+            Py_DECREF(mgr);
+            if (enter == NULL)
+                goto error;
+            res = PyObject_CallFunctionObjArgs(enter, NULL);
+            Py_DECREF(enter);
+            if (res == NULL)
+                goto error;
+            /* Setup the finally block before pushing the result
+               of __aenter__ on the stack. */
+            PyFrame_BlockSetup(f, SETUP_FINALLY, INSTR_OFFSET() + oparg,
+                               STACK_LEVEL());
+
+            PUSH(res);
+            DISPATCH();
+        }
+
         TARGET(SETUP_WITH) {
             _Py_IDENTIFIER(__exit__);
             _Py_IDENTIFIER(__enter__);
@@ -2909,7 +2937,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
-        TARGET(WITH_CLEANUP) {
+        TARGET(WITH_CLEANUP_EXIT) {
             /* At the top of the stack are 1-6 values indicating
                how/why we entered the finally clause:
                - TOP = None
@@ -2937,7 +2965,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
             PyObject *exit_func;
             PyObject *exc = TOP(), *val = Py_None, *tb = Py_None, *res;
-            int err;
             if (exc == Py_None) {
                 (void)POP();
                 exit_func = TOP();
@@ -2987,10 +3014,21 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             if (res == NULL)
                 goto error;
 
+            PUSH(exc);
+            PUSH(res);
+            DISPATCH();
+        }
+
+        TARGET(WITH_CLEANUP_FINAL) {
+            PyObject *res = POP();
+            PyObject *exc = POP();
+            int err;
+
             if (exc != Py_None)
                 err = PyObject_IsTrue(res);
             else
                 err = 0;
+
             Py_DECREF(res);
 
             if (err < 0)

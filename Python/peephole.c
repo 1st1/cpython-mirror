@@ -318,6 +318,7 @@ markblocks(unsigned char *code, Py_ssize_t len)
             case SETUP_LOOP:
             case SETUP_EXCEPT:
             case SETUP_FINALLY:
+            case SETUP_ASYNC_WITH:
             case SETUP_WITH:
                 j = GETJUMPTGT(code, i);
                 blocks[j] = 1;

@@ -52,7 +52,8 @@ extern "C" {
 #define INPLACE_XOR         	78 
 #define INPLACE_OR          	79 
 #define BREAK_LOOP          	80 
-#define WITH_CLEANUP        	81 
+#define WITH_CLEANUP_EXIT   	81 
+#define WITH_CLEANUP_FINAL  	82 
 #define RETURN_VALUE        	83 
 #define IMPORT_STAR         	84 
 #define YIELD_VALUE         	86 
@@ -116,6 +117,7 @@ extern "C" {
 #define BUILD_MAP_UNPACK_WITH_CALL	151
 #define BUILD_TUPLE_UNPACK  	152
 #define BUILD_SET_UNPACK    	153
+#define SETUP_ASYNC_WITH    	154
 
 /* EXCEPT_HANDLER is a special, implicit block type which is created when
    entering an except handler. It is not an opcode but we define it here

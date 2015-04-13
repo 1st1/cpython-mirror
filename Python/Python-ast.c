@@ -108,6 +108,11 @@ static char *With_fields[]={
     "items",
     "body",
 };
+static PyTypeObject *AsyncWith_type;
+static char *AsyncWith_fields[]={
+    "items",
+    "body",
+};
 static PyTypeObject *Raise_type;
 _Py_IDENTIFIER(exc);
 _Py_IDENTIFIER(cause);
@@ -830,6 +835,8 @@ static int init_types(void)
     if (!If_type) return 0;
     With_type = make_type("With", stmt_type, With_fields, 2);
     if (!With_type) return 0;
+    AsyncWith_type = make_type("AsyncWith", stmt_type, AsyncWith_fields, 2);
+    if (!AsyncWith_type) return 0;
     Raise_type = make_type("Raise", stmt_type, Raise_fields, 2);
     if (!Raise_type) return 0;
     Try_type = make_type("Try", stmt_type, Try_fields, 4);
@@ -1398,6 +1405,22 @@ With(asdl_seq * items, asdl_seq * body, int lineno, int col_offset, PyArena
     p->kind = With_kind;
     p->v.With.items = items;
     p->v.With.body = body;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    return p;
+}
+
+stmt_ty
+AsyncWith(asdl_seq * items, asdl_seq * body, int lineno, int col_offset,
+          PyArena *arena)
+{
+    stmt_ty p;
+    p = (stmt_ty)PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = AsyncWith_kind;
+    p->v.AsyncWith.items = items;
+    p->v.AsyncWith.body = body;
     p->lineno = lineno;
     p->col_offset = col_offset;
     return p;
@@ -2593,6 +2616,20 @@ ast2obj_stmt(void* _o)
             goto failed;
         Py_DECREF(value);
         value = ast2obj_list(o->v.With.body, ast2obj_stmt);
+        if (!value) goto failed;
+        if (_PyObject_SetAttrId(result, &PyId_body, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        break;
+    case AsyncWith_kind:
+        result = PyType_GenericNew(AsyncWith_type, NULL, NULL);
+        if (!result) goto failed;
+        value = ast2obj_list(o->v.AsyncWith.items, ast2obj_withitem);
+        if (!value) goto failed;
+        if (_PyObject_SetAttrId(result, &PyId_items, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        value = ast2obj_list(o->v.AsyncWith.body, ast2obj_stmt);
         if (!value) goto failed;
         if (_PyObject_SetAttrId(result, &PyId_body, value) == -1)
             goto failed;
@@ -4442,6 +4479,66 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
             return 1;
         }
         *out = With(items, body, lineno, col_offset, arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
+    isinstance = PyObject_IsInstance(obj, (PyObject*)AsyncWith_type);
+    if (isinstance == -1) {
+        return 1;
+    }
+    if (isinstance) {
+        asdl_seq* items;
+        asdl_seq* body;
+
+        if (_PyObject_HasAttrId(obj, &PyId_items)) {
+            int res;
+            Py_ssize_t len;
+            Py_ssize_t i;
+            tmp = _PyObject_GetAttrId(obj, &PyId_items);
+            if (tmp == NULL) goto failed;
+            if (!PyList_Check(tmp)) {
+                PyErr_Format(PyExc_TypeError, "AsyncWith field \"items\" must be a list, not a %.200s", tmp->ob_type->tp_name);
+                goto failed;
+            }
+            len = PyList_GET_SIZE(tmp);
+            items = _Py_asdl_seq_new(len, arena);
+            if (items == NULL) goto failed;
+            for (i = 0; i < len; i++) {
+                withitem_ty value;
+                res = obj2ast_withitem(PyList_GET_ITEM(tmp, i), &value, arena);
+                if (res != 0) goto failed;
+                asdl_seq_SET(items, i, value);
+            }
+            Py_CLEAR(tmp);
+        } else {
+            PyErr_SetString(PyExc_TypeError, "required field \"items\" missing from AsyncWith");
+            return 1;
+        }
+        if (_PyObject_HasAttrId(obj, &PyId_body)) {
+            int res;
+            Py_ssize_t len;
+            Py_ssize_t i;
+            tmp = _PyObject_GetAttrId(obj, &PyId_body);
+            if (tmp == NULL) goto failed;
+            if (!PyList_Check(tmp)) {
+                PyErr_Format(PyExc_TypeError, "AsyncWith field \"body\" must be a list, not a %.200s", tmp->ob_type->tp_name);
+                goto failed;
+            }
+            len = PyList_GET_SIZE(tmp);
+            body = _Py_asdl_seq_new(len, arena);
+            if (body == NULL) goto failed;
+            for (i = 0; i < len; i++) {
+                stmt_ty value;
+                res = obj2ast_stmt(PyList_GET_ITEM(tmp, i), &value, arena);
+                if (res != 0) goto failed;
+                asdl_seq_SET(body, i, value);
+            }
+            Py_CLEAR(tmp);
+        } else {
+            PyErr_SetString(PyExc_TypeError, "required field \"body\" missing from AsyncWith");
+            return 1;
+        }
+        *out = AsyncWith(items, body, lineno, col_offset, arena);
         if (*out == NULL) goto failed;
         return 0;
     }
@@ -6872,6 +6969,8 @@ PyInit__ast(void)
         NULL;
     if (PyDict_SetItemString(d, "If", (PyObject*)If_type) < 0) return NULL;
     if (PyDict_SetItemString(d, "With", (PyObject*)With_type) < 0) return NULL;
+    if (PyDict_SetItemString(d, "AsyncWith", (PyObject*)AsyncWith_type) < 0)
+        return NULL;
     if (PyDict_SetItemString(d, "Raise", (PyObject*)Raise_type) < 0) return
         NULL;
     if (PyDict_SetItemString(d, "Try", (PyObject*)Try_type) < 0) return NULL;
