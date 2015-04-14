@@ -1971,11 +1971,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 Py_DECREF(iter_attr);
 
                 if (!valid) {
+                    Py_DECREF(iterable);
+
                     PyErr_SetString(PyExc_SystemError,
                                     "not an async iterable");
                     goto error;
                 }
             }
+
+            Py_DECREF(iterable);
 
             PREDICT(YIELD_FROM);
             DISPATCH();
