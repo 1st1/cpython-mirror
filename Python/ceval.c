@@ -1927,9 +1927,11 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         }
 
         TARGET(ASYNC_FOR_ITER) {
+            _Py_IDENTIFIER(__aiter__);
+            _Py_IDENTIFIER(__anext__);
+
             PyObject *iterable = TOP();
-            PyObject *iter_meth = PyObject_GetAttrString(iterable,
-                                                         "__aiter__");
+            PyObject *iter_meth = special_lookup(iterable, &PyId___aiter__);
             PyObject *iter = NULL;
             PyObject *next_meth = NULL;
 
@@ -1953,7 +1955,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 goto error;
             }
 
-            next_meth = PyObject_GetAttrString(iter, "__anext__");
+            next_meth = special_lookup(iter, &PyId___anext__);
             Py_DECREF(iter);
 
             if (next_meth == NULL) {
@@ -1993,6 +1995,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         }
 
         TARGET(GET_ASYNC) {
+            _Py_IDENTIFIER(__iter__);
+
             PyObject *iterable = TOP();
             PyObject *iter = PyObject_GetIter(iterable);
             PyObject *iter_attr = NULL;
@@ -2018,7 +2022,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 // Let's check if 'iterable.__iter__' has an
                 // __async__ flag.
 
-                iter_attr = PyObject_GetAttrString(iterable, "__iter__");
+                iter_attr = special_lookup(iterable, &PyId___iter__);
                 assert(iter_attr);
 
                 async_attr = PyObject_GetAttrString(iter_attr, "__async__");
