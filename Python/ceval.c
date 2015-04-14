@@ -1955,6 +1955,17 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 goto error;
             }
 
+            if (PyGen_CheckAsyncExact(iter)) {
+                SET_TOP(NULL);
+                Py_DECREF(iter);
+
+                PyErr_SetString(
+                    PyExc_SystemError,
+                    "__aiter__ should be a regular function (not async)");
+
+                goto error;
+            }
+
             next_meth = special_lookup(iter, &PyId___anext__);
             Py_DECREF(iter);
 
