@@ -124,6 +124,45 @@ class AsyncFunctionTest(unittest.TestCase):
                      'exit-1-B', 'exit-2-B', 'exit-1-A', 'exit-2-A']
         )
 
+    def test_with_2(self):
+        class CM:
+            def __aenter__(self):
+                pass
+
+        async def foo():
+            async with CM():
+                pass
+
+        with self.assertRaisesRegex(AttributeError, '__aexit__'):
+            list(foo())
+
+    def test_with_3(self):
+        class CM:
+            def __aexit__(self):
+                pass
+
+        async def foo():
+            async with CM():
+                pass
+
+        with self.assertRaisesRegex(AttributeError, '__aenter__'):
+            list(foo())
+
+    def test_with_4(self):
+        class CM:
+            def __enter__(self):
+                pass
+
+            def __exit__(self):
+                pass
+
+        async def foo():
+            async with CM():
+                pass
+
+        with self.assertRaisesRegex(AttributeError, '__aexit__'):
+            list(foo())
+
     def test_for_1(self):
         class AsyncIter:
             def __init__(self):
