@@ -46,6 +46,8 @@ del sys, _f, _g, _C,                              # Not for export
 def asyncdef(func):
     """Convert regular generator function to async function."""
 
+    # TODO: Implement this in C.
+
     if (not isinstance(func, (FunctionType, MethodType)) and
             not (object.__code__.co_flags & 0x20)):
         raise TypeError('coroutine() expects a generator function')
