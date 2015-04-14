@@ -265,6 +265,22 @@ class AsyncFunctionTest(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "is not iterable"):
             list(foo())
 
+    def test_for_6(self):
+        class I:
+            async def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                return 123
+
+        async def foo():
+            async for i in I():
+                pass
+
+        with self.assertRaisesRegex(SystemError,
+                                    "__aiter__ should be a regular"):
+            list(foo())
+
 
 class AsyncAsyncIOCompatTest(unittest.TestCase):
 
