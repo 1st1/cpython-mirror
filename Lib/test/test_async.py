@@ -92,6 +92,20 @@ class AsyncFunctionTest(unittest.TestCase):
 
         self.assertEqual(list(foo()), [1, 2, 3])
 
+    def test_await_4(self):
+        async def bar():
+            return 42
+
+        async def foo():
+            return (await bar())
+
+        try:
+            next(foo())
+        except StopIteration as ex:
+            self.assertEqual(ex.args[0], 42)
+        else:
+            self.assertFalse(True)
+
     def test_with_1(self):
         class Manager:
             def __init__(self, name):

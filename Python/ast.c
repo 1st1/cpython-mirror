@@ -2051,6 +2051,9 @@ ast_for_atom(struct compiling *c, const node *n)
         if (TYPE(ch) == yield_expr)
             return ast_for_expr(c, ch);
 
+        if (TYPE(ch) == await_expr)
+            return ast_for_expr(c, ch);
+
         /* testlist_comp: test ( comp_for | (',' test)* [','] ) */
         if ((NCH(ch) > 1) && (TYPE(CHILD(ch, 1)) == comp_for))
             return ast_for_genexp(c, ch);
@@ -2821,6 +2824,10 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
             node *ch = CHILD(n, i);
             if (TYPE(ch) == yield_expr) {
                 ast_error(c, ch, "assignment to yield expression not possible");
+                return NULL;
+            }
+            if (TYPE(ch) == await_expr) {
+                ast_error(c, ch, "assignment to await expression not possible");
                 return NULL;
             }
             e = ast_for_testlist(c, ch);
