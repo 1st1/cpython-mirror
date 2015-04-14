@@ -195,6 +195,7 @@ static int expr_constant(struct compiler *, expr_ty);
 
 static int compiler_with(struct compiler *, stmt_ty, int);
 static int compiler_async_with(struct compiler *, stmt_ty, int);
+static int compiler_async_for(struct compiler *, stmt_ty);
 static int compiler_call_helper(struct compiler *c, Py_ssize_t n,
                                 asdl_seq *args,
                                 asdl_seq *keywords,
@@ -2079,6 +2080,8 @@ compiler_async_for(struct compiler *c, stmt_ty s)
 
     compiler_pop_fblock(c, LOOP, try);
     compiler_use_next_block(c, end);
+
+    return 1;
 }
 
 static int
