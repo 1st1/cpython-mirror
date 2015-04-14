@@ -1370,6 +1370,13 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
         VISIT_SEQ(st, withitem, s->v.AsyncWith.items);
         VISIT_SEQ(st, stmt, s->v.AsyncWith.body);
         break;
+    case AsyncFor_kind:
+        VISIT(st, expr, s->v.AsyncFor.target);
+        VISIT(st, expr, s->v.AsyncFor.iter);
+        VISIT_SEQ(st, stmt, s->v.AsyncFor.body);
+        if (s->v.AsyncFor.orelse)
+            VISIT_SEQ(st, stmt, s->v.AsyncFor.orelse);
+        break;
     }
     VISIT_QUIT(st, 1);
 }

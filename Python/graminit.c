@@ -849,16 +849,17 @@ static state states_39[2] = {
 static arc arcs_40_0[1] = {
     {21, 1},
 };
-static arc arcs_40_1[2] = {
+static arc arcs_40_1[3] = {
     {19, 2},
     {96, 2},
+    {94, 2},
 };
 static arc arcs_40_2[1] = {
     {0, 2},
 };
 static state states_40[3] = {
     {1, arcs_40_0},
-    {2, arcs_40_1},
+    {3, arcs_40_1},
     {1, arcs_40_2},
 };
 static arc arcs_41_0[1] = {

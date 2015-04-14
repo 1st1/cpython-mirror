@@ -75,6 +75,10 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
         self.check_suite("async def f():\n async with 1: pass")
         self.check_suite("async def f():\n async with a as b, c as d: pass")
 
+    def test_async_for_statement(self):
+        self.check_suite("async def f():\n async for i in (): pass")
+        self.check_suite("async def f():\n async for i, b in (): pass")
+
     def test_nonlocal_statement(self):
         self.check_suite("def f():\n"
                          "    x = 0\n"

@@ -510,6 +510,7 @@ static expr_ty ast_for_testlist(struct compiling *, const node *);
 static stmt_ty ast_for_classdef(struct compiling *, const node *, asdl_seq *);
 
 static stmt_ty ast_for_with_stmt(struct compiling *, const node *, int);
+static stmt_ty ast_for_for_stmt(struct compiling *, const node *, int);
 
 /* Note different signature for ast_for_call */
 static expr_ty ast_for_call(struct compiling *, const node *, expr_ty);
@@ -1552,7 +1553,7 @@ ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
 static stmt_ty
 ast_for_async_stmt(struct compiling *c, const node *n)
 {
-    /* async_stmt: ASYNC (funcdef | with_stmt) */
+    /* async_stmt: ASYNC (funcdef | with_stmt | for_stmt) */
 
     REQ(n, async_stmt);
     REQ(CHILD(n, 0), ASYNC);
@@ -1562,7 +1563,12 @@ ast_for_async_stmt(struct compiling *c, const node *n)
             return _ast_for_funcdef(c, CHILD(n, 1), NULL,
                                     1 /* is_async */);
         case with_stmt:
-            return ast_for_with_stmt(c, CHILD(n, 1), 1);
+            return ast_for_with_stmt(c, CHILD(n, 1),
+                                     1 /* is_async */);
+
+        case for_stmt:
+            return ast_for_for_stmt(c, CHILD(n, 1),
+                                    1 /* is_async */);
 
         default:
             PyErr_Format(PyExc_SystemError,
@@ -3361,7 +3367,7 @@ ast_for_while_stmt(struct compiling *c, const node *n)
 }
 
 static stmt_ty
-ast_for_for_stmt(struct compiling *c, const node *n)
+ast_for_for_stmt(struct compiling *c, const node *n, int is_async)
 {
     asdl_seq *_target, *seq = NULL, *suite_seq;
     expr_ty expression;
@@ -3395,8 +3401,16 @@ ast_for_for_stmt(struct compiling *c, const node *n)
     if (!suite_seq)
         return NULL;
 
-    return For(target, expression, suite_seq, seq, LINENO(n), n->n_col_offset,
-               c->c_arena);
+    if (is_async) {
+        return AsyncFor(target, expression, suite_seq, seq,
+                        LINENO(n), n->n_col_offset,
+                        c->c_arena);
+    }
+    else {
+        return For(target, expression, suite_seq, seq,
+                   LINENO(n), n->n_col_offset,
+                   c->c_arena);
+    }
 }
 
 static excepthandler_ty
@@ -3689,7 +3703,7 @@ ast_for_stmt(struct compiling *c, const node *n)
             case while_stmt:
                 return ast_for_while_stmt(c, ch);
             case for_stmt:
-                return ast_for_for_stmt(c, ch);
+                return ast_for_for_stmt(c, ch, 0);
             case try_stmt:
                 return ast_for_try_stmt(c, ch);
             case with_stmt:

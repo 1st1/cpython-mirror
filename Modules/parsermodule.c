@@ -2701,7 +2701,7 @@ validate_async_funcdef(node *tree)
 }
 
 
-/* async_stmt: ASYNC (funcdef | with_stmt) */
+/* async_stmt: ASYNC (funcdef | with_stmt | for_stmt) */
 
 static int
 validate_async_stmt(node *tree)
@@ -2719,6 +2719,9 @@ validate_async_stmt(node *tree)
         }
         else if (TYPE(CHILD(tree, 1)) == with_stmt) {
             res = validate_with_stmt(CHILD(tree, 1));
+        }
+        else if (TYPE(CHILD(tree, 1)) == for_stmt) {
+            res = validate_for(CHILD(tree, 1));
         }
     }
 

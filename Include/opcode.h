@@ -29,6 +29,8 @@ extern "C" {
 #define BINARY_TRUE_DIVIDE  	27 
 #define INPLACE_FLOOR_DIVIDE	28 
 #define INPLACE_TRUE_DIVIDE 	29 
+#define ASYNC_FOR_ITER      	50 
+#define ASYNC_FOR_NEXT      	51 
 #define STORE_MAP           	54 
 #define INPLACE_ADD         	55 
 #define INPLACE_SUBTRACT    	56 
