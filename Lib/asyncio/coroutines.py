@@ -30,6 +30,12 @@ _DEBUG = (not sys.flags.ignore_environment
           and bool(os.environ.get('PYTHONASYNCIODEBUG')))
 
 
+try:
+    asyncdef = types.asyncdef
+except AttributeError:
+    asyncdef = lambda func: func
+
+
 # Check for CPython issue #21209
 def has_yield_from_bug():
     class MyGen:
@@ -142,6 +148,8 @@ def coroutine(func):
             if isinstance(res, futures.Future) or inspect.isgenerator(res):
                 res = yield from res
             return res
+
+    coro = asyncdef(coro)
 
     if not _DEBUG:
         wrapper = coro
