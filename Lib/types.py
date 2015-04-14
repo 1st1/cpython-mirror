@@ -43,6 +43,24 @@ MemberDescriptorType = type(FunctionType.__globals__)
 del sys, _f, _g, _C,                              # Not for export
 
 
+def asyncdef(func):
+    """Convert regular generator function to async function."""
+
+    if (not isinstance(func, (FunctionType, MethodType)) and
+            not (object.__code__.co_flags & 0x20)):
+        raise TypeError('coroutine() expects a generator function')
+
+    co = func.__code__
+    func.__code__ = CodeType(
+        co.co_argcount, co.co_kwonlyargcount, co.co_nlocals,
+        co.co_stacksize, co.co_flags | 0x80, co.co_code,
+        co.co_consts, co.co_names, co.co_varnames, co.co_filename,
+        co.co_name, co.co_firstlineno, co.co_lnotab,
+        co.co_freevars, co.co_cellvars)
+
+    return func
+
+
 # Provide a PEP 3115 compliant mechanism for class creation
 def new_class(name, bases=(), kwds=None, exec_body=None):
     """Create a class object dynamically using the appropriate metaclass."""
