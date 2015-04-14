@@ -33,6 +33,18 @@ class AsyncBadSyntaxTest(unittest.TestCase):
         with self.assertRaisesRegex(SyntaxError, 'invalid syntax'):
             import test.badsyntax_async5
 
+    def test_badsyntax_6(self):
+        with self.assertRaisesRegex(
+            SyntaxError, "'yield' inside async function"):
+
+            import test.badsyntax_async6
+
+    def test_badsyntax_7(self):
+        with self.assertRaisesRegex(
+            SyntaxError, "'yield from' inside async function"):
+
+            import test.badsyntax_async7
+
 
 class AsyncFunctionTest(unittest.TestCase):
     def test_func_1(self):

@@ -92,6 +92,7 @@ enum {
     COMPILER_SCOPE_MODULE,
     COMPILER_SCOPE_CLASS,
     COMPILER_SCOPE_FUNCTION,
+    COMPILER_SCOPE_ASYNC_FUNCTION,
     COMPILER_SCOPE_LAMBDA,
     COMPILER_SCOPE_COMPREHENSION,
 };
@@ -676,7 +677,9 @@ compiler_set_qualname(struct compiler *c)
         parent = (struct compiler_unit *)PyCapsule_GetPointer(capsule, COMPILER_CAPSULE_NAME_COMPILER_UNIT);
         assert(parent);
 
-        if (u->u_scope_type == COMPILER_SCOPE_FUNCTION || u->u_scope_type == COMPILER_SCOPE_CLASS) {
+        if (u->u_scope_type == COMPILER_SCOPE_FUNCTION
+            || u->u_scope_type == COMPILER_SCOPE_ASYNC_FUNCTION
+            || u->u_scope_type == COMPILER_SCOPE_CLASS) {
             assert(u->u_name);
             mangled = _Py_Mangle(parent->u_private, u->u_name);
             if (!mangled)
@@ -690,6 +693,7 @@ compiler_set_qualname(struct compiler *c)
 
         if (!force_global) {
             if (parent->u_scope_type == COMPILER_SCOPE_FUNCTION
+                || parent->u_scope_type == COMPILER_SCOPE_ASYNC_FUNCTION
                 || parent->u_scope_type == COMPILER_SCOPE_LAMBDA) {
                 dot_locals_str = _PyUnicode_FromId(&dot_locals);
                 if (dot_locals_str == NULL)
@@ -1654,8 +1658,12 @@ compiler_function(struct compiler *c, stmt_ty s)
     Py_ssize_t i, n, arglength;
     int docstring, kw_default_count = 0;
     int num_annotations;
+    int scope_type = COMPILER_SCOPE_FUNCTION;
 
     assert(s->kind == FunctionDef_kind);
+
+    if (s->v.FunctionDef.is_async)
+        scope_type = COMPILER_SCOPE_ASYNC_FUNCTION;
 
     if (!compiler_decorators(c, decos))
         return 0;
@@ -1674,7 +1682,7 @@ compiler_function(struct compiler *c, stmt_ty s)
     assert((num_annotations & 0xFFFF) == num_annotations);
 
     if (!compiler_enter_scope(c, s->v.FunctionDef.name,
-                              COMPILER_SCOPE_FUNCTION, (void *)s,
+                              scope_type, (void *)s,
                               s->lineno))
         return 0;
 
@@ -3565,6 +3573,8 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
     case Yield_kind:
         if (c->u->u_ste->ste_type != FunctionBlock)
             return compiler_error(c, "'yield' outside function");
+        if (c->u->u_scope_type == COMPILER_SCOPE_ASYNC_FUNCTION)
+            return compiler_error(c, "'yield' inside async function");
         if (e->v.Yield.value) {
             VISIT(c, expr, e->v.Yield.value);
         }
@@ -3576,6 +3586,10 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
     case YieldFrom_kind:
         if (c->u->u_ste->ste_type != FunctionBlock)
             return compiler_error(c, "'yield' outside function");
+
+        if (c->u->u_scope_type == COMPILER_SCOPE_ASYNC_FUNCTION)
+            return compiler_error(c, "'yield from' inside async function");
+
         VISIT(c, expr, e->v.YieldFrom.value);
         ADDOP(c, GET_ITER);
         ADDOP_O(c, LOAD_CONST, Py_None, consts);
@@ -3584,6 +3598,11 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
     case Await_kind:
         if (c->u->u_ste->ste_type != FunctionBlock)
             return compiler_error(c, "'await' outside function");
+
+        // this check won't be triggered while we have AWAIT token
+        if (c->u->u_scope_type != COMPILER_SCOPE_ASYNC_FUNCTION)
+            return compiler_error(c, "'await' outside async function");
+
         VISIT(c, expr, e->v.Await.value);
         ADDOP(c, GET_ASYNC_ITER);
         ADDOP_O(c, LOAD_CONST, Py_None, consts);
