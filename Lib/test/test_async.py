@@ -23,6 +23,7 @@ class FutureLike:
 
 
 class AsyncBadSyntaxTest(unittest.TestCase):
+
     def test_badsyntax_1(self):
         with self.assertRaisesRegex(SyntaxError, 'invalid syntax'):
             import test.badsyntax_async1
@@ -57,6 +58,7 @@ class AsyncBadSyntaxTest(unittest.TestCase):
 
 
 class AsyncFunctionTest(unittest.TestCase):
+
     def test_func_1(self):
         async def foo():
             return 10
@@ -264,8 +266,46 @@ class AsyncFunctionTest(unittest.TestCase):
             list(foo())
 
 
+class AsyncAsyncIOCompatTest(unittest.TestCase):
+
+    def test_asyncio_1(self):
+        import asyncio
+
+        class MyException(Exception):
+            pass
+
+        buffer = []
+
+        class CM:
+            async def __aenter__(self):
+                buffer.append(1)
+                await asyncio.sleep(0.01)
+                buffer.append(2)
+                return self
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                await asyncio.sleep(0.01)
+                buffer.append(exc_type.__name__)
+
+        async def f():
+            async with CM() as c:
+                await asyncio.sleep(0.01)
+                raise MyException
+            buffer.append('unreachable')
+
+        loop = asyncio.get_event_loop()
+        try:
+            loop.run_until_complete(f())
+        except MyException:
+            pass
+
+        self.assertEqual(buffer, [1, 2, 'MyException'])
+
+
 def test_main():
-    support.run_unittest(AsyncBadSyntaxTest, AsyncFunctionTest)
+    support.run_unittest(AsyncBadSyntaxTest,
+                         AsyncFunctionTest,
+                         AsyncAsyncIOCompatTest)
 
 
 if __name__=="__main__":
