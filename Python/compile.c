@@ -1732,6 +1732,9 @@ compiler_function(struct compiler *c, stmt_ty s)
 
     if (s->v.FunctionDef.is_async) {
         co->co_flags |= CO_ASYNC;
+
+        // An async function is always a generator, even
+        // if there is no 'yield' expressions in it.
         co->co_flags |= CO_GENERATOR;
     }
 
