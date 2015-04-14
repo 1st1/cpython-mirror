@@ -1924,7 +1924,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             goto fast_block_end;
         }
 
-        TARGET(GET_ASYNC_ITER) {
+        TARGET(GET_ASYNC) {
             PyObject *iterable = TOP();
             PyObject *iter = PyObject_GetIter(iterable);
 
