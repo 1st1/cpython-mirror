@@ -2011,11 +2011,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 
             // TODO: factor out this functionality?
-            if (!PyGen_CheckExact(iter) ||
-                     !(((PyCodeObject*)
-                            ((PyGenObject*)iter)->gi_code)
-                                    ->co_flags & CO_ASYNC))
-            {
+            if (!PyGen_CheckAsyncExact(iter)) {
                 // 'iter' is not a generator from an 'async'
                 // function.
 
