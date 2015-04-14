@@ -473,7 +473,7 @@ SimpleExtendsException(PyExc_Exception, TypeError,
 
 
 /*
- *    TypeError extends Exception
+ *    StopAsyncIteration extends Exception
  */
 SimpleExtendsException(PyExc_Exception, StopAsyncIteration,
                        "Signal the end from iterator.__anext__().");
