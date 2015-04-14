@@ -50,7 +50,7 @@ def asyncdef(func):
 
     if (not isinstance(func, (FunctionType, MethodType)) and
             not (object.__code__.co_flags & 0x20)):
-        raise TypeError('coroutine() expects a generator function')
+        raise TypeError('asyncdef() expects a generator function')
 
     co = func.__code__
     func.__code__ = CodeType(
