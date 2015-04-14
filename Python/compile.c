@@ -1058,6 +1058,10 @@ PyCompile_OpcodeStackEffect(int opcode, int oparg)
             return 0;
         case GET_ASYNC:
             return 0;
+        case ASYNC_FOR_ITER:
+            return 0;
+        case ASYNC_FOR_NEXT:
+            return 1;
         default:
             return PY_INVALID_STACK_EFFECT;
     }
@@ -2008,6 +2012,78 @@ compiler_for(struct compiler *c, stmt_ty s)
     return 1;
 }
 
+
+static int
+compiler_async_for(struct compiler *c, stmt_ty s)
+{
+    static PyObject *stopiter_error = NULL;
+    basicblock *try, *except, *end, *after_try, *try_cleanup;
+
+    if (stopiter_error == NULL) {
+        stopiter_error = PyUnicode_InternFromString("StopAsyncIteration");
+        if (stopiter_error == NULL)
+            return 0;
+    }
+
+    try = compiler_new_block(c);
+    except = compiler_new_block(c);
+    end = compiler_new_block(c);
+    after_try = compiler_new_block(c);
+    try_cleanup = compiler_new_block(c);
+
+    if (try == NULL || except == NULL || end == NULL
+            || after_try == NULL || try_cleanup == NULL)
+        return 0;
+
+    ADDOP_JREL(c, SETUP_LOOP, end);
+    if (!compiler_push_fblock(c, LOOP, try))
+        return 0;
+
+    VISIT(c, expr, s->v.AsyncFor.iter);
+    ADDOP(c, ASYNC_FOR_ITER);
+
+    compiler_use_next_block(c, try);
+
+
+    ADDOP_JREL(c, SETUP_EXCEPT, except);
+    if (!compiler_push_fblock(c, EXCEPT, try))
+        return 0;
+    ADDOP(c, ASYNC_FOR_NEXT);
+    ADDOP(c, GET_ASYNC);
+    ADDOP_O(c, LOAD_CONST, Py_None, consts);
+    ADDOP(c, YIELD_FROM);
+    VISIT(c, expr, s->v.AsyncFor.target);
+    ADDOP(c, POP_BLOCK);
+    compiler_pop_fblock(c, EXCEPT, try);
+    ADDOP_JREL(c, JUMP_FORWARD, after_try);
+
+
+    compiler_use_next_block(c, except);
+    ADDOP(c, DUP_TOP);
+    ADDOP_O(c, LOAD_GLOBAL, stopiter_error, names);
+    ADDOP_I(c, COMPARE_OP, PyCmp_EXC_MATCH);
+    ADDOP_JABS(c, POP_JUMP_IF_FALSE, try_cleanup);
+
+    ADDOP(c, POP_TOP);
+    ADDOP(c, POP_TOP);
+    ADDOP(c, POP_TOP);
+    ADDOP(c, BREAK_LOOP);
+    ADDOP(c, POP_EXCEPT);
+    ADDOP_JREL(c, JUMP_FORWARD, after_try);
+
+
+    compiler_use_next_block(c, try_cleanup);
+    ADDOP(c, END_FINALLY);
+
+    compiler_use_next_block(c, after_try);
+    VISIT_SEQ(c, stmt, s->v.AsyncFor.body);
+    ADDOP_JABS(c, JUMP_ABSOLUTE, try);
+
+
+    compiler_pop_fblock(c, LOOP, try);
+    compiler_use_next_block(c, end);
+}
+
 static int
 compiler_while(struct compiler *c, stmt_ty s)
 {
@@ -2615,6 +2691,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         return compiler_with(c, s, 0);
     case AsyncWith_kind:
         return compiler_async_with(c, s, 0);
+    case AsyncFor_kind:
+        return compiler_async_for(c, s);
     }
 
     return 1;

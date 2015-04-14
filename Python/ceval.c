@@ -1926,6 +1926,72 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             goto fast_block_end;
         }
 
+        TARGET(ASYNC_FOR_ITER) {
+            PyObject *iterable = TOP();
+            PyObject *iter_meth = PyObject_GetAttrString(iterable,
+                                                         "__aiter__");
+            PyObject *iter = NULL;
+            PyObject *next_meth = NULL;
+
+            Py_DECREF(iterable);
+
+            if (!iter_meth) {
+                SET_TOP(NULL);
+
+                PyErr_SetString(
+                    PyExc_SystemError,
+                    "'async for' requires an object with __aiter__");
+
+                goto error;
+            }
+
+            iter = PyObject_CallFunctionObjArgs(iter_meth, NULL);
+            Py_DECREF(iter_meth);
+
+            if (iter == NULL) {
+                SET_TOP(NULL);
+                goto error;
+            }
+
+            next_meth = PyObject_GetAttrString(iter, "__anext__");
+            Py_DECREF(iter);
+
+            if (next_meth == NULL) {
+                PyErr_SetString(
+                    PyExc_SystemError,
+                    "iterators returned from __aiter__ must have __anext__ defined");
+
+                SET_TOP(NULL);
+                goto error;
+            }
+
+            SET_TOP(next_meth);
+
+            DISPATCH();
+        }
+
+        TARGET(ASYNC_FOR_NEXT) {
+            PyObject *next = TOP();
+            PyObject *gen = PyObject_CallFunctionObjArgs(next, NULL);
+
+            if (PyErr_Occurred()) {
+                Py_DECREF(next);
+                goto error;
+            }
+
+            if (!gen) {
+                Py_DECREF(next);
+
+                PyErr_SetString(PyExc_SystemError,
+                                "unhandled exception");
+
+                goto error;
+            }
+
+            PUSH(gen);
+            DISPATCH();
+        }
+
         TARGET(GET_ASYNC) {
             PyObject *iterable = TOP();
             PyObject *iter = PyObject_GetIter(iterable);
