@@ -79,13 +79,13 @@ class AsyncFunctionTest(unittest.TestCase):
     def test_await_1(self):
         async def foo():
             await 1
-        with self.assertRaisesRegex(TypeError, 'not iterable'):
+        with self.assertRaisesRegex(RuntimeError, 'object can.t.*await'):
             list(foo())
 
     def test_await_2(self):
         async def foo():
             await []
-        with self.assertRaisesRegex(SystemError, 'not an async iterable'):
+        with self.assertRaisesRegex(RuntimeError, 'object can.t.*await'):
             list(foo())
 
     def test_await_3(self):
@@ -247,7 +247,7 @@ class AsyncFunctionTest(unittest.TestCase):
             async for i in I():
                 pass
 
-        with self.assertRaisesRegex(SystemError, "not an async iterable"):
+        with self.assertRaisesRegex(RuntimeError, 'object can.t.*await'):
             list(foo())
 
     def test_for_5(self):
@@ -262,7 +262,7 @@ class AsyncFunctionTest(unittest.TestCase):
             async for i in I():
                 pass
 
-        with self.assertRaisesRegex(TypeError, "is not iterable"):
+        with self.assertRaisesRegex(RuntimeError, 'object can.t.*await'):
             list(foo())
 
     def test_for_6(self):
