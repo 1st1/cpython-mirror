@@ -3033,7 +3033,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
-        TARGET(WITH_CLEANUP_EXIT) {
+        TARGET(WITH_CLEANUP_ENTER) {
             /* At the top of the stack are 1-6 values indicating
                how/why we entered the finally clause:
                - TOP = None
@@ -3115,7 +3115,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
-        TARGET(WITH_CLEANUP_FINAL) {
+        TARGET(WITH_CLEANUP_EXIT) {
             PyObject *res = POP();
             PyObject *exc = POP();
             int err;

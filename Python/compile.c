@@ -934,9 +934,9 @@ PyCompile_OpcodeStackEffect(int opcode, int oparg)
         case SETUP_ASYNC_WITH:
         case SETUP_WITH:
             return 7;
-        case WITH_CLEANUP_EXIT:
+        case WITH_CLEANUP_ENTER:
             return 1;
-        case WITH_CLEANUP_FINAL:
+        case WITH_CLEANUP_EXIT:
             return -1; /* XXX Sometimes more */
         case RETURN_VALUE:
             return -1;
@@ -3656,13 +3656,13 @@ compiler_async_with(struct compiler *c, stmt_ty s, int pos)
     /* Finally block starts; context.__exit__ is on the stack under
        the exception or return information. Just issue our magic
        opcode. */
-    ADDOP(c, WITH_CLEANUP_EXIT);
+    ADDOP(c, WITH_CLEANUP_ENTER);
 
     ADDOP(c, GET_ASYNC);
     ADDOP_O(c, LOAD_CONST, Py_None, consts);
     ADDOP(c, YIELD_FROM);
 
-    ADDOP(c, WITH_CLEANUP_FINAL);
+    ADDOP(c, WITH_CLEANUP_EXIT);
 
     /* Finally block ends. */
     ADDOP(c, END_FINALLY);
@@ -3744,8 +3744,8 @@ compiler_with(struct compiler *c, stmt_ty s, int pos)
     /* Finally block starts; context.__exit__ is on the stack under
        the exception or return information. Just issue our magic
        opcode. */
+    ADDOP(c, WITH_CLEANUP_ENTER);
     ADDOP(c, WITH_CLEANUP_EXIT);
-    ADDOP(c, WITH_CLEANUP_FINAL);
 
     /* Finally block ends. */
     ADDOP(c, END_FINALLY);
