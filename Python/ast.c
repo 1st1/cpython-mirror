@@ -1493,13 +1493,14 @@ static stmt_ty
 _ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq, int is_async)
 {
     /* funcdef: 'def' NAME parameters ['->' test] ':' suite */
-    REQ(n, funcdef);
 
     identifier name;
     arguments_ty args;
     asdl_seq *body;
     expr_ty returns = NULL;
     int name_i = 1;
+
+    REQ(n, funcdef);
 
     name = NEW_IDENTIFIER(CHILD(n, name_i));
     if (!name)
