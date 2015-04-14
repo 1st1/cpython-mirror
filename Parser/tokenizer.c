@@ -1340,6 +1340,11 @@ tok_get(struct tok_state *tok, char **p_start, char **p_end)
     int c;
     int blankline, nonascii;
 
+    int tok_len;
+    struct tok_state ahead_tok;
+    char *ahead_tok_start = NULL, *ahead_top_end = NULL;
+    int ahead_tok_kind;
+
     *p_start = *p_end = NULL;
   nextline:
     tok->start = NULL;
@@ -1495,7 +1500,7 @@ tok_get(struct tok_state *tok, char **p_start, char **p_end)
         *p_start = tok->start;
         *p_end = tok->cur;
 
-        int tok_len = tok->cur - tok->start;
+        tok_len = tok->cur - tok->start;
         if (tok_len == 3 && memcmp(tok->start, "def", 3) == 0) {
 
             if (tok->def + 1 >= MAXINDENT) {
@@ -1514,13 +1519,10 @@ tok_get(struct tok_state *tok, char **p_start, char **p_end)
         }
         else if (tok_len == 5) {
             if (memcmp(tok->start, "async", 5) == 0) {
-                struct tok_state ahead_tok;
-                char *ahead_tok_start = NULL, *ahead_top_end = NULL;
-
                 memcpy(&ahead_tok, tok, sizeof(struct tok_state));
 
-                int ahead_tok_kind = tok_get(&ahead_tok, &ahead_tok_start,
-                                             &ahead_top_end);
+                ahead_tok_kind = tok_get(&ahead_tok, &ahead_tok_start,
+                                         &ahead_top_end);
 
                 if (ahead_tok_kind == NAME &&
                         ahead_tok.cur - ahead_tok.start == 3 &&
