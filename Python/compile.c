@@ -1056,7 +1056,7 @@ PyCompile_OpcodeStackEffect(int opcode, int oparg)
             return -1;
         case DELETE_DEREF:
             return 0;
-        case GET_ASYNC_ITER:
+        case GET_ASYNC:
             return 0;
         default:
             return PY_INVALID_STACK_EFFECT;
@@ -3541,7 +3541,7 @@ compiler_async_with(struct compiler *c, stmt_ty s, int pos)
         return 0;
     }
 
-    ADDOP(c, GET_ASYNC_ITER);
+    ADDOP(c, GET_ASYNC);
     ADDOP_O(c, LOAD_CONST, Py_None, consts);
     ADDOP(c, YIELD_FROM);
 
@@ -3574,7 +3574,7 @@ compiler_async_with(struct compiler *c, stmt_ty s, int pos)
        opcode. */
     ADDOP(c, WITH_CLEANUP_EXIT);
 
-    ADDOP(c, GET_ASYNC_ITER);
+    ADDOP(c, GET_ASYNC);
     ADDOP_O(c, LOAD_CONST, Py_None, consts);
     ADDOP(c, YIELD_FROM);
 
@@ -3743,7 +3743,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
             return compiler_error(c, "'await' outside async function");
 
         VISIT(c, expr, e->v.Await.value);
-        ADDOP(c, GET_ASYNC_ITER);
+        ADDOP(c, GET_ASYNC);
         ADDOP_O(c, LOAD_CONST, Py_None, consts);
         ADDOP(c, YIELD_FROM);
         break;

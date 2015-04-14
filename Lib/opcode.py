@@ -104,7 +104,7 @@ def_op('GET_ITER', 68)
 def_op('PRINT_EXPR', 70)
 def_op('LOAD_BUILD_CLASS', 71)
 def_op('YIELD_FROM', 72)
-def_op('GET_ASYNC_ITER', 73)
+def_op('GET_ASYNC', 73)
 
 def_op('INPLACE_LSHIFT', 75)
 def_op('INPLACE_RSHIFT', 76)
