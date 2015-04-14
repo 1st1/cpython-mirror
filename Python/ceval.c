@@ -1929,6 +1929,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(GET_ASYNC) {
             PyObject *iterable = TOP();
             PyObject *iter = PyObject_GetIter(iterable);
+            PyObject *iter_attr = NULL;
+            PyObject *async_attr = NULL;
+            int valid = 1;
 
             SET_TOP(iter);
             if (iter == NULL) {
@@ -1938,7 +1941,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 
             // TODO: factor out this functionality?
-            int valid = 1;
             if (!PyGen_CheckExact(iter) ||
                      !(((PyCodeObject*)
                             ((PyGenObject*)iter)->gi_code)
@@ -1950,14 +1952,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 // Let's check if 'iterable.__iter__' has an
                 // __async__ flag.
 
-                PyObject *iter_attr = PyObject_GetAttrString(
-                    iterable, "__iter__");
-
+                iter_attr = PyObject_GetAttrString(iterable, "__iter__");
                 assert(iter_attr);
 
-                PyObject *async_attr = PyObject_GetAttrString(
-                    iter_attr, "__async__");
-
+                async_attr = PyObject_GetAttrString(iter_attr, "__async__");
                 if (async_attr) {
                     if (!PyObject_IsTrue(async_attr)) {
                         valid = 0;
