@@ -51,6 +51,7 @@ PyAPI_FUNC(int) _PyGen_FetchStopIterationValue(PyObject **);
 PyObject *_PyGen_Send(PyGenObject *, PyObject *);
 PyAPI_FUNC(void) _PyGen_Finalize(PyObject *self);
 
+PyObject *_PyGen_GetAsyncIter(PyObject *);
 
 #ifdef __cplusplus
 }

@@ -2006,57 +2006,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         }
 
         TARGET(GET_ASYNC) {
-            _Py_IDENTIFIER(__iter__);
-
             PyObject *iterable = TOP();
-            PyObject *iter = PyObject_GetIter(iterable);
-            PyObject *iter_attr = NULL;
-            PyObject *async_attr = NULL;
-            int valid = 1;
-
-            SET_TOP(iter);
-            if (iter == NULL) {
-                Py_DECREF(iterable);
-                goto error;
-            }
-
-
-            // TODO: factor out this functionality?
-            if (!PyGen_CheckAsyncExact(iter)) {
-                // 'iter' is not a generator from an 'async'
-                // function.
-
-                // Let's check if 'iterable.__iter__' has an
-                // __async__ flag.
-
-                iter_attr = special_lookup(iterable, &PyId___iter__);
-                assert(iter_attr);
-
-                async_attr = PyObject_GetAttrString(iter_attr, "__async__");
-                if (async_attr) {
-                    if (!PyObject_IsTrue(async_attr)) {
-                        valid = 0;
-                    }
-                    Py_DECREF(async_attr);
-                } else {
-                    if (PyErr_ExceptionMatches(PyExc_AttributeError))
-                        PyErr_Clear();
-
-                    valid = 0;
-                }
-
-                Py_DECREF(iter_attr);
-
-                if (!valid) {
-                    Py_DECREF(iterable);
-
-                    PyErr_SetString(PyExc_SystemError,
-                                    "not an async iterable");
-                    goto error;
-                }
-            }
+            PyObject *iter = _PyGen_GetAsyncIter(iterable);
 
             Py_DECREF(iterable);
+
+            SET_TOP(iter); // Even if it's NULL
+
+            if (iter == NULL) {
+                goto error;
+            }
 
             PREDICT(YIELD_FROM);
             DISPATCH();
