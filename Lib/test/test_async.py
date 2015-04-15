@@ -91,6 +91,15 @@ class AsyncFunctionTest(unittest.TestCase):
             foo()
             support.gc_collect()
 
+    def test_func_3(self):
+        async def foo():
+            raise StopIteration
+
+        with self.assertRaisesRegex(
+                RuntimeError, "generator raised StopIteration"):
+
+            next(foo())
+
     def test_await_1(self):
         async def foo():
             await 1
