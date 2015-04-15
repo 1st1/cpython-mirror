@@ -94,13 +94,13 @@ class AsyncFunctionTest(unittest.TestCase):
     def test_await_1(self):
         async def foo():
             await 1
-        with self.assertRaisesRegex(RuntimeError, "object '1' can.t.*await"):
+        with self.assertRaisesRegex(RuntimeError, "object 1 can.t.*await"):
             list(foo())
 
     def test_await_2(self):
         async def foo():
             await []
-        with self.assertRaisesRegex(RuntimeError, "object '\[\]' can.t.*await"):
+        with self.assertRaisesRegex(RuntimeError, "object \[\] can.t.*await"):
             list(foo())
 
     def test_await_3(self):

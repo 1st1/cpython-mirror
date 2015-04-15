@@ -179,80 +179,6 @@ PyDoc_STRVAR(close_doc,
 
 
 /*
- *   This helper function returns an iterator for 'o' if
- *   it's an 'async def' function, or if 'o' has its '__iter__'
- *   tagged with '__async__ = True'.
- *
- *   Raises a RuntimeError if it's not possible to return
- *   an iterator and returns NULL.
- */
-PyObject *
-_PyGen_GetAsyncIter(PyObject *o)
-{
-    _Py_IDENTIFIER(__iter__);
-    _Py_IDENTIFIER(__async__);
-
-    PyObject *iter = PyObject_GetIter(o);
-    PyObject *iter_attr = NULL;
-    PyObject *async_attr = NULL;
-    PyObject *repr = NULL;
-
-    if (iter == NULL) {
-        goto error;
-    }
-
-    if (PyGen_CheckAsyncExact(iter)) {
-        // It's an async def method, or a function patched
-        // with 'types.funcdef()'.
-        return iter;
-    }
-
-    iter_attr = _PyObject_LookupSpecial(o, &PyId___iter__);
-    if (iter_attr == NULL) {
-        Py_DECREF(iter);
-        goto error;
-    }
-
-    async_attr = _PyObject_GetAttrId(iter_attr, &PyId___async__);
-    if (async_attr == NULL) {
-        if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
-            // It's OK not to have '__async__', it's a different
-            // kind of error.
-            PyErr_Clear();
-        }
-
-        Py_DECREF(iter);
-        Py_DECREF(iter_attr);
-        goto error;
-    }
-
-    if (PyObject_IsTrue(async_attr)) {
-        Py_DECREF(async_attr);
-        Py_DECREF(iter_attr);
-        return iter;
-    }
-
-    Py_DECREF(async_attr);
-    Py_DECREF(iter);
-    Py_DECREF(iter_attr);
-
-error:
-    if (PyErr_Occurred())
-        PyErr_Clear();
-
-    repr = PyObject_Repr(o);
-    if (repr == NULL) {
-        return NULL;
-    }
-
-    PyErr_Format(PyExc_RuntimeError,
-                 "object %.200R can't be used in 'await' expression",
-                 repr);
-
-    return NULL;
-}
-
-/*
  *   This helper function is used by gen_close and gen_throw to
  *   close a subiterator being delegated to by yield-from.
  */
@@ -686,4 +612,73 @@ PyGen_NeedsFinalizing(PyGenObject *gen)
 
     /* No blocks except loops, it's safe to skip finalization. */
     return 0;
+}
+
+
+/*
+ *   This helper function returns an iterator for 'o' if
+ *   it's an 'async def' function, or if 'o' has its '__iter__'
+ *   tagged with '__async__ = True'.
+ *
+ *   Raises a RuntimeError if it's not possible to return
+ *   an iterator and returns NULL.
+ */
+PyObject *
+_PyGen_GetAsyncIter(PyObject *o)
+{
+    _Py_IDENTIFIER(__iter__);
+    _Py_IDENTIFIER(__async__);
+
+    PyObject *iter = PyObject_GetIter(o);
+    PyObject *iter_attr = NULL;
+    PyObject *async_attr = NULL;
+
+    if (iter == NULL) {
+        goto error;
+    }
+
+    if (PyGen_CheckAsyncExact(iter)) {
+        // It's an async def method, or a function patched
+        // with 'types.funcdef()'.
+        return iter;
+    }
+
+    iter_attr = _PyObject_LookupSpecial(o, &PyId___iter__);
+    if (iter_attr == NULL) {
+        Py_DECREF(iter);
+        goto error;
+    }
+
+    async_attr = _PyObject_GetAttrId(iter_attr, &PyId___async__);
+    if (async_attr == NULL) {
+        if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+            // It's OK not to have '__async__', it's a different
+            // kind of error.
+            PyErr_Clear();
+        }
+
+        Py_DECREF(iter);
+        Py_DECREF(iter_attr);
+        goto error;
+    }
+
+    if (PyObject_IsTrue(async_attr)) {
+        Py_DECREF(async_attr);
+        Py_DECREF(iter_attr);
+        return iter;
+    }
+
+    Py_DECREF(async_attr);
+    Py_DECREF(iter);
+    Py_DECREF(iter_attr);
+
+error:
+    if (PyErr_Occurred())
+        PyErr_Clear();
+
+    PyErr_Format(PyExc_RuntimeError,
+                 "object %.200R can't be used in 'await' expression",
+                 o);
+
+    return NULL;
 }
