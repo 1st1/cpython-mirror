@@ -85,8 +85,8 @@ def_op('BINARY_TRUE_DIVIDE', 27)
 def_op('INPLACE_FLOOR_DIVIDE', 28)
 def_op('INPLACE_TRUE_DIVIDE', 29)
 
-def_op('ASYNC_FOR_ITER', 50)
-def_op('ASYNC_FOR_NEXT', 51)
+def_op('ASYNC_AITER', 50)
+def_op('ASYNC_ANEXT', 51)
 
 def_op('STORE_MAP', 54)
 def_op('INPLACE_ADD', 55)

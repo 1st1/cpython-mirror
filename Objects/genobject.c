@@ -208,6 +208,7 @@ _PyGen_GetAsyncIter(PyObject *o)
     PyObject *iter = PyObject_GetIter(o);
     PyObject *iter_attr = NULL;
     PyObject *async_attr = NULL;
+    PyObject *repr = NULL;
 
     if (iter == NULL) {
         goto error;
@@ -249,8 +250,17 @@ _PyGen_GetAsyncIter(PyObject *o)
     Py_DECREF(iter_attr);
 
 error:
-    PyErr_SetString(PyExc_RuntimeError,
-                    "object can't be used in 'await' expression");
+    if (PyErr_Occurred())
+        PyErr_Clear();
+
+    repr = PyObject_Repr(o);
+    if (repr == NULL) {
+        return NULL;
+    }
+
+    PyErr_Format(PyExc_RuntimeError,
+                 "object %.200R can't be used in 'await' expression",
+                 repr);
 
     return NULL;
 }
