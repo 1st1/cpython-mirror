@@ -33,7 +33,9 @@ _DEBUG = (not sys.flags.ignore_environment
 try:
     asyncdef = types.asyncdef
 except AttributeError:
-    asyncdef = lambda func: func
+    native_asyncdef = False
+else:
+    native_asyncdef = True
 
 
 # Check for CPython issue #21209
@@ -149,21 +151,24 @@ def coroutine(func):
                 res = yield from res
             return res
 
-    coro = asyncdef(coro)
-
-    if not _DEBUG:
-        wrapper = coro
+    if native_asyncdef:
+        # Python 3.5 with native 'async def' and integrated
+        # warning for not-yielded coroutines.
+        wrapper = types.asyncdef(coro)
     else:
-        @functools.wraps(func)
-        def wrapper(*args, **kwds):
-            w = CoroWrapper(coro(*args, **kwds), func)
-            if w._source_traceback:
-                del w._source_traceback[-1]
-            w.__name__ = func.__name__
-            if hasattr(func, '__qualname__'):
-                w.__qualname__ = func.__qualname__
-            w.__doc__ = func.__doc__
-            return w
+        if not _DEBUG:
+            wrapper = coro
+        else:
+            @functools.wraps(func)
+            def wrapper(*args, **kwds):
+                w = CoroWrapper(coro(*args, **kwds), func)
+                if w._source_traceback:
+                    del w._source_traceback[-1]
+                w.__name__ = func.__name__
+                if hasattr(func, '__qualname__'):
+                    w.__qualname__ = func.__qualname__
+                w.__doc__ = func.__doc__
+                return w
 
     wrapper._is_coroutine = True  # For iscoroutinefunction().
     return wrapper
