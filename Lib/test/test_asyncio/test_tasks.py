@@ -1663,35 +1663,51 @@ class TaskTests(test_utils.TestCase):
 
     @mock.patch('asyncio.coroutines.logger')
     def test_coroutine_never_yielded(self, m_log):
-        debug = asyncio.coroutines._DEBUG
-        try:
-            asyncio.coroutines._DEBUG = True
+        if PY35:
             @asyncio.coroutine
             def coro_noop():
                 pass
-        finally:
-            asyncio.coroutines._DEBUG = debug
 
-        tb_filename = __file__
-        tb_lineno = sys._getframe().f_lineno + 2
-        # create a coroutine object but don't use it
-        coro_noop()
-        support.gc_collect()
+            with self.assertWarnsRegex(
+                    ResourceWarning,
+                    "<generator.*\.coro_noop.*was never awaited on"):
 
-        self.assertTrue(m_log.error.called)
-        message = m_log.error.call_args[0][0]
-        func_filename, func_lineno = test_utils.get_function_source(coro_noop)
-        regex = (r'^<CoroWrapper %s\(\) .* at %s:%s, .*> '
-                    r'was never yielded from\n'
-                 r'Coroutine object created at \(most recent call last\):\n'
-                 r'.*\n'
-                 r'  File "%s", line %s, in test_coroutine_never_yielded\n'
-                 r'    coro_noop\(\)$'
-                 % (re.escape(coro_noop.__qualname__),
-                    re.escape(func_filename), func_lineno,
-                    re.escape(tb_filename), tb_lineno))
+                coro_noop()
+                support.gc_collect()
 
-        self.assertRegex(message, re.compile(regex, re.DOTALL))
+        else:
+            debug = asyncio.coroutines._DEBUG
+            try:
+                asyncio.coroutines._DEBUG = True
+                @asyncio.coroutine
+                def coro_noop():
+                    pass
+            finally:
+                asyncio.coroutines._DEBUG = debug
+
+            tb_filename = __file__
+            tb_lineno = sys._getframe().f_lineno + 2
+            # create a coroutine object but don't use it
+            coro_noop()
+            support.gc_collect()
+
+            self.assertTrue(m_log.error.called)
+            message = m_log.error.call_args[0][0]
+
+            func_filename, func_lineno = test_utils.get_function_source(
+                coro_noop)
+
+            regex = (r'^<CoroWrapper %s\(\) .* at %s:%s, .*> '
+                        r'was never yielded from\n'
+                     r'Coroutine object created at \(most recent call last\):\n'
+                     r'.*\n'
+                     r'  File "%s", line %s, in test_coroutine_never_yielded\n'
+                     r'    coro_noop\(\)$'
+                     % (re.escape(coro_noop.__qualname__),
+                        re.escape(func_filename), func_lineno,
+                        re.escape(tb_filename), tb_lineno))
+
+            self.assertRegex(message, re.compile(regex, re.DOTALL))
 
     def test_task_source_traceback(self):
         self.loop.set_debug(True)

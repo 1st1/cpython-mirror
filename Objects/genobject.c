@@ -23,6 +23,21 @@ _PyGen_Finalize(PyObject *self)
     PyGenObject *gen = (PyGenObject *)self;
     PyObject *res;
     PyObject *error_type, *error_value, *error_traceback;
+    PyObject *repr = NULL;
+
+    /* If it's an 'async def' kind of generator, and if
+       it wasn't ever iterated over we want to issues a warning. */
+    if (gen->gi_code != NULL
+            && (((PyCodeObject *)gen->gi_code)->co_flags & CO_ASYNC)
+            && gen->gi_frame != NULL
+            && gen->gi_frame->f_lasti == -1) {
+
+        repr = PyObject_Repr(gen);
+        if (repr != NULL) {
+            PyErr_WarnFormat(PyExc_ResourceWarning, 1,
+                            "%R was never awaited on", repr);
+        }
+    }
 
     if (gen->gi_frame == NULL || gen->gi_frame->f_stacktop == NULL)
         /* Generator isn't paused, so no need to close */

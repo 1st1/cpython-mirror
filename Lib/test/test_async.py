@@ -1,3 +1,4 @@
+import types
 import unittest
 from test import support
 
@@ -62,12 +63,15 @@ class AsyncFunctionTest(unittest.TestCase):
     def test_func_1(self):
         async def foo():
             return 10
+
+        f = foo()
+        self.assertIsInstance(f, types.GeneratorType)
         self.assertTrue(bool(foo.__code__.co_flags & 0x80))
         self.assertTrue(bool(foo.__code__.co_flags & 0x20))
-        self.assertTrue(bool(foo().gi_code.co_flags & 0x80))
-        self.assertTrue(bool(foo().gi_code.co_flags & 0x20))
+        self.assertTrue(bool(f.gi_code.co_flags & 0x80))
+        self.assertTrue(bool(f.gi_code.co_flags & 0x20))
         try:
-            next(foo())
+            next(f)
         except StopIteration as ex:
             self.assertEqual(ex.args[0], 10)
         else:
@@ -75,6 +79,17 @@ class AsyncFunctionTest(unittest.TestCase):
 
         def bar(): pass
         self.assertFalse(bool(bar.__code__.co_flags & 0x80))
+
+    def test_func_2(self):
+        async def foo():
+            return 'spam'
+
+        with self.assertWarnsRegex(
+                ResourceWarning,
+                "<generator.*AsyncFunctionTe.*\.foo.*was never awaited on"):
+
+            foo()
+            support.gc_collect()
 
     def test_await_1(self):
         async def foo():
