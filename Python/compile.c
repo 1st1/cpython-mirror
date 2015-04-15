@@ -2021,7 +2021,8 @@ static int
 compiler_async_for(struct compiler *c, stmt_ty s)
 {
     static PyObject *stopiter_error = NULL;
-    basicblock *try, *except, *end, *after_try, *try_cleanup;
+    basicblock *try, *except, *end, *after_try, *try_cleanup,
+               *after_loop, *after_loop_else;
 
     if (stopiter_error == NULL) {
         stopiter_error = PyUnicode_InternFromString("StopAsyncIteration");
@@ -2034,12 +2035,14 @@ compiler_async_for(struct compiler *c, stmt_ty s)
     end = compiler_new_block(c);
     after_try = compiler_new_block(c);
     try_cleanup = compiler_new_block(c);
+    after_loop = compiler_new_block(c);
+    after_loop_else = compiler_new_block(c);
 
     if (try == NULL || except == NULL || end == NULL
             || after_try == NULL || try_cleanup == NULL)
         return 0;
 
-    ADDOP_JREL(c, SETUP_LOOP, end);
+    ADDOP_JREL(c, SETUP_LOOP, after_loop);
     if (!compiler_push_fblock(c, LOOP, try))
         return 0;
 
@@ -2073,9 +2076,8 @@ compiler_async_for(struct compiler *c, stmt_ty s)
     ADDOP(c, POP_TOP);
     ADDOP(c, POP_TOP);
     ADDOP(c, POP_TOP);
-    ADDOP(c, BREAK_LOOP);
     ADDOP(c, POP_EXCEPT);
-    ADDOP_JREL(c, JUMP_FORWARD, after_try);
+    ADDOP_JABS(c, JUMP_ABSOLUTE, after_loop_else);
 
 
     compiler_use_next_block(c, try_cleanup);
@@ -2085,8 +2087,15 @@ compiler_async_for(struct compiler *c, stmt_ty s)
     VISIT_SEQ(c, stmt, s->v.AsyncFor.body);
     ADDOP_JABS(c, JUMP_ABSOLUTE, try);
 
-
+    ADDOP(c, POP_BLOCK);
     compiler_pop_fblock(c, LOOP, try);
+
+    compiler_use_next_block(c, after_loop);
+    ADDOP_JABS(c, JUMP_ABSOLUTE, end);
+
+    compiler_use_next_block(c, after_loop_else);
+    VISIT_SEQ(c, stmt, s->v.For.orelse);
+
     compiler_use_next_block(c, end);
 
     return 1;

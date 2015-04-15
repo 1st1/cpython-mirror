@@ -3,7 +3,7 @@ import unittest
 from test import support
 
 
-class AsyncIter:
+class AsyncYieldFrom:
     def __init__(self, obj):
         self.obj = obj
 
@@ -13,7 +13,7 @@ class AsyncIter:
     __iter__.__async__ = True
 
 
-class FutureLike:
+class AsyncYield:
     def __init__(self, value):
         self.value = value
 
@@ -114,7 +114,7 @@ class AsyncFunctionTest(unittest.TestCase):
 
     def test_await_3(self):
         async def foo():
-            await AsyncIter([1, 2, 3])
+            await AsyncYieldFrom([1, 2, 3])
 
         self.assertEqual(list(foo()), [1, 2, 3])
 
@@ -138,13 +138,13 @@ class AsyncFunctionTest(unittest.TestCase):
                 self.name = name
 
             async def __aenter__(self):
-                await AsyncIter(['enter-1-' + self.name,
-                                 'enter-2-' + self.name])
+                await AsyncYieldFrom(['enter-1-' + self.name,
+                                      'enter-2-' + self.name])
                 return self
 
             async def __aexit__(self, *args):
-                await AsyncIter(['exit-1-' + self.name,
-                                 'exit-2-' + self.name])
+                await AsyncYieldFrom(['exit-1-' + self.name,
+                                      'exit-2-' + self.name])
 
                 if self.name == 'B':
                     return True
@@ -152,7 +152,7 @@ class AsyncFunctionTest(unittest.TestCase):
 
         async def foo():
             async with Manager("A") as a, Manager("B") as b:
-                await AsyncIter([('managers', a.name, b.name)])
+                await AsyncYieldFrom([('managers', a.name, b.name)])
                 1/0
 
         f = foo()
@@ -163,6 +163,14 @@ class AsyncFunctionTest(unittest.TestCase):
                      ('managers', 'A', 'B'),
                      'exit-1-B', 'exit-2-B', 'exit-1-A', 'exit-2-A']
         )
+
+        async def foo():
+            async with Manager("A") as a, Manager("C") as c:
+                await AsyncYieldFrom([('managers', a.name, c.name)])
+                1/0
+
+        with self.assertRaises(ZeroDivisionError):
+            list(foo())
 
     def test_with_2(self):
         class CM:
@@ -204,35 +212,77 @@ class AsyncFunctionTest(unittest.TestCase):
             list(foo())
 
     def test_for_1(self):
+        aiter_calls = 0
+
         class AsyncIter:
             def __init__(self):
                 self.i = 0
 
             async def __aiter__(self):
+                nonlocal aiter_calls
+                aiter_calls += 1
                 return self
 
             async def __anext__(self):
                 self.i += 1
 
                 if not (self.i % 10):
-                    await FutureLike(self.i * 10)
+                    await AsyncYield(self.i * 10)
 
                 if self.i > 100:
                     raise StopAsyncIteration
 
                 return self.i, self.i
 
+
         buffer = []
-
-        async def foo():
+        async def test1():
             nonlocal buffer
-
             async for i1, i2 in AsyncIter():
                 buffer.append(i1 + i2)
 
-        yielded = list(foo())
+        yielded = list(test1())
+        # Make sure that __aiter__ was called only once
+        self.assertEqual(aiter_calls, 1)
         self.assertEqual(yielded, [i * 100 for i in range(1, 11)])
         self.assertEqual(buffer, [i*2 for i in range(1, 101)])
+
+
+        buffer = []
+        async def test2():
+            nonlocal buffer
+            async for i in AsyncIter():
+                buffer.append(i[0])
+                if i[0] == 20:
+                    break
+            else:
+                buffer.append('what?')
+            buffer.append('end')
+
+        yielded = list(test2())
+        # Make sure that __aiter__ was called only once
+        self.assertEqual(aiter_calls, 2)
+        self.assertEqual(yielded, [100, 200])
+        self.assertEqual(buffer, [i for i in range(1, 21)] + ['end'])
+
+
+        buffer = []
+        async def test3():
+            nonlocal buffer
+            async for i in AsyncIter():
+                if i[0] > 20:
+                    continue
+                buffer.append(i[0])
+            else:
+                buffer.append('what?')
+            buffer.append('end')
+
+        yielded = list(test3())
+        # Make sure that __aiter__ was called only once
+        self.assertEqual(aiter_calls, 3)
+        self.assertEqual(yielded, [i * 100 for i in range(1, 11)])
+        self.assertEqual(buffer, [i for i in range(1, 21)] +
+                                 ['what?', 'end'])
 
     def test_for_2(self):
         async def foo():
