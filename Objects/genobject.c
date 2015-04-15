@@ -33,7 +33,7 @@ _PyGen_Finalize(PyObject *self)
             && !PyErr_Occurred()) {
 
         PyErr_WarnFormat(PyExc_ResourceWarning, 1,
-                         "%R was never awaited on", gen);
+                         "%.200R was never awaited on", gen);
     }
 
     if (gen->gi_frame == NULL || gen->gi_frame->f_stacktop == NULL)
