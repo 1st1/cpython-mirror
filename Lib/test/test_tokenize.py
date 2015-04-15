@@ -641,6 +641,107 @@ Legacy unicode literals:
     NAME       'grün'        (2, 0) (2, 4)
     OP         '='           (2, 5) (2, 6)
     STRING     "U'green'"    (2, 7) (2, 15)
+
+Async/await extension:
+
+    >>> dump_tokens("async = 1")
+    ENCODING   'utf-8'       (0, 0) (0, 0)
+    NAME       'async'       (1, 0) (1, 5)
+    OP         '='           (1, 6) (1, 7)
+    NUMBER     '1'           (1, 8) (1, 9)
+
+    >>> dump_tokens("await = 1")
+    ENCODING   'utf-8'       (0, 0) (0, 0)
+    NAME       'await'       (1, 0) (1, 5)
+    OP         '='           (1, 6) (1, 7)
+    NUMBER     '1'           (1, 8) (1, 9)
+
+    >>> dump_tokens("foo.async")
+    ENCODING   'utf-8'       (0, 0) (0, 0)
+    NAME       'foo'         (1, 0) (1, 3)
+    OP         '.'           (1, 3) (1, 4)
+    NAME       'async'       (1, 4) (1, 9)
+
+    >>> dump_tokens("foo.async + 1")
+    ENCODING   'utf-8'       (0, 0) (0, 0)
+    NAME       'foo'         (1, 0) (1, 3)
+    OP         '.'           (1, 3) (1, 4)
+    NAME       'async'       (1, 4) (1, 9)
+    OP         '+'           (1, 10) (1, 11)
+    NUMBER     '1'           (1, 12) (1, 13)
+
+    >>> dump_tokens("async def foo(): pass")
+    ENCODING   'utf-8'       (0, 0) (0, 0)
+    ASYNC      'async'       (1, 0) (1, 5)
+    NAME       'def'         (1, 6) (1, 9)
+    NAME       'foo'         (1, 10) (1, 13)
+    OP         '('           (1, 13) (1, 14)
+    OP         ')'           (1, 14) (1, 15)
+    OP         ':'           (1, 15) (1, 16)
+    NAME       'pass'        (1, 17) (1, 21)
+
+    >>> dump_tokens('''async def foo():
+    ...   def foo(await):
+    ...     await = 1
+    ...   if 1:
+    ...     await
+    ... async += 1
+    ... ''')
+    ENCODING   'utf-8'       (0, 0) (0, 0)
+    ASYNC      'async'       (1, 0) (1, 5)
+    NAME       'def'         (1, 6) (1, 9)
+    NAME       'foo'         (1, 10) (1, 13)
+    OP         '('           (1, 13) (1, 14)
+    OP         ')'           (1, 14) (1, 15)
+    OP         ':'           (1, 15) (1, 16)
+    NEWLINE    '\\n'          (1, 16) (1, 17)
+    INDENT     '  '          (2, 0) (2, 2)
+    NAME       'def'         (2, 2) (2, 5)
+    NAME       'foo'         (2, 6) (2, 9)
+    OP         '('           (2, 9) (2, 10)
+    NAME       'await'       (2, 10) (2, 15)
+    OP         ')'           (2, 15) (2, 16)
+    OP         ':'           (2, 16) (2, 17)
+    NEWLINE    '\\n'          (2, 17) (2, 18)
+    INDENT     '    '        (3, 0) (3, 4)
+    NAME       'await'       (3, 4) (3, 9)
+    OP         '='           (3, 10) (3, 11)
+    NUMBER     '1'           (3, 12) (3, 13)
+    NEWLINE    '\\n'          (3, 13) (3, 14)
+    DEDENT     ''            (4, 2) (4, 2)
+    NAME       'if'          (4, 2) (4, 4)
+    NUMBER     '1'           (4, 5) (4, 6)
+    OP         ':'           (4, 6) (4, 7)
+    NEWLINE    '\\n'          (4, 7) (4, 8)
+    INDENT     '    '        (5, 0) (5, 4)
+    AWAIT      'await'       (5, 4) (5, 9)
+    NEWLINE    '\\n'          (5, 9) (5, 10)
+    DEDENT     ''            (6, 0) (6, 0)
+    DEDENT     ''            (6, 0) (6, 0)
+    NAME       'async'       (6, 0) (6, 5)
+    OP         '+='          (6, 6) (6, 8)
+    NUMBER     '1'           (6, 9) (6, 10)
+    NEWLINE    '\\n'          (6, 10) (6, 11)
+
+    >>> dump_tokens('''async def foo():
+    ...   async for i in 1: pass''')
+    ENCODING   'utf-8'       (0, 0) (0, 0)
+    ASYNC      'async'       (1, 0) (1, 5)
+    NAME       'def'         (1, 6) (1, 9)
+    NAME       'foo'         (1, 10) (1, 13)
+    OP         '('           (1, 13) (1, 14)
+    OP         ')'           (1, 14) (1, 15)
+    OP         ':'           (1, 15) (1, 16)
+    NEWLINE    '\\n'          (1, 16) (1, 17)
+    INDENT     '  '          (2, 0) (2, 2)
+    ASYNC      'async'       (2, 2) (2, 7)
+    NAME       'for'         (2, 8) (2, 11)
+    NAME       'i'           (2, 12) (2, 13)
+    NAME       'in'          (2, 14) (2, 16)
+    NUMBER     '1'           (2, 17) (2, 18)
+    OP         ':'           (2, 18) (2, 19)
+    NAME       'pass'        (2, 20) (2, 24)
+    DEDENT     ''            (3, 0) (3, 0)
 """
 
 from test import support
@@ -651,6 +752,7 @@ from io import BytesIO
 from unittest import TestCase
 import os, sys, glob
 import token
+import unittest
 
 def dump_tokens(s):
     """Print out the tokens in s in a table format.
