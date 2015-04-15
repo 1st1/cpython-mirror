@@ -752,7 +752,6 @@ from io import BytesIO
 from unittest import TestCase
 import os, sys, glob
 import token
-import unittest
 
 def dump_tokens(s):
     """Print out the tokens in s in a table format.
