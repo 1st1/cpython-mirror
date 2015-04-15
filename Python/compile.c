@@ -1054,9 +1054,9 @@ PyCompile_OpcodeStackEffect(int opcode, int oparg)
             return 0;
         case GET_ASYNC:
             return 0;
-        case ASYNC_FOR_ITER:
+        case ASYNC_AITER:
             return 0;
-        case ASYNC_FOR_NEXT:
+        case ASYNC_ANEXT:
             return 1;
         default:
             return PY_INVALID_STACK_EFFECT;
@@ -2041,7 +2041,9 @@ compiler_async_for(struct compiler *c, stmt_ty s)
         return 0;
 
     VISIT(c, expr, s->v.AsyncFor.iter);
-    ADDOP(c, ASYNC_FOR_ITER);
+    ADDOP(c, ASYNC_AITER);
+    ADDOP_O(c, LOAD_CONST, Py_None, consts);
+    ADDOP(c, YIELD_FROM);
 
     compiler_use_next_block(c, try);
 
@@ -2049,8 +2051,8 @@ compiler_async_for(struct compiler *c, stmt_ty s)
     ADDOP_JREL(c, SETUP_EXCEPT, except);
     if (!compiler_push_fblock(c, EXCEPT, try))
         return 0;
-    ADDOP(c, ASYNC_FOR_NEXT);
-    ADDOP(c, GET_ASYNC);
+
+    ADDOP(c, ASYNC_ANEXT);
     ADDOP_O(c, LOAD_CONST, Py_None, consts);
     ADDOP(c, YIELD_FROM);
     VISIT(c, expr, s->v.AsyncFor.target);

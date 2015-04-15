@@ -1924,23 +1924,22 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             goto fast_block_end;
         }
 
-        TARGET(ASYNC_FOR_ITER) {
+        TARGET(ASYNC_AITER) {
             _Py_IDENTIFIER(__aiter__);
-            _Py_IDENTIFIER(__anext__);
 
-            PyObject *iterable = TOP();
-            PyObject *iter_meth = special_lookup(iterable, &PyId___aiter__);
             PyObject *iter = NULL;
-            PyObject *next_meth = NULL;
+            PyObject *async_iter = NULL;
+            PyObject *obj = TOP();
+            PyObject *iter_meth = special_lookup(obj, &PyId___aiter__);
 
-            Py_DECREF(iterable);
+            Py_DECREF(obj);
 
-            if (!iter_meth) {
+            if (iter_meth == NULL) {
                 SET_TOP(NULL);
 
                 PyErr_SetString(
-                    PyExc_SystemError,
-                    "'async for' requires an object with __aiter__");
+                    PyExc_RuntimeError,
+                    "'async for' requires an object with async __aiter__ method");
 
                 goto error;
             }
@@ -1953,53 +1952,57 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 goto error;
             }
 
-            if (PyGen_CheckAsyncExact(iter)) {
-                SET_TOP(NULL);
-                Py_DECREF(iter);
-
-                PyErr_SetString(
-                    PyExc_SystemError,
-                    "__aiter__ should be a regular function (not async)");
-
-                goto error;
-            }
-
-            next_meth = special_lookup(iter, &PyId___anext__);
+            async_iter = _PyGen_GetAsyncIter(iter);
             Py_DECREF(iter);
 
-            if (next_meth == NULL) {
-                PyErr_SetString(
-                    PyExc_SystemError,
-                    "iterators returned from __aiter__ must have __anext__ defined");
-
+            if (async_iter == NULL) {
                 SET_TOP(NULL);
+                PyErr_SetString(
+                    PyExc_RuntimeError,
+                    "'async for' received an invalid object from __aiter__");
+
                 goto error;
             }
 
-            SET_TOP(next_meth);
-
+            SET_TOP(async_iter);
             DISPATCH();
         }
 
-        TARGET(ASYNC_FOR_NEXT) {
-            PyObject *next = TOP();
-            PyObject *gen = PyObject_CallFunctionObjArgs(next, NULL);
+        TARGET(ASYNC_ANEXT) {
+            _Py_IDENTIFIER(__anext__);
 
-            if (PyErr_Occurred()) {
-                Py_DECREF(next);
-                goto error;
-            }
+            PyObject *next_iter = NULL;
+            PyObject *async_iter = NULL;
+            PyObject *iter = TOP();
+            PyObject *next_meth = special_lookup(iter, &PyId___anext__);
 
-            if (!gen) {
-                Py_DECREF(next);
-
-                PyErr_SetString(PyExc_SystemError,
-                                "unhandled exception");
+            if (next_meth == NULL) {
+                PyErr_SetString(
+                    PyExc_RuntimeError,
+                    "'async for' requires an iterator with async __anext__ method");
 
                 goto error;
             }
 
-            PUSH(gen);
+            next_iter = PyObject_CallFunctionObjArgs(next_meth, NULL);
+            Py_DECREF(next_meth);
+
+            if (next_iter == NULL) {
+                goto error;
+            }
+
+            async_iter = _PyGen_GetAsyncIter(next_iter);
+            Py_DECREF(next_iter);
+
+            if (async_iter == NULL) {
+                PyErr_SetString(
+                    PyExc_RuntimeError,
+                    "'async for' received an invalid object from __anext__");
+
+                goto error;
+            }
+
+            PUSH(async_iter);
             DISPATCH();
         }
 

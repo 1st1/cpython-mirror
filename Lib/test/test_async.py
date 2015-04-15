@@ -79,13 +79,13 @@ class AsyncFunctionTest(unittest.TestCase):
     def test_await_1(self):
         async def foo():
             await 1
-        with self.assertRaisesRegex(RuntimeError, 'object can.t.*await'):
+        with self.assertRaisesRegex(RuntimeError, "object '1' can.t.*await"):
             list(foo())
 
     def test_await_2(self):
         async def foo():
             await []
-        with self.assertRaisesRegex(RuntimeError, 'object can.t.*await'):
+        with self.assertRaisesRegex(RuntimeError, "object '\[\]' can.t.*await"):
             list(foo())
 
     def test_await_3(self):
@@ -184,7 +184,7 @@ class AsyncFunctionTest(unittest.TestCase):
             def __init__(self):
                 self.i = 0
 
-            def __aiter__(self):
+            async def __aiter__(self):
                 return self
 
             async def __anext__(self):
@@ -212,11 +212,11 @@ class AsyncFunctionTest(unittest.TestCase):
 
     def test_for_2(self):
         async def foo():
-            async for i in ():
-                pass
+            async for i in (1, 2, 3):
+                print('never going to happen')
 
         with self.assertRaisesRegex(
-                SystemError, "async for' requires an object with __aiter__"):
+                RuntimeError, "async for' requires an object.*__aiter__"):
 
             list(foo())
 
@@ -227,17 +227,16 @@ class AsyncFunctionTest(unittest.TestCase):
 
         async def foo():
             async for i in I():
-                pass
+                print('never going to happen')
 
         with self.assertRaisesRegex(
-                SystemError,
-                "iterators returned from __aiter__ must have __anext__"):
+                RuntimeError, "async for' received an invalid object.*__aiter"):
 
             list(foo())
 
     def test_for_4(self):
         class I:
-            def __aiter__(self):
+            async def __aiter__(self):
                 return self
 
             def __anext__(self):
@@ -245,14 +244,15 @@ class AsyncFunctionTest(unittest.TestCase):
 
         async def foo():
             async for i in I():
-                pass
+                print('never going to happen')
 
-        with self.assertRaisesRegex(RuntimeError, 'object can.t.*await'):
+        with self.assertRaisesRegex(
+                RuntimeError, "async for' received an invalid object.*__anext"):
             list(foo())
 
     def test_for_5(self):
         class I:
-            def __aiter__(self):
+            async def __aiter__(self):
                 return self
 
             def __anext__(self):
@@ -260,25 +260,11 @@ class AsyncFunctionTest(unittest.TestCase):
 
         async def foo():
             async for i in I():
-                pass
+                print('never going to happen')
 
-        with self.assertRaisesRegex(RuntimeError, 'object can.t.*await'):
-            list(foo())
+        with self.assertRaisesRegex(
+                RuntimeError, "async for' received an invalid object.*__anext"):
 
-    def test_for_6(self):
-        class I:
-            async def __aiter__(self):
-                return self
-
-            async def __anext__(self):
-                return 123
-
-        async def foo():
-            async for i in I():
-                pass
-
-        with self.assertRaisesRegex(SystemError,
-                                    "__aiter__ should be a regular"):
             list(foo())
 
 
@@ -314,6 +300,8 @@ class AsyncAsyncIOCompatTest(unittest.TestCase):
             loop.run_until_complete(f())
         except MyException:
             pass
+        finally:
+            loop.close()
 
         self.assertEqual(buffer, [1, 2, 'MyException'])
 
