@@ -147,7 +147,7 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
          * a leaking StopIteration into RuntimeError (with its cause
          * set appropriately). */
         if ((((PyCodeObject *)gen->gi_code)->co_flags &
-                                                CO_FUTURE_GENERATOR_STOP)
+                                        (CO_FUTURE_GENERATOR_STOP | CO_ASYNC))
             && PyErr_ExceptionMatches(PyExc_StopIteration))
         {
             PyObject *exc, *val, *val2, *tb;
