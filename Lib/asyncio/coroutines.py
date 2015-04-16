@@ -31,11 +31,11 @@ _DEBUG = (not sys.flags.ignore_environment
 
 
 try:
-    asyncdef = types.asyncdef
+    async_def = types.async_def
 except AttributeError:
-    native_asyncdef = False
+    native_async_def = False
 else:
-    native_asyncdef = True
+    native_async_def = True
 
 
 # Check for CPython issue #21209
@@ -151,10 +151,10 @@ def coroutine(func):
                 res = yield from res
             return res
 
-    if native_asyncdef:
+    if native_async_def:
         # Python 3.5 with native 'async def' and integrated
         # warning for not-yielded coroutines.
-        wrapper = types.asyncdef(coro)
+        wrapper = types.async_def(coro)
     else:
         if not _DEBUG:
             wrapper = coro
