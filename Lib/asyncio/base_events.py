@@ -32,7 +32,7 @@ from . import coroutines
 from . import events
 from . import futures
 from . import tasks
-from .coroutines import coroutine
+from .coroutines import coroutine, CoroWrapper
 from .log import logger
 
 
@@ -191,8 +191,8 @@ class BaseEventLoop(events.AbstractEventLoop):
         self._thread_id = None
         self._clock_resolution = time.get_clock_info('monotonic').resolution
         self._exception_handler = None
-        self._debug = (not sys.flags.ignore_environment
-                       and bool(os.environ.get('PYTHONASYNCIODEBUG')))
+        self.set_debug((not sys.flags.ignore_environment
+                        and bool(os.environ.get('PYTHONASYNCIODEBUG'))))
         # In debug mode, if the execution of a callback or a step of a task
         # exceed this duration in seconds, the slow callback/task is logged.
         self.slow_callback_duration = 0.1
@@ -338,13 +338,16 @@ class BaseEventLoop(events.AbstractEventLoop):
             return
         if self._debug:
             logger.debug("Close %r", self)
-        self._closed = True
-        self._ready.clear()
-        self._scheduled.clear()
-        executor = self._default_executor
-        if executor is not None:
-            self._default_executor = None
-            executor.shutdown(wait=False)
+        try:
+            self._closed = True
+            self._ready.clear()
+            self._scheduled.clear()
+            executor = self._default_executor
+            if executor is not None:
+                self._default_executor = None
+                executor.shutdown(wait=False)
+        finally:
+            self.set_debug(False)
 
     def is_closed(self):
         """Returns True if the event loop was closed."""
@@ -1177,3 +1180,9 @@ class BaseEventLoop(events.AbstractEventLoop):
 
     def set_debug(self, enabled):
         self._debug = enabled
+
+        if hasattr(sys, 'set_async_wrapper'):
+            if enabled:
+                sys.set_async_wrapper(lambda gen: CoroWrapper(gen, None))
+            else:
+                sys.set_async_wrapper(None)

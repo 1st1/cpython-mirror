@@ -1664,16 +1664,11 @@ class TaskTests(test_utils.TestCase):
     @mock.patch('asyncio.coroutines.logger')
     def test_coroutine_never_yielded(self, m_log):
         if PY35:
+            self.loop.set_debug(True)
+
             @asyncio.coroutine
             def coro_noop():
                 pass
-
-            with self.assertWarnsRegex(
-                    ResourceWarning,
-                    "<generator.*\.coro_noop.*was never awaited on"):
-
-                coro_noop()
-                support.gc_collect()
 
         else:
             debug = asyncio.coroutines._DEBUG
@@ -1685,18 +1680,19 @@ class TaskTests(test_utils.TestCase):
             finally:
                 asyncio.coroutines._DEBUG = debug
 
-            tb_filename = __file__
-            tb_lineno = sys._getframe().f_lineno + 2
-            # create a coroutine object but don't use it
-            coro_noop()
-            support.gc_collect()
+        tb_filename = __file__
+        tb_lineno = sys._getframe().f_lineno + 2
+        # create a coroutine object but don't use it
+        coro_noop()
+        support.gc_collect()
 
-            self.assertTrue(m_log.error.called)
-            message = m_log.error.call_args[0][0]
+        self.assertTrue(m_log.error.called)
+        message = m_log.error.call_args[0][0]
 
-            func_filename, func_lineno = test_utils.get_function_source(
-                coro_noop)
+        func_filename, func_lineno = test_utils.get_function_source(
+            coro_noop)
 
+        if not PY35: # TODO
             regex = (r'^<CoroWrapper %s\(\) .* at %s:%s, .*> '
                         r'was never yielded from\n'
                      r'Coroutine object created at \(most recent call last\):\n'

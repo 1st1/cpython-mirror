@@ -33,9 +33,9 @@ _DEBUG = (not sys.flags.ignore_environment
 try:
     async_def = types.async_def
 except AttributeError:
-    native_async_def = False
+    native_async = False
 else:
-    native_async_def = True
+    native_async = True
 
 
 # Check for CPython issue #21209
@@ -70,6 +70,11 @@ class CoroWrapper:
         self.gen = gen
         self.func = func
         self._source_traceback = traceback.extract_stack(sys._getframe(1))
+
+        if '__name__' not in self.__dict__:
+            self.__name__ = gen.__name__
+            self.__qualname__ = gen.__qualname__
+            self.__doc__ = gen.__doc__
         # __name__, __qualname__, __doc__ attributes are set by the coroutine()
         # decorator
 
@@ -151,9 +156,7 @@ def coroutine(func):
                 res = yield from res
             return res
 
-    if native_async_def:
-        # Python 3.5 with native 'async def' and integrated
-        # warning for not-yielded coroutines.
+    if native_async:
         wrapper = types.async_def(coro)
     else:
         if not _DEBUG:
@@ -192,7 +195,8 @@ def _format_coroutine(coro):
 
     filename = coro.gi_code.co_filename
     if (isinstance(coro, CoroWrapper)
-    and not inspect.isgeneratorfunction(coro.func)):
+    and not inspect.isgeneratorfunction(coro.func)
+    and coro.func is not None):
         filename, lineno = events._get_function_source(coro.func)
         if coro.gi_frame is None:
             coro_repr = ('%s() done, defined at %s:%s'
