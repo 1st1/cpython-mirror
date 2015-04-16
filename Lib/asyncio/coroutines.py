@@ -87,7 +87,8 @@ class CoroWrapper:
 
     def __iter__(self):
         return self
-    __iter__.__async__ = True # Python 3.5 compatibility
+
+    __await__ = __iter__ # Python 3.5 compatibility
 
     def __next__(self):
         return next(self.gen)

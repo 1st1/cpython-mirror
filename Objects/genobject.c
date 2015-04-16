@@ -647,8 +647,8 @@ PyGen_NeedsFinalizing(PyGenObject *gen)
 
 /*
  *   This helper function returns an iterator for 'o' if
- *   it's an 'async def' function, or if 'o' has its '__iter__'
- *   tagged with '__async__ = True'.
+ *   it's an 'async def' function, or if 'o' has an '__await__'
+ *   method that returns an iterator.
  *
  *   Raises a RuntimeError if it's not possible to return
  *   an iterator and returns NULL.
@@ -656,56 +656,50 @@ PyGen_NeedsFinalizing(PyGenObject *gen)
 PyObject *
 _PyGen_GetAsyncIter(PyObject *o)
 {
-    _Py_IDENTIFIER(__iter__);
-    _Py_IDENTIFIER(__async__);
+    _Py_IDENTIFIER(__await__);
 
-    PyObject *iter = PyObject_GetIter(o);
-    PyObject *iter_attr = NULL;
-    PyObject *async_attr = NULL;
+    PyObject *await_meth = NULL;
+    PyObject *await_obj = NULL;
+    PyObject *oiter = NULL;
 
-    if (iter == NULL) {
-        goto error;
-    }
-
-    if (PyGen_CheckAsyncExact(iter)) {
-        // It's an async def method, or a function patched
-        // with 'types.funcdef()'.
-        return iter;
-    }
-
-    iter_attr = _PyObject_LookupSpecial(o, &PyId___iter__);
-    if (iter_attr == NULL) {
-        Py_DECREF(iter);
-        goto error;
-    }
-
-    async_attr = _PyObject_GetAttrId(iter_attr, &PyId___async__);
-    if (async_attr == NULL) {
-        if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
-            // It's OK not to have '__async__', it's a different
-            // kind of error.
+    oiter = PyObject_GetIter(o);
+    if (oiter == NULL) {
+        if (PyErr_Occurred())
             PyErr_Clear();
+    } else {
+        if (PyGen_CheckAsyncExact(oiter)) {
+            // It's an async def method, or a function patched
+            // with 'types.async_def()'.
+            return oiter;
         }
 
-        Py_DECREF(iter);
-        Py_DECREF(iter_attr);
+        Py_CLEAR(oiter);
+    }
+
+    await_meth = _PyObject_GetAttrId(o, &PyId___await__);
+    if (await_meth == NULL) {
         goto error;
     }
 
-    if (PyObject_IsTrue(async_attr)) {
-        Py_DECREF(async_attr);
-        Py_DECREF(iter_attr);
-        return iter;
+    await_obj = PyObject_CallFunction(await_meth, NULL);
+    Py_DECREF(await_meth);
+
+    if (await_obj == NULL) {
+        goto error;
     }
 
-    Py_DECREF(async_attr);
-    Py_DECREF(iter);
-    Py_DECREF(iter_attr);
+    if (!PyIter_Check(await_obj)) {
+        PyErr_Format(PyExc_RuntimeError,
+                     "__await__ returned non-iterator '%.100R'",
+                     await_obj);
+
+        Py_DECREF(await_obj);
+        return NULL;
+    }
+
+    return await_obj;
 
 error:
-    if (PyErr_Occurred())
-        PyErr_Clear();
-
     PyErr_Format(PyExc_RuntimeError,
                  "object %.200R can't be used in 'await' expression",
                  o);

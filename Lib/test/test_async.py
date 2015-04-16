@@ -7,20 +7,16 @@ class AsyncYieldFrom:
     def __init__(self, obj):
         self.obj = obj
 
-    def __iter__(self):
+    def __await__(self):
         yield from self.obj
-
-    __iter__.__async__ = True
 
 
 class AsyncYield:
     def __init__(self, value):
         self.value = value
 
-    def __iter__(self):
+    def __await__(self):
         yield self.value
-
-    __iter__.__async__ = True
 
 
 class AsyncBadSyntaxTest(unittest.TestCase):
@@ -120,6 +116,51 @@ class AsyncFunctionTest(unittest.TestCase):
             self.assertEqual(ex.args[0], 42)
         else:
             self.assertFalse(True)
+
+    def test_await_5(self):
+        class Awaitable:
+            def __await__(self):
+                return
+
+        async def foo():
+            return (await Awaitable())
+
+        with self.assertRaisesRegex(RuntimeError,
+                                    "__await__ returned non-iterator"):
+
+            next(foo())
+
+    def test_await_6(self):
+        class Awaitable:
+            def __await__(self):
+                return iter([52])
+
+        async def foo():
+            return (await Awaitable())
+
+        self.assertEqual(next(foo()), 52)
+
+    def test_await_7(self):
+        class Awaitable:
+            def __await__(self):
+                yield 42
+
+        async def foo():
+            return (await Awaitable())
+
+        self.assertEqual(next(foo()), 42)
+
+    def test_await_8(self):
+        class Awaitable:
+            pass
+
+        async def foo():
+            return (await Awaitable())
+
+        with self.assertRaisesRegex(
+            RuntimeError, "Awaitable object.*used in 'await' expression"):
+
+            self.assertEqual(next(foo()), 42)
 
     def test_with_1(self):
         class Manager:
@@ -226,7 +267,6 @@ class AsyncFunctionTest(unittest.TestCase):
 
         buffer = []
         async def test1():
-            nonlocal buffer
             async for i1, i2 in AsyncIter():
                 buffer.append(i1 + i2)
 

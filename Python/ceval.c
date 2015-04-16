@@ -1932,34 +1932,35 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             _Py_IDENTIFIER(__aiter__);
 
             PyObject *iter = NULL;
-            PyObject *async_iter = NULL;
+            PyObject *async_aiter = NULL;
             PyObject *obj = TOP();
-            PyObject *iter_meth = special_lookup(obj, &PyId___aiter__);
 
+            PyObject *aiter_meth = special_lookup(obj, &PyId___aiter__);
             Py_DECREF(obj);
 
-            if (iter_meth == NULL) {
+            if (aiter_meth == NULL) {
                 SET_TOP(NULL);
 
                 PyErr_SetString(
                     PyExc_RuntimeError,
-                    "'async for' requires an object with async __aiter__ method");
+                    "'async for' requires an object with "
+                    "async __aiter__ method");
 
                 goto error;
             }
 
-            iter = PyObject_CallFunctionObjArgs(iter_meth, NULL);
-            Py_DECREF(iter_meth);
+            iter = PyObject_CallFunction(aiter_meth, NULL);
+            Py_DECREF(aiter_meth);
 
             if (iter == NULL) {
                 SET_TOP(NULL);
                 goto error;
             }
 
-            async_iter = _PyGen_GetAsyncIter(iter);
+            async_aiter = _PyGen_GetAsyncIter(iter);
             Py_DECREF(iter);
 
-            if (async_iter == NULL) {
+            if (async_aiter == NULL) {
                 SET_TOP(NULL);
                 PyErr_SetString(
                     PyExc_RuntimeError,
@@ -1968,7 +1969,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 goto error;
             }
 
-            SET_TOP(async_iter);
+            SET_TOP(async_aiter);
             DISPATCH();
         }
 
@@ -1977,13 +1978,14 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
             PyObject *next_iter = NULL;
             PyObject *async_iter = NULL;
-            PyObject *iter = TOP();
-            PyObject *next_meth = special_lookup(iter, &PyId___anext__);
+            PyObject *aiter = TOP();
+            PyObject *next_meth = special_lookup(aiter, &PyId___anext__);
 
             if (next_meth == NULL) {
-                PyErr_SetString(
+                PyErr_Format(
                     PyExc_RuntimeError,
-                    "'async for' requires an iterator with async __anext__ method");
+                    "'async for' requires an iterator with "
+                    "async __anext__ method %R", aiter);
 
                 goto error;
             }
