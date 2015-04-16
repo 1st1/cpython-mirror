@@ -260,6 +260,40 @@ class AsyncFunctionTest(unittest.TestCase):
         with self.assertRaises(AssertionError):
             next(func())
 
+    def test_with_6(self):
+        class CM:
+            def __aenter__(self):
+                return 123
+
+            def __aexit__(self, *e):
+                return 456
+
+        async def foo():
+            async with CM():
+                pass
+
+        with self.assertRaisesRegex(
+            RuntimeError, "object 123 can't be used in 'await' expression"):
+            # it's important that __aexit__ wasn't called
+            list(foo())
+
+    def test_with_7(self):
+        class CM:
+            async def __aenter__(self):
+                return self
+
+            def __aexit__(self, *e):
+                return 456
+
+        async def foo():
+            async with CM():
+                pass
+
+        with self.assertRaisesRegex(
+            RuntimeError, "object 456 can't be used in 'await' expression"):
+
+            list(foo())
+
     def test_for_1(self):
         aiter_calls = 0
 

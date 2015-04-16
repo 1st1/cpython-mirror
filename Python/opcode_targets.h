@@ -51,7 +51,7 @@ static void *opcode_targets[256] = {
     &&_unknown_opcode,
     &&TARGET_ASYNC_AITER,
     &&TARGET_ASYNC_ANEXT,
-    &&_unknown_opcode,
+    &&TARGET_BEFORE_ASYNC_WITH,
     &&_unknown_opcode,
     &&TARGET_STORE_MAP,
     &&TARGET_INPLACE_ADD,

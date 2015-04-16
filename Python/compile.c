@@ -1054,6 +1054,8 @@ PyCompile_OpcodeStackEffect(int opcode, int oparg)
             return 0;
         case GET_ASYNC:
             return 0;
+        case BEFORE_ASYNC_WITH:
+            return 1;
         case ASYNC_AITER:
             return 0;
         case ASYNC_ANEXT:
@@ -3473,6 +3475,12 @@ compiler_async_with(struct compiler *c, stmt_ty s, int pos)
 
     /* Evaluate EXPR */
     VISIT(c, expr, item->context_expr);
+
+    ADDOP(c, BEFORE_ASYNC_WITH);
+    ADDOP(c, GET_ASYNC);
+    ADDOP_O(c, LOAD_CONST, Py_None, consts);
+    ADDOP(c, YIELD_FROM);
+
     ADDOP_JREL(c, SETUP_ASYNC_WITH, finally);
 
     /* SETUP_ASYNC_WITH pushes a finally block. */
@@ -3480,10 +3488,6 @@ compiler_async_with(struct compiler *c, stmt_ty s, int pos)
     if (!compiler_push_fblock(c, FINALLY_TRY, block)) {
         return 0;
     }
-
-    ADDOP(c, GET_ASYNC);
-    ADDOP_O(c, LOAD_CONST, Py_None, consts);
-    ADDOP(c, YIELD_FROM);
 
     if (item->optional_vars) {
         VISIT(c, expr, item->optional_vars);
