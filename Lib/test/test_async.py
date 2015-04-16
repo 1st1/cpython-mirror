@@ -241,6 +241,25 @@ class AsyncFunctionTest(unittest.TestCase):
         with self.assertRaisesRegex(AttributeError, '__aexit__'):
             list(foo())
 
+    def test_with_5(self):
+        # While this test doesn't make a lot of sense,
+        # it's a regression test for an early bug with opcodes
+        # generation
+
+        class CM:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                pass
+
+        async def func():
+            async with CM():
+                assert (1, ) == 1
+
+        with self.assertRaises(AssertionError):
+            next(func())
+
     def test_for_1(self):
         aiter_calls = 0
 

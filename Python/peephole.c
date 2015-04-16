@@ -620,6 +620,7 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
             case SETUP_LOOP:
             case SETUP_EXCEPT:
             case SETUP_FINALLY:
+            case SETUP_ASYNC_WITH:
             case SETUP_WITH:
                 tgt = GETJUMPTGT(codestr, i);
                 /* Replace JUMP_* to a RETURN into just a RETURN */
@@ -704,6 +705,7 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
             case SETUP_LOOP:
             case SETUP_EXCEPT:
             case SETUP_FINALLY:
+            case SETUP_ASYNC_WITH:
             case SETUP_WITH:
                 j = addrmap[GETARG(codestr, i) + i + 3] - addrmap[i] - 3;
                 SETARG(codestr, i, j);
