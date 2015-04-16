@@ -153,6 +153,8 @@ static PyObject * special_lookup(PyObject *, _Py_Identifier *);
     "free variable '%.200s' referenced before assignment" \
     " in enclosing scope"
 
+static PyObject *generator_wrapper = NULL;
+
 /* Dynamic execution profile */
 #ifdef DYNAMIC_EXECUTION_PROFILE
 #ifdef DXPAIRS
@@ -3735,6 +3737,8 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
     }
 
     if (co->co_flags & CO_GENERATOR) {
+        PyObject *gen;
+
         /* Don't need to keep the reference to f_back, it will be set
          * when the generator is resumed. */
         Py_CLEAR(f->f_back);
@@ -3743,7 +3747,18 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
 
         /* Create a new generator that owns the ready to run frame
          * and return that as the value. */
-        return PyGen_NewWithQualName(f, name, qualname);
+        gen = PyGen_NewWithQualName(f, name, qualname);
+        if (gen == NULL)
+            return NULL;
+
+        if (generator_wrapper != NULL && co->co_flags & CO_ASYNC) {
+            PyObject *wrapped_gen =
+                        PyObject_CallFunction(generator_wrapper, "O", gen);
+
+            Py_DECREF(gen);
+            gen = wrapped_gen;
+        }
+        return gen;
     }
 
     retval = PyEval_EvalFrameEx(f,0);
@@ -4177,6 +4192,15 @@ PyEval_SetTrace(Py_tracefunc func, PyObject *arg)
     /* Flag that tracing or profiling is turned on */
     tstate->use_tracing = ((func != NULL)
                            || (tstate->c_profilefunc != NULL));
+}
+
+void
+PyEval_SetAsyncWrapper(PyObject *wrapper)
+{
+    Py_CLEAR(generator_wrapper);
+
+    Py_XINCREF(wrapper);
+    generator_wrapper = wrapper;
 }
 
 PyObject *

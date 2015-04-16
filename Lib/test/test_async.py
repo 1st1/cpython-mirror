@@ -82,17 +82,6 @@ class AsyncFunctionTest(unittest.TestCase):
 
     def test_func_2(self):
         async def foo():
-            return 'spam'
-
-        with self.assertWarnsRegex(
-                ResourceWarning,
-                "<generator.*AsyncFunctionTe.*\.foo.*was never awaited on"):
-
-            foo()
-            support.gc_collect()
-
-    def test_func_3(self):
-        async def foo():
             raise StopIteration
 
         with self.assertRaisesRegex(
@@ -380,10 +369,40 @@ class AsyncAsyncIOCompatTest(unittest.TestCase):
         self.assertEqual(buffer, [1, 2, 'MyException'])
 
 
+class SysSetAsyncWrapperTest(unittest.TestCase):
+
+    def test_set_wrapper_1(self):
+        import sys
+
+        async def foo():
+            return 'spam'
+
+        wrapped = None
+        def wrap(gen):
+            nonlocal wrapped
+            wrapped = gen
+            return gen
+
+        sys.set_async_wrapper(wrap)
+        try:
+            f = foo()
+            self.assertTrue(wrapped)
+
+            with self.assertRaisesRegexp(StopIteration, 'spam'):
+                next(f)
+        finally:
+            sys.set_async_wrapper(None)
+
+        wrapped = None
+        f = foo()
+        self.assertFalse(wrapped)
+
+
 def test_main():
     support.run_unittest(AsyncBadSyntaxTest,
                          AsyncFunctionTest,
-                         AsyncAsyncIOCompatTest)
+                         AsyncAsyncIOCompatTest,
+                         SysSetAsyncWrapperTest)
 
 
 if __name__=="__main__":

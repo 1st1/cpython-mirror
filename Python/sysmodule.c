@@ -645,6 +645,31 @@ sys_setrecursionlimit(PyObject *self, PyObject *args)
     return Py_None;
 }
 
+static PyObject *
+sys_set_async_wrapper(PyObject *self, PyObject *wrapper)
+{
+    if (wrapper != Py_None) {
+        if (!PyCallable_Check(wrapper)) {
+            PyErr_Format(PyExc_TypeError,
+                         "callback expected, got %s",
+                         Py_TYPE(wrapper)->tp_name);
+            return NULL;
+        }
+
+        PyEval_SetAsyncWrapper(wrapper);
+    }
+    else
+        PyEval_SetAsyncWrapper(NULL);
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+PyDoc_STRVAR(set_async_wrapper_doc,
+"set_async_wrapper(wrapper)\n\
+\n\
+Call wrapper when creating an async function."
+);
+
 static PyTypeObject Hash_InfoType;
 
 PyDoc_STRVAR(hash_info_doc,
@@ -1215,6 +1240,7 @@ static PyMethodDef sys_methods[] = {
     {"call_tracing", sys_call_tracing, METH_VARARGS, call_tracing_doc},
     {"_debugmallocstats", sys_debugmallocstats, METH_NOARGS,
      debugmallocstats_doc},
+    {"set_async_wrapper", sys_set_async_wrapper, METH_O, set_async_wrapper_doc},
     {NULL,              NULL}           /* sentinel */
 };
 
