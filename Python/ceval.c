@@ -2986,7 +2986,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
-        TARGET(SETUP_ASYNC_WITH) {
+        TARGET(BEFORE_ASYNC_WITH) {
             _Py_IDENTIFIER(__aexit__);
             _Py_IDENTIFIER(__aenter__);
 
@@ -3005,11 +3005,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             Py_DECREF(enter);
             if (res == NULL)
                 goto error;
+            PUSH(res);
+            DISPATCH();
+        }
+
+        TARGET(SETUP_ASYNC_WITH) {
+            PyObject *res = POP();
             /* Setup the finally block before pushing the result
                of __aenter__ on the stack. */
             PyFrame_BlockSetup(f, SETUP_FINALLY, INSTR_OFFSET() + oparg,
                                STACK_LEVEL());
-
             PUSH(res);
             DISPATCH();
         }
