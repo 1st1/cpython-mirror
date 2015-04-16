@@ -387,7 +387,7 @@ class Future:
         assert self.done(), "yield from wasn't used with future"
         return self.result()  # May raise too.
 
-    __iter__.__async__ = True # for async/await in Python 3.5
+    __await__ = __iter__ # for async/await in Python 3.5
 
 
 def wrap_future(fut, *, loop=None):
