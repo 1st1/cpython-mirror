@@ -2773,7 +2773,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(GET_ITER) {
             /* before: [obj]; after [getiter(obj)] */
             PyObject *iterable = TOP();
-            PyObject *iter = PyObject_GetIter(iterable);
+            PyObject *iter = __PyObject_GetIterLL(iterable);
             Py_DECREF(iterable);
             SET_TOP(iter);
             if (iter == NULL)

@@ -2724,6 +2724,20 @@ _PyObject_RealIsSubclass(PyObject *derived, PyObject *cls)
 PyObject *
 PyObject_GetIter(PyObject *o)
 {
+    if (o != NULL && PyGen_CheckAsyncExact(o)) {
+        PyErr_Format(PyExc_TypeError,
+                     "unable to get iterator for "
+                     "async function '%.100R'",
+                     o);
+        return NULL;
+    }
+
+    return __PyObject_GetIterLL(o);
+}
+
+PyObject *
+__PyObject_GetIterLL(PyObject *o)
+{
     PyTypeObject *t = o->ob_type;
     getiterfunc f = NULL;
     f = t->tp_iter;

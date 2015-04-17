@@ -100,6 +100,25 @@ class AsyncFunctionTest(unittest.TestCase):
 
         self.assertRegex(repr(foo()), '^<coroutine object.* at 0x.*>$')
 
+    def test_func_4(self):
+        check = lambda: self.assertRaisesRegex(
+            TypeError, "unable to get iterator for async function")
+
+        with check():
+            list(foo())
+
+        with check():
+            tuple(foo())
+
+        with check():
+            sum(foo())
+
+        with check():
+            iter(foo())
+
+        with check():
+            next(foo())
+
     def test_await_1(self):
         async def foo():
             await 1
