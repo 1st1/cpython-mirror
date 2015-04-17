@@ -19,6 +19,20 @@ class AsyncYield:
         yield self.value
 
 
+def run_async(coro):
+    assert coro.__class__ is types.GeneratorType
+
+    buffer = []
+    result = None
+    while True:
+        try:
+            buffer.append(coro.send(None))
+        except StopIteration as ex:
+            result = ex.args[0] if ex.args else None
+            break
+    return buffer, result
+
+
 class AsyncBadSyntaxTest(unittest.TestCase):
 
     def test_badsyntax_1(self):
@@ -66,12 +80,7 @@ class AsyncFunctionTest(unittest.TestCase):
         self.assertTrue(bool(foo.__code__.co_flags & 0x20))
         self.assertTrue(bool(f.gi_code.co_flags & 0x80))
         self.assertTrue(bool(f.gi_code.co_flags & 0x20))
-        try:
-            next(f)
-        except StopIteration as ex:
-            self.assertEqual(ex.args[0], 10)
-        else:
-            self.assertTrue(False)
+        self.assertEqual(run_async(f), ([], 10))
 
         def bar(): pass
         self.assertFalse(bool(bar.__code__.co_flags & 0x80))
@@ -83,25 +92,25 @@ class AsyncFunctionTest(unittest.TestCase):
         with self.assertRaisesRegex(
                 RuntimeError, "generator raised StopIteration"):
 
-            next(foo())
+            run_async(foo())
 
     def test_await_1(self):
         async def foo():
             await 1
         with self.assertRaisesRegex(RuntimeError, "object 1 can.t.*await"):
-            list(foo())
+            run_async(foo())
 
     def test_await_2(self):
         async def foo():
             await []
         with self.assertRaisesRegex(RuntimeError, "object \[\] can.t.*await"):
-            list(foo())
+            run_async(foo())
 
     def test_await_3(self):
         async def foo():
             await AsyncYieldFrom([1, 2, 3])
 
-        self.assertEqual(list(foo()), [1, 2, 3])
+        self.assertEqual(run_async(foo()), ([1, 2, 3], None))
 
     def test_await_4(self):
         async def bar():
@@ -110,12 +119,7 @@ class AsyncFunctionTest(unittest.TestCase):
         async def foo():
             return (await bar())
 
-        try:
-            next(foo())
-        except StopIteration as ex:
-            self.assertEqual(ex.args[0], 42)
-        else:
-            self.assertFalse(True)
+        self.assertEqual(run_async(foo()), ([], 42))
 
     def test_await_5(self):
         class Awaitable:
@@ -128,7 +132,7 @@ class AsyncFunctionTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,
                                     "__await__ returned non-iterator"):
 
-            next(foo())
+            run_async(foo())
 
     def test_await_6(self):
         class Awaitable:
@@ -138,17 +142,18 @@ class AsyncFunctionTest(unittest.TestCase):
         async def foo():
             return (await Awaitable())
 
-        self.assertEqual(next(foo()), 52)
+        self.assertEqual(run_async(foo()), ([52], None))
 
     def test_await_7(self):
         class Awaitable:
             def __await__(self):
                 yield 42
+                return 100
 
         async def foo():
             return (await Awaitable())
 
-        self.assertEqual(next(foo()), 42)
+        self.assertEqual(run_async(foo()), ([42], 100))
 
     def test_await_8(self):
         class Awaitable:
@@ -160,7 +165,7 @@ class AsyncFunctionTest(unittest.TestCase):
         with self.assertRaisesRegex(
             RuntimeError, "Awaitable object.*used in 'await' expression"):
 
-            self.assertEqual(next(foo()), 42)
+            run_async(foo())
 
     def test_with_1(self):
         class Manager:
@@ -186,7 +191,7 @@ class AsyncFunctionTest(unittest.TestCase):
                 1/0
 
         f = foo()
-        result = list(f)
+        result, _ = run_async(f)
 
         self.assertEqual(
             result, ['enter-1-A', 'enter-2-A', 'enter-1-B', 'enter-2-B',
@@ -200,7 +205,7 @@ class AsyncFunctionTest(unittest.TestCase):
                 1/0
 
         with self.assertRaises(ZeroDivisionError):
-            list(foo())
+            run_async(foo())
 
     def test_with_2(self):
         class CM:
@@ -212,7 +217,7 @@ class AsyncFunctionTest(unittest.TestCase):
                 pass
 
         with self.assertRaisesRegex(AttributeError, '__aexit__'):
-            list(foo())
+            run_async(foo())
 
     def test_with_3(self):
         class CM:
@@ -224,7 +229,7 @@ class AsyncFunctionTest(unittest.TestCase):
                 pass
 
         with self.assertRaisesRegex(AttributeError, '__aenter__'):
-            list(foo())
+            run_async(foo())
 
     def test_with_4(self):
         class CM:
@@ -239,7 +244,7 @@ class AsyncFunctionTest(unittest.TestCase):
                 pass
 
         with self.assertRaisesRegex(AttributeError, '__aexit__'):
-            list(foo())
+            run_async(foo())
 
     def test_with_5(self):
         # While this test doesn't make a lot of sense,
@@ -258,7 +263,7 @@ class AsyncFunctionTest(unittest.TestCase):
                 assert (1, ) == 1
 
         with self.assertRaises(AssertionError):
-            next(func())
+            run_async(func())
 
     def test_with_6(self):
         class CM:
@@ -275,7 +280,7 @@ class AsyncFunctionTest(unittest.TestCase):
         with self.assertRaisesRegex(
             RuntimeError, "object 123 can't be used in 'await' expression"):
             # it's important that __aexit__ wasn't called
-            list(foo())
+            run_async(foo())
 
     def test_with_7(self):
         class CM:
@@ -292,7 +297,7 @@ class AsyncFunctionTest(unittest.TestCase):
         with self.assertRaisesRegex(
             RuntimeError, "object 456 can't be used in 'await' expression"):
 
-            list(foo())
+            run_async(foo())
 
     def test_for_1(self):
         aiter_calls = 0
@@ -323,7 +328,7 @@ class AsyncFunctionTest(unittest.TestCase):
             async for i1, i2 in AsyncIter():
                 buffer.append(i1 + i2)
 
-        yielded = list(test1())
+        yielded, _ = run_async(test1())
         # Make sure that __aiter__ was called only once
         self.assertEqual(aiter_calls, 1)
         self.assertEqual(yielded, [i * 100 for i in range(1, 11)])
@@ -341,7 +346,7 @@ class AsyncFunctionTest(unittest.TestCase):
                 buffer.append('what?')
             buffer.append('end')
 
-        yielded = list(test2())
+        yielded, _ = run_async(test2())
         # Make sure that __aiter__ was called only once
         self.assertEqual(aiter_calls, 2)
         self.assertEqual(yielded, [100, 200])
@@ -359,7 +364,7 @@ class AsyncFunctionTest(unittest.TestCase):
                 buffer.append('what?')
             buffer.append('end')
 
-        yielded = list(test3())
+        yielded, _ = run_async(test3())
         # Make sure that __aiter__ was called only once
         self.assertEqual(aiter_calls, 3)
         self.assertEqual(yielded, [i * 100 for i in range(1, 11)])
@@ -374,7 +379,7 @@ class AsyncFunctionTest(unittest.TestCase):
         with self.assertRaisesRegex(
                 RuntimeError, "async for' requires an object.*__aiter__"):
 
-            list(foo())
+            run_async(foo())
 
     def test_for_3(self):
         class I:
@@ -388,7 +393,7 @@ class AsyncFunctionTest(unittest.TestCase):
         with self.assertRaisesRegex(
                 RuntimeError, "async for' received an invalid object.*__aiter"):
 
-            list(foo())
+            run_async(foo())
 
     def test_for_4(self):
         class I:
@@ -404,7 +409,7 @@ class AsyncFunctionTest(unittest.TestCase):
 
         with self.assertRaisesRegex(
                 RuntimeError, "async for' received an invalid object.*__anext"):
-            list(foo())
+            run_async(foo())
 
     def test_for_5(self):
         class I:
@@ -421,7 +426,7 @@ class AsyncFunctionTest(unittest.TestCase):
         with self.assertRaisesRegex(
                 RuntimeError, "async for' received an invalid object.*__anext"):
 
-            list(foo())
+            run_async(foo())
 
 
 class AsyncAsyncIOCompatTest(unittest.TestCase):
@@ -481,8 +486,7 @@ class SysSetAsyncWrapperTest(unittest.TestCase):
             f = foo()
             self.assertTrue(wrapped)
 
-            with self.assertRaisesRegexp(StopIteration, 'spam'):
-                next(f)
+            self.assertEqual(run_async(f), ([], 'spam'))
         finally:
             sys.set_async_wrapper(None)
 
