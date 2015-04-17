@@ -649,7 +649,7 @@ _PyGen_GetAsyncIter(PyObject *o)
 
     if (PyGen_CheckAsyncExact(o)) {
         // Fast path. It's a central function for 'await'.
-        return ((PyTypeObject *)o->ob_type)->tp_iter(o);
+        return o->ob_type->tp_iter(o);
     }
 
     oiter = PyObject_GetIter(o);
