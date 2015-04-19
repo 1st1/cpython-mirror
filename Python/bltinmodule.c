@@ -1263,6 +1263,13 @@ builtin_next(PyObject *self, PyObject *args)
         return NULL;
     }
 
+    if (PyGen_CheckAsyncExact(it)) {
+        PyErr_Format(PyExc_TypeError,
+                     "next() received a coroutine object: %.100R",
+                     it);
+        return NULL;
+    }
+
     res = (*it->ob_type->tp_iternext)(it);
     if (res != NULL) {
         return res;

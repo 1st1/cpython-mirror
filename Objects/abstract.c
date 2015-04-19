@@ -2727,7 +2727,7 @@ PyObject_GetIter(PyObject *o)
     if (o != NULL && PyGen_CheckAsyncExact(o)) {
         PyErr_Format(PyExc_TypeError,
                      "unable to get iterator for "
-                     "async function '%.100R'",
+                     "coroutine %.100R",
                      o);
         return NULL;
     }

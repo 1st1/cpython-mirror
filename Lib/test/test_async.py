@@ -101,8 +101,11 @@ class AsyncFunctionTest(unittest.TestCase):
         self.assertRegex(repr(foo()), '^<coroutine object.* at 0x.*>$')
 
     def test_func_4(self):
+        async def foo():
+            raise StopIteration
+
         check = lambda: self.assertRaisesRegex(
-            TypeError, "unable to get iterator for async function")
+            TypeError, "unable to get iterator for coroutine")
 
         with check():
             list(foo())
@@ -116,7 +119,9 @@ class AsyncFunctionTest(unittest.TestCase):
         with check():
             iter(foo())
 
-        with check():
+        with self.assertRaisesRegex(
+            TypeError, "received a coroutine object"):
+
             next(foo())
 
     def test_await_1(self):
