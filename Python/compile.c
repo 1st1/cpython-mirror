@@ -1660,23 +1660,43 @@ error:
 }
 
 static int
-compiler_function(struct compiler *c, stmt_ty s)
+compiler_function(struct compiler *c, stmt_ty s, int is_async)
 {
     PyCodeObject *co;
     PyObject *qualname, *first_const = Py_None;
-    arguments_ty args = s->v.FunctionDef.args;
-    expr_ty returns = s->v.FunctionDef.returns;
-    asdl_seq* decos = s->v.FunctionDef.decorator_list;
+    arguments_ty args;
+    expr_ty returns;
+    identifier name;
+    asdl_seq* decos;
+    asdl_seq *body;
     stmt_ty st;
     Py_ssize_t i, n, arglength;
     int docstring, kw_default_count = 0;
     int num_annotations;
-    int scope_type = COMPILER_SCOPE_FUNCTION;
+    int scope_type;
 
-    assert(s->kind == FunctionDef_kind);
 
-    if (s->v.FunctionDef.is_async)
+    if (is_async) {
+        assert(s->kind == AsyncFunctionDef_kind);
+
+        args = s->v.AsyncFunctionDef.args;
+        returns = s->v.AsyncFunctionDef.returns;
+        decos = s->v.AsyncFunctionDef.decorator_list;
+        name = s->v.AsyncFunctionDef.name;
+        body = s->v.AsyncFunctionDef.body;
+
         scope_type = COMPILER_SCOPE_ASYNC_FUNCTION;
+    } else {
+        assert(s->kind == FunctionDef_kind);
+
+        args = s->v.FunctionDef.args;
+        returns = s->v.FunctionDef.returns;
+        decos = s->v.FunctionDef.decorator_list;
+        name = s->v.FunctionDef.name;
+        body = s->v.FunctionDef.body;
+
+        scope_type = COMPILER_SCOPE_FUNCTION;
+    }
 
     if (!compiler_decorators(c, decos))
         return 0;
@@ -1694,12 +1714,12 @@ compiler_function(struct compiler *c, stmt_ty s)
         return 0;
     assert((num_annotations & 0xFFFF) == num_annotations);
 
-    if (!compiler_enter_scope(c, s->v.FunctionDef.name,
+    if (!compiler_enter_scope(c, name,
                               scope_type, (void *)s,
                               s->lineno))
         return 0;
 
-    st = (stmt_ty)asdl_seq_GET(s->v.FunctionDef.body, 0);
+    st = (stmt_ty)asdl_seq_GET(body, 0);
     docstring = compiler_isdocstring(st);
     if (docstring && c->c_optimize < 2)
         first_const = st->v.Expr.value->v.Str.s;
@@ -1710,10 +1730,10 @@ compiler_function(struct compiler *c, stmt_ty s)
 
     c->u->u_argcount = asdl_seq_LEN(args->args);
     c->u->u_kwonlyargcount = asdl_seq_LEN(args->kwonlyargs);
-    n = asdl_seq_LEN(s->v.FunctionDef.body);
+    n = asdl_seq_LEN(body);
     /* if there was a docstring, we need to skip the first statement */
     for (i = docstring; i < n; i++) {
-        st = (stmt_ty)asdl_seq_GET(s->v.FunctionDef.body, i);
+        st = (stmt_ty)asdl_seq_GET(body, i);
         VISIT_IN_SCOPE(c, stmt, st);
     }
     co = assemble(c, 1);
@@ -1733,7 +1753,7 @@ compiler_function(struct compiler *c, stmt_ty s)
     Py_DECREF(qualname);
     Py_DECREF(co);
 
-    if (s->v.FunctionDef.is_async) {
+    if (is_async) {
         co->co_flags |= CO_ASYNC;
 
         // An async function is always a generator, even
@@ -1746,7 +1766,7 @@ compiler_function(struct compiler *c, stmt_ty s)
         ADDOP_I(c, CALL_FUNCTION, 1);
     }
 
-    return compiler_nameop(c, s->v.FunctionDef.name, Store);
+    return compiler_nameop(c, name, Store);
 }
 
 static int
@@ -2630,7 +2650,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 
     switch (s->kind) {
     case FunctionDef_kind:
-        return compiler_function(c, s);
+        return compiler_function(c, s, 0);
     case ClassDef_kind:
         return compiler_class(c, s);
     case Return_kind:
@@ -2709,6 +2729,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         return compiler_continue(c);
     case With_kind:
         return compiler_with(c, s, 0);
+    case AsyncFunctionDef_kind:
+        return compiler_function(c, s, 1);
     case AsyncWith_kind:
         return compiler_async_with(c, s, 0);
     case AsyncFor_kind:

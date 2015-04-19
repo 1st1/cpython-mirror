@@ -422,6 +422,12 @@ validate_stmt(stmt_ty stmt)
         return validate_nonempty_seq(stmt->v.Nonlocal.names, "names", "Nonlocal");
     case Expr_kind:
         return validate_expr(stmt->v.Expr.value, Load);
+    case AsyncFunctionDef_kind:
+        return validate_body(stmt->v.AsyncFunctionDef.body, "AsyncFunctionDef") &&
+            validate_arguments(stmt->v.AsyncFunctionDef.args) &&
+            validate_exprs(stmt->v.AsyncFunctionDef.decorator_list, Load, 0) &&
+            (!stmt->v.AsyncFunctionDef.returns ||
+             validate_expr(stmt->v.AsyncFunctionDef.returns, Load));
     case Pass_kind:
     case Break_kind:
     case Continue_kind:
@@ -1533,11 +1539,15 @@ _ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq, in
     if (!body)
         return NULL;
 
-    return FunctionDef(name, args, body, decorator_seq, returns,
-                       is_async,
-                       LINENO(n),
-                       n->n_col_offset, c->c_arena);
-
+    if (is_async) {
+        return AsyncFunctionDef(name, args, body, decorator_seq, returns,
+                                LINENO(n),
+                                n->n_col_offset, c->c_arena);
+    } else {
+        return FunctionDef(name, args, body, decorator_seq, returns,
+                           LINENO(n),
+                           n->n_col_offset, c->c_arena);
+    }
 }
 
 static stmt_ty

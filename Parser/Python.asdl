@@ -10,8 +10,10 @@ module Python
         | Suite(stmt* body)
 
     stmt = FunctionDef(identifier name, arguments args,
-                           stmt* body, expr* decorator_list, expr? returns,
-                           int? is_async)
+                       stmt* body, expr* decorator_list, expr? returns)
+          | AsyncFunctionDef(identifier name, arguments args,
+                             stmt* body, expr* decorator_list, expr? returns)
+
           | ClassDef(identifier name,
              expr* bases,
              keyword* keywords,
