@@ -153,7 +153,22 @@ class AsyncFunctionTest(unittest.TestCase):
         with self.assertRaises(StopIteration):
             f.send(None)
 
+    def test_func_7(self):
+        async def bar():
+            return 10
+
+        def foo():
+            yield from bar()
+
+        f = foo()
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "cannot 'yield from' a coroutine object from a generator"):
+
+            list(f)
+
     def test_await_1(self):
+
         async def foo():
             await 1
         with self.assertRaisesRegex(RuntimeError, "object 1 can.t.*await"):
