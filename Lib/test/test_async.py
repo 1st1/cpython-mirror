@@ -94,6 +94,12 @@ class AsyncFunctionTest(unittest.TestCase):
 
             run_async(foo())
 
+    def test_func_3(self):
+        async def foo():
+            raise StopIteration
+
+        self.assertRegex(repr(foo()), '^<coroutine object.* at 0x.*>$')
+
     def test_await_1(self):
         async def foo():
             await 1
