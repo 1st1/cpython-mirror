@@ -63,13 +63,13 @@ struct _mod {
     } v;
 };
 
-enum _stmt_kind {FunctionDef_kind=1, ClassDef_kind=2, Return_kind=3,
-                  Delete_kind=4, Assign_kind=5, AugAssign_kind=6, For_kind=7,
-                  AsyncFor_kind=8, While_kind=9, If_kind=10, With_kind=11,
-                  AsyncWith_kind=12, Raise_kind=13, Try_kind=14,
-                  Assert_kind=15, Import_kind=16, ImportFrom_kind=17,
-                  Global_kind=18, Nonlocal_kind=19, Expr_kind=20, Pass_kind=21,
-                  Break_kind=22, Continue_kind=23};
+enum _stmt_kind {FunctionDef_kind=1, AsyncFunctionDef_kind=2, ClassDef_kind=3,
+                  Return_kind=4, Delete_kind=5, Assign_kind=6,
+                  AugAssign_kind=7, For_kind=8, AsyncFor_kind=9, While_kind=10,
+                  If_kind=11, With_kind=12, AsyncWith_kind=13, Raise_kind=14,
+                  Try_kind=15, Assert_kind=16, Import_kind=17,
+                  ImportFrom_kind=18, Global_kind=19, Nonlocal_kind=20,
+                  Expr_kind=21, Pass_kind=22, Break_kind=23, Continue_kind=24};
 struct _stmt {
     enum _stmt_kind kind;
     union {
@@ -79,8 +79,15 @@ struct _stmt {
             asdl_seq *body;
             asdl_seq *decorator_list;
             expr_ty returns;
-            int is_async;
         } FunctionDef;
+        
+        struct {
+            identifier name;
+            arguments_ty args;
+            asdl_seq *body;
+            asdl_seq *decorator_list;
+            expr_ty returns;
+        } AsyncFunctionDef;
         
         struct {
             identifier name;
@@ -420,10 +427,14 @@ mod_ty _Py_Interactive(asdl_seq * body, PyArena *arena);
 mod_ty _Py_Expression(expr_ty body, PyArena *arena);
 #define Suite(a0, a1) _Py_Suite(a0, a1)
 mod_ty _Py_Suite(asdl_seq * body, PyArena *arena);
-#define FunctionDef(a0, a1, a2, a3, a4, a5, a6, a7, a8) _Py_FunctionDef(a0, a1, a2, a3, a4, a5, a6, a7, a8)
+#define FunctionDef(a0, a1, a2, a3, a4, a5, a6, a7) _Py_FunctionDef(a0, a1, a2, a3, a4, a5, a6, a7)
 stmt_ty _Py_FunctionDef(identifier name, arguments_ty args, asdl_seq * body,
-                        asdl_seq * decorator_list, expr_ty returns, int
-                        is_async, int lineno, int col_offset, PyArena *arena);
+                        asdl_seq * decorator_list, expr_ty returns, int lineno,
+                        int col_offset, PyArena *arena);
+#define AsyncFunctionDef(a0, a1, a2, a3, a4, a5, a6, a7) _Py_AsyncFunctionDef(a0, a1, a2, a3, a4, a5, a6, a7)
+stmt_ty _Py_AsyncFunctionDef(identifier name, arguments_ty args, asdl_seq *
+                             body, asdl_seq * decorator_list, expr_ty returns,
+                             int lineno, int col_offset, PyArena *arena);
 #define ClassDef(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9) _Py_ClassDef(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9)
 stmt_ty _Py_ClassDef(identifier name, asdl_seq * bases, asdl_seq * keywords,
                      expr_ty starargs, expr_ty kwargs, asdl_seq * body,

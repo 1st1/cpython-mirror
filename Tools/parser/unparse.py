@@ -236,13 +236,17 @@ class Unparser:
         self.leave()
 
     def _FunctionDef(self, t):
+        self.__FunctionDef_helper(t, "def")
+
+    def _AsyncFunctionDef(self, t):
+        self.__FunctionDef_helper(t, "async def")
+
+    def __FunctionDef_helper(self, t, fill_suffix):
         self.write("\n")
         for deco in t.decorator_list:
             self.fill("@")
             self.dispatch(deco)
-        def_str = "def "+t.name + "("
-        if t.is_async:
-            def_str = "async " + def_str
+        def_str = fill_suffix+" "+t.name + "("
         self.fill(def_str)
         self.dispatch(t.args)
         self.write(")")

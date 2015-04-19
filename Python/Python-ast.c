@@ -38,14 +38,20 @@ _Py_IDENTIFIER(name);
 _Py_IDENTIFIER(args);
 _Py_IDENTIFIER(decorator_list);
 _Py_IDENTIFIER(returns);
-_Py_IDENTIFIER(is_async);
 static char *FunctionDef_fields[]={
     "name",
     "args",
     "body",
     "decorator_list",
     "returns",
-    "is_async",
+};
+static PyTypeObject *AsyncFunctionDef_type;
+static char *AsyncFunctionDef_fields[]={
+    "name",
+    "args",
+    "body",
+    "decorator_list",
+    "returns",
 };
 static PyTypeObject *ClassDef_type;
 _Py_IDENTIFIER(bases);
@@ -828,8 +834,11 @@ static int init_types(void)
     if (!stmt_type) return 0;
     if (!add_attributes(stmt_type, stmt_attributes, 2)) return 0;
     FunctionDef_type = make_type("FunctionDef", stmt_type, FunctionDef_fields,
-                                 6);
+                                 5);
     if (!FunctionDef_type) return 0;
+    AsyncFunctionDef_type = make_type("AsyncFunctionDef", stmt_type,
+                                      AsyncFunctionDef_fields, 5);
+    if (!AsyncFunctionDef_type) return 0;
     ClassDef_type = make_type("ClassDef", stmt_type, ClassDef_fields, 7);
     if (!ClassDef_type) return 0;
     Return_type = make_type("Return", stmt_type, Return_fields, 1);
@@ -1202,8 +1211,8 @@ Suite(asdl_seq * body, PyArena *arena)
 
 stmt_ty
 FunctionDef(identifier name, arguments_ty args, asdl_seq * body, asdl_seq *
-            decorator_list, expr_ty returns, int is_async, int lineno, int
-            col_offset, PyArena *arena)
+            decorator_list, expr_ty returns, int lineno, int col_offset,
+            PyArena *arena)
 {
     stmt_ty p;
     if (!name) {
@@ -1225,7 +1234,36 @@ FunctionDef(identifier name, arguments_ty args, asdl_seq * body, asdl_seq *
     p->v.FunctionDef.body = body;
     p->v.FunctionDef.decorator_list = decorator_list;
     p->v.FunctionDef.returns = returns;
-    p->v.FunctionDef.is_async = is_async;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    return p;
+}
+
+stmt_ty
+AsyncFunctionDef(identifier name, arguments_ty args, asdl_seq * body, asdl_seq
+                 * decorator_list, expr_ty returns, int lineno, int col_offset,
+                 PyArena *arena)
+{
+    stmt_ty p;
+    if (!name) {
+        PyErr_SetString(PyExc_ValueError,
+                        "field name is required for AsyncFunctionDef");
+        return NULL;
+    }
+    if (!args) {
+        PyErr_SetString(PyExc_ValueError,
+                        "field args is required for AsyncFunctionDef");
+        return NULL;
+    }
+    p = (stmt_ty)PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = AsyncFunctionDef_kind;
+    p->v.AsyncFunctionDef.name = name;
+    p->v.AsyncFunctionDef.args = args;
+    p->v.AsyncFunctionDef.body = body;
+    p->v.AsyncFunctionDef.decorator_list = decorator_list;
+    p->v.AsyncFunctionDef.returns = returns;
     p->lineno = lineno;
     p->col_offset = col_offset;
     return p;
@@ -2511,9 +2549,34 @@ ast2obj_stmt(void* _o)
         if (_PyObject_SetAttrId(result, &PyId_returns, value) == -1)
             goto failed;
         Py_DECREF(value);
-        value = ast2obj_int(o->v.FunctionDef.is_async);
+        break;
+    case AsyncFunctionDef_kind:
+        result = PyType_GenericNew(AsyncFunctionDef_type, NULL, NULL);
+        if (!result) goto failed;
+        value = ast2obj_identifier(o->v.AsyncFunctionDef.name);
         if (!value) goto failed;
-        if (_PyObject_SetAttrId(result, &PyId_is_async, value) == -1)
+        if (_PyObject_SetAttrId(result, &PyId_name, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        value = ast2obj_arguments(o->v.AsyncFunctionDef.args);
+        if (!value) goto failed;
+        if (_PyObject_SetAttrId(result, &PyId_args, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        value = ast2obj_list(o->v.AsyncFunctionDef.body, ast2obj_stmt);
+        if (!value) goto failed;
+        if (_PyObject_SetAttrId(result, &PyId_body, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        value = ast2obj_list(o->v.AsyncFunctionDef.decorator_list,
+                             ast2obj_expr);
+        if (!value) goto failed;
+        if (_PyObject_SetAttrId(result, &PyId_decorator_list, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        value = ast2obj_expr(o->v.AsyncFunctionDef.returns);
+        if (!value) goto failed;
+        if (_PyObject_SetAttrId(result, &PyId_returns, value) == -1)
             goto failed;
         Py_DECREF(value);
         break;
@@ -3921,7 +3984,6 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
         asdl_seq* body;
         asdl_seq* decorator_list;
         expr_ty returns;
-        int is_async;
 
         if (_PyObject_HasAttrId(obj, &PyId_name)) {
             int res;
@@ -4003,18 +4065,104 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
         } else {
             returns = NULL;
         }
-        if (exists_not_none(obj, &PyId_is_async)) {
+        *out = FunctionDef(name, args, body, decorator_list, returns, lineno,
+                           col_offset, arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
+    isinstance = PyObject_IsInstance(obj, (PyObject*)AsyncFunctionDef_type);
+    if (isinstance == -1) {
+        return 1;
+    }
+    if (isinstance) {
+        identifier name;
+        arguments_ty args;
+        asdl_seq* body;
+        asdl_seq* decorator_list;
+        expr_ty returns;
+
+        if (_PyObject_HasAttrId(obj, &PyId_name)) {
             int res;
-            tmp = _PyObject_GetAttrId(obj, &PyId_is_async);
+            tmp = _PyObject_GetAttrId(obj, &PyId_name);
             if (tmp == NULL) goto failed;
-            res = obj2ast_int(tmp, &is_async, arena);
+            res = obj2ast_identifier(tmp, &name, arena);
             if (res != 0) goto failed;
             Py_CLEAR(tmp);
         } else {
-            is_async = 0;
+            PyErr_SetString(PyExc_TypeError, "required field \"name\" missing from AsyncFunctionDef");
+            return 1;
         }
-        *out = FunctionDef(name, args, body, decorator_list, returns, is_async,
-                           lineno, col_offset, arena);
+        if (_PyObject_HasAttrId(obj, &PyId_args)) {
+            int res;
+            tmp = _PyObject_GetAttrId(obj, &PyId_args);
+            if (tmp == NULL) goto failed;
+            res = obj2ast_arguments(tmp, &args, arena);
+            if (res != 0) goto failed;
+            Py_CLEAR(tmp);
+        } else {
+            PyErr_SetString(PyExc_TypeError, "required field \"args\" missing from AsyncFunctionDef");
+            return 1;
+        }
+        if (_PyObject_HasAttrId(obj, &PyId_body)) {
+            int res;
+            Py_ssize_t len;
+            Py_ssize_t i;
+            tmp = _PyObject_GetAttrId(obj, &PyId_body);
+            if (tmp == NULL) goto failed;
+            if (!PyList_Check(tmp)) {
+                PyErr_Format(PyExc_TypeError, "AsyncFunctionDef field \"body\" must be a list, not a %.200s", tmp->ob_type->tp_name);
+                goto failed;
+            }
+            len = PyList_GET_SIZE(tmp);
+            body = _Py_asdl_seq_new(len, arena);
+            if (body == NULL) goto failed;
+            for (i = 0; i < len; i++) {
+                stmt_ty value;
+                res = obj2ast_stmt(PyList_GET_ITEM(tmp, i), &value, arena);
+                if (res != 0) goto failed;
+                asdl_seq_SET(body, i, value);
+            }
+            Py_CLEAR(tmp);
+        } else {
+            PyErr_SetString(PyExc_TypeError, "required field \"body\" missing from AsyncFunctionDef");
+            return 1;
+        }
+        if (_PyObject_HasAttrId(obj, &PyId_decorator_list)) {
+            int res;
+            Py_ssize_t len;
+            Py_ssize_t i;
+            tmp = _PyObject_GetAttrId(obj, &PyId_decorator_list);
+            if (tmp == NULL) goto failed;
+            if (!PyList_Check(tmp)) {
+                PyErr_Format(PyExc_TypeError, "AsyncFunctionDef field \"decorator_list\" must be a list, not a %.200s", tmp->ob_type->tp_name);
+                goto failed;
+            }
+            len = PyList_GET_SIZE(tmp);
+            decorator_list = _Py_asdl_seq_new(len, arena);
+            if (decorator_list == NULL) goto failed;
+            for (i = 0; i < len; i++) {
+                expr_ty value;
+                res = obj2ast_expr(PyList_GET_ITEM(tmp, i), &value, arena);
+                if (res != 0) goto failed;
+                asdl_seq_SET(decorator_list, i, value);
+            }
+            Py_CLEAR(tmp);
+        } else {
+            PyErr_SetString(PyExc_TypeError, "required field \"decorator_list\" missing from AsyncFunctionDef");
+            return 1;
+        }
+        if (exists_not_none(obj, &PyId_returns)) {
+            int res;
+            tmp = _PyObject_GetAttrId(obj, &PyId_returns);
+            if (tmp == NULL) goto failed;
+            res = obj2ast_expr(tmp, &returns, arena);
+            if (res != 0) goto failed;
+            Py_CLEAR(tmp);
+        } else {
+            returns = NULL;
+        }
+        *out = AsyncFunctionDef(name, args, body, decorator_list, returns,
+                                lineno, col_offset, arena);
         if (*out == NULL) goto failed;
         return 0;
     }
@@ -7180,6 +7328,8 @@ PyInit__ast(void)
     if (PyDict_SetItemString(d, "stmt", (PyObject*)stmt_type) < 0) return NULL;
     if (PyDict_SetItemString(d, "FunctionDef", (PyObject*)FunctionDef_type) <
         0) return NULL;
+    if (PyDict_SetItemString(d, "AsyncFunctionDef",
+        (PyObject*)AsyncFunctionDef_type) < 0) return NULL;
     if (PyDict_SetItemString(d, "ClassDef", (PyObject*)ClassDef_type) < 0)
         return NULL;
     if (PyDict_SetItemString(d, "Return", (PyObject*)Return_type) < 0) return

@@ -182,7 +182,7 @@ static int symtable_visit_slice(struct symtable *st, slice_ty);
 static int symtable_visit_params(struct symtable *st, asdl_seq *args);
 static int symtable_visit_argannotations(struct symtable *st, asdl_seq *args);
 static int symtable_implicit_arg(struct symtable *st, int pos);
-static int symtable_visit_annotations(struct symtable *st, stmt_ty s);
+static int symtable_visit_annotations(struct symtable *st, stmt_ty s, arguments_ty, expr_ty);
 static int symtable_visit_withitem(struct symtable *st, withitem_ty item);
 
 
@@ -1182,7 +1182,8 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
         if (s->v.FunctionDef.args->kw_defaults)
             VISIT_KWONLYDEFAULTS(st,
                                s->v.FunctionDef.args->kw_defaults);
-        if (!symtable_visit_annotations(st, s))
+        if (!symtable_visit_annotations(st, s, s->v.FunctionDef.args,
+                                        s->v.FunctionDef.returns))
             VISIT_QUIT(st, 0);
         if (s->v.FunctionDef.decorator_list)
             VISIT_SEQ(st, expr, s->v.FunctionDef.decorator_list);
@@ -1365,6 +1366,28 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
     case With_kind:
         VISIT_SEQ(st, withitem, s->v.With.items);
         VISIT_SEQ(st, stmt, s->v.With.body);
+        break;
+    case AsyncFunctionDef_kind:
+        if (!symtable_add_def(st, s->v.AsyncFunctionDef.name, DEF_LOCAL))
+            VISIT_QUIT(st, 0);
+        if (s->v.AsyncFunctionDef.args->defaults)
+            VISIT_SEQ(st, expr, s->v.AsyncFunctionDef.args->defaults);
+        if (s->v.AsyncFunctionDef.args->kw_defaults)
+            VISIT_KWONLYDEFAULTS(st,
+                               s->v.AsyncFunctionDef.args->kw_defaults);
+        if (!symtable_visit_annotations(st, s, s->v.AsyncFunctionDef.args,
+                                        s->v.AsyncFunctionDef.returns))
+            VISIT_QUIT(st, 0);
+        if (s->v.AsyncFunctionDef.decorator_list)
+            VISIT_SEQ(st, expr, s->v.AsyncFunctionDef.decorator_list);
+        if (!symtable_enter_block(st, s->v.AsyncFunctionDef.name,
+                                  FunctionBlock, (void *)s, s->lineno,
+                                  s->col_offset))
+            VISIT_QUIT(st, 0);
+        VISIT(st, arguments, s->v.AsyncFunctionDef.args);
+        VISIT_SEQ(st, stmt, s->v.AsyncFunctionDef.body);
+        if (!symtable_exit_block(st, s))
+            VISIT_QUIT(st, 0);
         break;
     case AsyncWith_kind:
         VISIT_SEQ(st, withitem, s->v.AsyncWith.items);
@@ -1563,10 +1586,9 @@ symtable_visit_argannotations(struct symtable *st, asdl_seq *args)
 }
 
 static int
-symtable_visit_annotations(struct symtable *st, stmt_ty s)
+symtable_visit_annotations(struct symtable *st, stmt_ty s,
+                           arguments_ty a, expr_ty returns)
 {
-    arguments_ty a = s->v.FunctionDef.args;
-
     if (a->args && !symtable_visit_argannotations(st, a->args))
         return 0;
     if (a->vararg && a->vararg->annotation)
@@ -1575,7 +1597,7 @@ symtable_visit_annotations(struct symtable *st, stmt_ty s)
         VISIT(st, expr, a->kwarg->annotation);
     if (a->kwonlyargs && !symtable_visit_argannotations(st, a->kwonlyargs))
         return 0;
-    if (s->v.FunctionDef.returns)
+    if (returns)
         VISIT(st, expr, s->v.FunctionDef.returns);
     return 1;
 }
