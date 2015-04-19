@@ -932,6 +932,7 @@ PyCompile_OpcodeStackEffect(int opcode, int oparg)
         case BREAK_LOOP:
             return 0;
         case SETUP_ASYNC_WITH:
+            return 6;
         case SETUP_WITH:
             return 7;
         case WITH_CLEANUP_ENTER:
