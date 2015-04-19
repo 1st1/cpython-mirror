@@ -2770,10 +2770,22 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 #endif
         }
 
+        TARGET(GET_YIELD_FROM_ITER) {
+            /* before: [obj]; after [getiter(obj)] */
+            PyObject *iterable = TOP();
+            PyObject *iter = PyObject_GetCoroIter(iterable);
+            Py_DECREF(iterable);
+            SET_TOP(iter);
+            if (iter == NULL)
+                goto error;
+            PREDICT(YIELD_FROM);
+            DISPATCH();
+        }
+
         TARGET(GET_ITER) {
             /* before: [obj]; after [getiter(obj)] */
             PyObject *iterable = TOP();
-            PyObject *iter = __PyObject_GetIterLL(iterable);
+            PyObject *iter = PyObject_GetIter(iterable);
             Py_DECREF(iterable);
             SET_TOP(iter);
             if (iter == NULL)

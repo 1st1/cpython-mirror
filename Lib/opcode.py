@@ -119,6 +119,9 @@ def_op('BINARY_OR', 66)
 def_op('INPLACE_POWER', 67)
 def_op('GET_ITER', 68)
 
+def_op('GET_YIELD_FROM_ITER', 69) # A separate opcode to enable backwards
+                                  # compatibility for yield-from/await
+
 def_op('PRINT_EXPR', 70)
 def_op('LOAD_BUILD_CLASS', 71)
 def_op('YIELD_FROM', 72)

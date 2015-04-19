@@ -918,6 +918,7 @@ PyCompile_OpcodeStackEffect(int opcode, int oparg)
             return -1;
         case INPLACE_POWER:
             return -1;
+        case GET_YIELD_FROM_ITER:
         case GET_ITER:
             return 0;
 
@@ -3713,7 +3714,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
             return compiler_error(c, "'yield from' inside async function");
 
         VISIT(c, expr, e->v.YieldFrom.value);
-        ADDOP(c, GET_ITER);
+        ADDOP(c, GET_YIELD_FROM_ITER);
         ADDOP_O(c, LOAD_CONST, Py_None, consts);
         ADDOP(c, YIELD_FROM);
         break;

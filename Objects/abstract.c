@@ -2732,11 +2732,11 @@ PyObject_GetIter(PyObject *o)
         return NULL;
     }
 
-    return __PyObject_GetIterLL(o);
+    return PyObject_GetCoroIter(o);
 }
 
 PyObject *
-__PyObject_GetIterLL(PyObject *o)
+PyObject_GetCoroIter(PyObject *o)
 {
     PyTypeObject *t = o->ob_type;
     getiterfunc f = NULL;

@@ -124,6 +124,35 @@ class AsyncFunctionTest(unittest.TestCase):
 
             next(foo())
 
+    def test_func_5(self):
+        @types.async_def
+        def bar():
+            yield 1
+            yield 2
+
+        async def foo():
+            await bar()
+
+        with self.assertRaisesRegex(TypeError,
+                                    "unable to get iterator for coroutine"):
+
+            for el in foo(): pass
+
+    def test_func_6(self):
+        @types.async_def
+        def bar():
+            yield 1
+            yield 2
+
+        async def foo():
+            await bar()
+
+        f = foo()
+        self.assertEquals(f.send(None), 1)
+        self.assertEquals(f.send(None), 2)
+        with self.assertRaises(StopIteration):
+            f.send(None)
+
     def test_await_1(self):
         async def foo():
             await 1

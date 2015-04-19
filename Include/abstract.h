@@ -615,7 +615,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
 /* Iterators */
 
-     PyAPI_FUNC(PyObject *) __PyObject_GetIterLL(PyObject *);
+     PyAPI_FUNC(PyObject *) PyObject_GetCoroIter(PyObject *);
      PyAPI_FUNC(PyObject *) PyObject_GetIter(PyObject *);
      /* Takes an object and returns an iterator for it.
     This is typically a new iterator but if the argument
