@@ -461,7 +461,7 @@ static PyObject *
 gen_repr(PyGenObject *gen)
 {
     if (PyGen_CheckAsyncExact(gen)) {
-        return PyUnicode_FromFormat("<async generator object %S at %p>",
+        return PyUnicode_FromFormat("<coroutine object %S at %p>",
                                     gen->gi_qualname, gen);
     } else {
         return PyUnicode_FromFormat("<generator object %S at %p>",
