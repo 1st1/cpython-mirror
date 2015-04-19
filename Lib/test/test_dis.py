@@ -480,6 +480,22 @@ Constants:
 Names:
    0: x"""
 
+
+async def async_def():
+    await 1
+
+code_info_async_def = """\
+Name:              async_def
+Filename:          (.*)
+Argument count:    0
+Kw-only arguments: 0
+Number of locals:  0
+Stack size:        2
+Flags:             OPTIMIZED, NEWLOCALS, GENERATOR, NOFREE, ASYNC
+Constants:
+   0: None
+   1: 1"""
+
 class CodeInfoTests(unittest.TestCase):
     test_pairs = [
       (dis.code_info, code_info_code_info),
@@ -488,6 +504,7 @@ class CodeInfoTests(unittest.TestCase):
       (expr_str, code_info_expr_str),
       (simple_stmt_str, code_info_simple_stmt_str),
       (compound_stmt_str, code_info_compound_stmt_str),
+      (async_def, code_info_async_def)
     ]
 
     def test_code_info(self):
