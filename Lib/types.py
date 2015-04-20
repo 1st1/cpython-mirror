@@ -43,14 +43,14 @@ MemberDescriptorType = type(FunctionType.__globals__)
 del sys, _f, _g, _C,                              # Not for export
 
 
-def async_def(func):
-    """Convert regular generator function to async function."""
+def coroutine(func):
+    """Convert regular generator function to a coroutine."""
 
     # TODO: Implement this in C.
 
     if (not isinstance(func, (FunctionType, MethodType)) and
             not (object.__code__.co_flags & 0x20)):
-        raise TypeError('async_def() expects a generator function')
+        raise TypeError('coroutine() expects a generator function')
 
     co = func.__code__
     func.__code__ = CodeType(

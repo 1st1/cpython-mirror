@@ -31,11 +31,11 @@ _DEBUG = (not sys.flags.ignore_environment
 
 
 try:
-    async_def = types.async_def
+    types_coroutine = types.coroutine
 except AttributeError:
-    native_async = False
+    native_coroutine = False
 else:
-    native_async = True
+    native_coroutine = True
 
 
 # Check for CPython issue #21209
@@ -158,8 +158,8 @@ def coroutine(func):
                 res = yield from res
             return res
 
-    if native_async:
-        wrapper = types.async_def(coro)
+    if types_coroutine:
+        wrapper = types_coroutine(coro)
     else:
         if not _DEBUG:
             wrapper = coro

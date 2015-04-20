@@ -679,7 +679,7 @@ _PyGen_GetAsyncIter(PyObject *o)
     } else {
         if (PyGen_CheckAsyncExact(oiter)) {
             // It's an async def method, or a function patched
-            // with 'types.async_def()'.
+            // with 'types.coroutine()'.
             return oiter;
         }
 
