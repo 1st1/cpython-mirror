@@ -434,6 +434,86 @@ class AsyncFunctionTest(unittest.TestCase):
 
             run_async(foo())
 
+    def test_for_6(self):
+        I = 0
+
+        class Manager:
+            async def __aenter__(self):
+                nonlocal I
+                I += 10000
+
+            async def __aexit__(self, *args):
+                nonlocal I
+                I += 100000
+
+        class Iterable:
+            def __init__(self):
+                self.i = 0
+
+            async def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                if self.i > 10:
+                    raise StopAsyncIteration
+                self.i += 1
+                return self.i
+
+        ##############
+
+        async def main():
+            nonlocal I
+
+            async with Manager():
+                async for i in Iterable():
+                    I += 1
+            I += 1000
+
+        run_async(main())
+        self.assertEqual(I, 111011)
+
+        ##############
+
+        async def main():
+            nonlocal I
+
+            async with Manager():
+                async for i in Iterable():
+                    I += 1
+            I += 1000
+
+            async with Manager():
+                async for i in Iterable():
+                    I += 1
+            I += 1000
+
+        run_async(main())
+        self.assertEqual(I, 333033)
+
+        ##############
+
+        async def main():
+            nonlocal I
+
+            async with Manager():
+                I += 100
+                async for i in Iterable():
+                    I += 1
+                else:
+                    I += 10000000
+            I += 1000
+
+            async with Manager():
+                I += 100
+                async for i in Iterable():
+                    I += 1
+                else:
+                    I += 10000000
+            I += 1000
+
+        run_async(main())
+        self.assertEqual(I, 20555255)
+
 
 class AsyncAsyncIOCompatTest(unittest.TestCase):
 
