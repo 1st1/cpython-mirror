@@ -932,7 +932,6 @@ PyCompile_OpcodeStackEffect(int opcode, int oparg)
         case BREAK_LOOP:
             return 0;
         case SETUP_ASYNC_WITH:
-            return 6;
         case SETUP_WITH:
             return 7;
         case WITH_CLEANUP_ENTER:
@@ -2099,7 +2098,8 @@ compiler_async_for(struct compiler *c, stmt_ty s)
     ADDOP(c, POP_TOP);
     ADDOP(c, POP_TOP);
     ADDOP(c, POP_TOP);
-    ADDOP(c, POP_EXCEPT);
+    ADDOP(c, POP_EXCEPT); // for SETUP_EXCEPT
+    ADDOP(c, POP_BLOCK); // for SETUP_LOOP
     ADDOP_JABS(c, JUMP_ABSOLUTE, after_loop_else);
 
 
@@ -2110,7 +2110,7 @@ compiler_async_for(struct compiler *c, stmt_ty s)
     VISIT_SEQ(c, stmt, s->v.AsyncFor.body);
     ADDOP_JABS(c, JUMP_ABSOLUTE, try);
 
-    ADDOP(c, POP_BLOCK);
+    ADDOP(c, POP_BLOCK); // for SETUP_LOOP
     compiler_pop_fblock(c, LOOP, try);
 
     compiler_use_next_block(c, after_loop);
