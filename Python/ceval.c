@@ -3911,7 +3911,7 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
         if (gen == NULL)
             return NULL;
 
-        if (generator_wrapper != NULL && co->co_flags & CO_ASYNC) {
+        if (generator_wrapper != NULL && co->co_flags & CO_COROUTINE) {
             PyObject *wrapped_gen =
                         PyObject_CallFunction(generator_wrapper, "O", gen);
 
