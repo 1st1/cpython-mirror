@@ -134,7 +134,7 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
         if (PyErr_ExceptionMatches(PyExc_StopIteration)
             /* Check if this is a coroutine (async def) conditionally turn a leaking
             StopIteration into RuntimeError (with its cause set appropriately). */
-            && (((PyCodeObject *)gen->gi_code)->co_flags & CO_ASYNC)) {
+            && (((PyCodeObject *)gen->gi_code)->co_flags & CO_COROUTINE)) {
 
             PyObject *exc, *val, *val2, *tb;
             PyErr_Fetch(&exc, &val, &tb);

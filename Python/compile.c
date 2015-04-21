@@ -1748,7 +1748,7 @@ compiler_function(struct compiler *c, stmt_ty s, int is_async)
     Py_DECREF(co);
 
     if (is_async) {
-        co->co_flags |= CO_ASYNC;
+        co->co_flags |= CO_COROUTINE;
 
         // An async function is always a generator, even
         // if there is no 'yield' expressions in it.
