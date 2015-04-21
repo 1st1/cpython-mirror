@@ -2978,9 +2978,11 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
             PUSH(exc);
             PUSH(res);
+            PREDICT(WITH_CLEANUP_EXIT);
             DISPATCH();
         }
 
+        PREDICTED(WITH_CLEANUP_EXIT);
         TARGET(WITH_CLEANUP_EXIT) {
             PyObject *res = POP();
             PyObject *exc = POP();
