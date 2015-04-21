@@ -420,13 +420,13 @@ def _call_with_frames_removed(f, *args, **kwds):
 #     Python 3.4a4  3300 (more changes to __qualname__ computation)
 #     Python 3.4rc2 3310 (alter __qualname__ computation)
 #     Python 3.5a0  3320 (matrix multiplication operator)
-#     Python 3.5a3  3331 (async/await extentions)
+#     Python 3.5a3  3332 (async/await extentions)
 #
 # MAGIC must change whenever the bytecode emitted by the compiler may no
 # longer be understood by older implementations of the eval loop (usually
 # due to the addition of new opcodes).
 
-MAGIC_NUMBER = (3331).to_bytes(2, 'little') + b'\r\n'
+MAGIC_NUMBER = (3332).to_bytes(2, 'little') + b'\r\n'
 _RAW_MAGIC_NUMBER = int.from_bytes(MAGIC_NUMBER, 'little')  # For import.c
 
 _PYCACHE = '__pycache__'
