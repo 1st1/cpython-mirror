@@ -931,7 +931,6 @@ PyCompile_OpcodeStackEffect(int opcode, int oparg)
             return -1;
         case BREAK_LOOP:
             return 0;
-        case SETUP_ASYNC_WITH:
         case SETUP_WITH:
             return 7;
         case WITH_CLEANUP_ENTER:
@@ -1059,6 +1058,8 @@ PyCompile_OpcodeStackEffect(int opcode, int oparg)
             return 0;
         case GET_ASYNC:
             return 0;
+        case SETUP_ASYNC_WITH:
+            return 6;
         case BEFORE_ASYNC_WITH:
             return 1;
         case ASYNC_AITER:
