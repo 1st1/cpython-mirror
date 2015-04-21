@@ -43,22 +43,25 @@ MemberDescriptorType = type(FunctionType.__globals__)
 del sys, _f, _g, _C,                              # Not for export
 
 
+CO_GENERATOR = 0x20
+CO_COROUTINE = 0x80
+
 def coroutine(func):
     """Convert regular generator function to a coroutine."""
 
     # TODO: Implement this in C.
 
     if (not isinstance(func, (FunctionType, MethodType)) and
-            not (object.__code__.co_flags & 0x20)):
+            not (object.__code__.co_flags & CO_GENERATOR)):
         raise TypeError('coroutine() expects a generator function')
 
     co = func.__code__
     func.__code__ = CodeType(
-        co.co_argcount, co.co_kwonlyargcount, co.co_nlocals,
-        co.co_stacksize, co.co_flags | 0x80, co.co_code,
-        co.co_consts, co.co_names, co.co_varnames, co.co_filename,
-        co.co_name, co.co_firstlineno, co.co_lnotab,
-        co.co_freevars, co.co_cellvars)
+        co.co_argcount, co.co_kwonlyargcount, co.co_nlocals, co.co_stacksize,
+        co.co_flags | CO_COROUTINE,
+        co.co_code,
+        co.co_consts, co.co_names, co.co_varnames, co.co_filename, co.co_name,
+        co.co_firstlineno, co.co_lnotab, co.co_freevars, co.co_cellvars)
 
     return func
 
