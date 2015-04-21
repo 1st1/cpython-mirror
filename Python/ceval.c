@@ -2013,7 +2013,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
-        TARGET(GET_ASYNC) {
+        TARGET(GET_AWAITABLE) {
             PyObject *iterable = TOP();
             PyObject *iter = _PyGen_GetAwaitableIter(iterable);
 
