@@ -220,7 +220,7 @@ validate_expr(expr_ty exp, expr_context_ty ctx)
     case YieldFrom_kind:
         return validate_expr(exp->v.YieldFrom.value, Load);
     case Await_kind:
-        return validate_expr(exp->v.YieldFrom.value, Load);
+        return validate_expr(exp->v.Await.value, Load);
     case Compare_kind:
         if (!asdl_seq_LEN(exp->v.Compare.comparators)) {
             PyErr_SetString(PyExc_ValueError, "Compare with no comparators");
