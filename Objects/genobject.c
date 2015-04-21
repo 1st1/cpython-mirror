@@ -440,7 +440,7 @@ _PyGen_FetchStopIterationValue(PyObject **pvalue) {
 static PyObject *
 gen_repr(PyGenObject *gen)
 {
-    if (PyGen_CheckAsyncExact(gen)) {
+    if (PyGen_CheckCoroutineExact(gen)) {
         return PyUnicode_FromFormat("<coroutine object %S at %p>",
                                     gen->gi_qualname, gen);
     } else {
@@ -647,7 +647,7 @@ _PyGen_GetAsyncIter(PyObject *o)
     PyObject *await_obj = NULL;
     PyObject *oiter = NULL;
 
-    if (PyGen_CheckAsyncExact(o)) {
+    if (PyGen_CheckCoroutineExact(o)) {
         // Fast path. It's a central function for 'await'.
         return o->ob_type->tp_iter(o);
     }
@@ -657,7 +657,7 @@ _PyGen_GetAsyncIter(PyObject *o)
         if (PyErr_Occurred())
             PyErr_Clear();
     } else {
-        if (PyGen_CheckAsyncExact(oiter)) {
+        if (PyGen_CheckCoroutineExact(oiter)) {
             // It's an async def method, or a function patched
             // with 'types.coroutine()'.
             return oiter;
