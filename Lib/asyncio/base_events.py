@@ -1203,8 +1203,8 @@ class BaseEventLoop(events.AbstractEventLoop):
     def set_debug(self, enabled):
         self._debug = enabled
 
-        if hasattr(sys, 'set_async_wrapper'):
+        if hasattr(sys, 'set_coroutine_wrapper'):
             if enabled:
-                sys.set_async_wrapper(lambda gen: CoroWrapper(gen, None))
+                sys.set_coroutine_wrapper(lambda gen: CoroWrapper(gen, None))
             else:
-                sys.set_async_wrapper(None)
+                sys.set_coroutine_wrapper(None)
