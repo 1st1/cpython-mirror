@@ -651,7 +651,7 @@ sys_set_coroutine_wrapper(PyObject *self, PyObject *wrapper)
     if (wrapper != Py_None) {
         if (!PyCallable_Check(wrapper)) {
             PyErr_Format(PyExc_TypeError,
-                         "callback expected, got %s",
+                         "callable expected, got %s",
                          Py_TYPE(wrapper)->tp_name);
             return NULL;
         }
@@ -661,13 +661,13 @@ sys_set_coroutine_wrapper(PyObject *self, PyObject *wrapper)
     else
         PyEval_SetCoroutineWrapper(NULL);
     Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 PyDoc_STRVAR(set_coroutine_wrapper_doc,
 "set_coroutine_wrapper(wrapper)\n\
 \n\
-Call wrapper when creating an async function."
+Set a wrapper for coroutine objects."
 );
 
 static PyTypeObject Hash_InfoType;
