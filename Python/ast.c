@@ -1512,10 +1512,10 @@ ast_for_decorators(struct compiling *c, const node *n)
 }
 
 static stmt_ty
-_ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq, int is_async)
+ast_for_funcdef_impl(struct compiling *c, const node *n,
+                     asdl_seq *decorator_seq, int is_async)
 {
     /* funcdef: 'def' NAME parameters ['->' test] ':' suite */
-
     identifier name;
     arguments_ty args;
     asdl_seq *body;
@@ -1542,36 +1542,34 @@ _ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq, in
     if (!body)
         return NULL;
 
-    if (is_async) {
+    if (is_async)
         return AsyncFunctionDef(name, args, body, decorator_seq, returns,
                                 LINENO(n),
                                 n->n_col_offset, c->c_arena);
-    } else {
+    else
         return FunctionDef(name, args, body, decorator_seq, returns,
                            LINENO(n),
                            n->n_col_offset, c->c_arena);
-    }
 }
 
 static stmt_ty
 ast_for_async_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
 {
     /* async_funcdef: ASYNC funcdef */
-
     REQ(n, async_funcdef);
     REQ(CHILD(n, 0), ASYNC);
     REQ(CHILD(n, 1), funcdef);
 
-    return _ast_for_funcdef(c, CHILD(n, 1), decorator_seq,
-                            1 /* is_async */);
+    return ast_for_funcdef_impl(c, CHILD(n, 1), decorator_seq,
+                                1 /* is_async */);
 }
 
 static stmt_ty
 ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
 {
     /* funcdef: 'def' NAME parameters ['->' test] ':' suite */
-    return _ast_for_funcdef(c, n, decorator_seq,
-                            0 /* is_async */);
+    return ast_for_funcdef_impl(c, n, decorator_seq,
+                                0 /* is_async */);
 }
 
 
@@ -1579,14 +1577,13 @@ static stmt_ty
 ast_for_async_stmt(struct compiling *c, const node *n)
 {
     /* async_stmt: ASYNC (funcdef | with_stmt | for_stmt) */
-
     REQ(n, async_stmt);
     REQ(CHILD(n, 0), ASYNC);
 
     switch (TYPE(CHILD(n, 1))) {
         case funcdef:
-            return _ast_for_funcdef(c, CHILD(n, 1), NULL,
-                                    1 /* is_async */);
+            return ast_for_funcdef_impl(c, CHILD(n, 1), NULL,
+                                        1 /* is_async */);
         case with_stmt:
             return ast_for_with_stmt(c, CHILD(n, 1),
                                      1 /* is_async */);
@@ -3433,16 +3430,14 @@ ast_for_for_stmt(struct compiling *c, const node *n, int is_async)
     if (!suite_seq)
         return NULL;
 
-    if (is_async) {
+    if (is_async)
         return AsyncFor(target, expression, suite_seq, seq,
                         LINENO(n), n->n_col_offset,
                         c->c_arena);
-    }
-    else {
+    else
         return For(target, expression, suite_seq, seq,
                    LINENO(n), n->n_col_offset,
                    c->c_arena);
-    }
 }
 
 static excepthandler_ty
@@ -3611,13 +3606,10 @@ ast_for_with_stmt(struct compiling *c, const node *n, int is_async)
     if (!body)
         return NULL;
 
-    if (is_async) {
+    if (is_async)
         return AsyncWith(items, body, LINENO(n), n->n_col_offset, c->c_arena);
-    }
-    else {
+    else
         return With(items, body, LINENO(n), n->n_col_offset, c->c_arena);
-    }
-
 }
 
 static stmt_ty
