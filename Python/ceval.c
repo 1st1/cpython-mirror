@@ -3767,11 +3767,9 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
             return NULL;
 
         if (coroutine_wrapper != NULL && co->co_flags & CO_COROUTINE) {
-            PyObject *wrapped_gen =
-                        PyObject_CallFunction(coroutine_wrapper, "O", gen);
-
-            Py_DECREF(gen);
-            gen = wrapped_gen;
+            PyObject *wrapped =
+                        PyObject_CallFunction(coroutine_wrapper, "N", gen);
+            gen = wrapped;
         }
         return gen;
     }

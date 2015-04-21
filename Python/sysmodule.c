@@ -646,7 +646,7 @@ sys_setrecursionlimit(PyObject *self, PyObject *args)
 }
 
 static PyObject *
-sys_set_async_wrapper(PyObject *self, PyObject *wrapper)
+sys_set_coroutine_wrapper(PyObject *self, PyObject *wrapper)
 {
     if (wrapper != Py_None) {
         if (!PyCallable_Check(wrapper)) {
@@ -664,8 +664,8 @@ sys_set_async_wrapper(PyObject *self, PyObject *wrapper)
     return Py_None;
 }
 
-PyDoc_STRVAR(set_async_wrapper_doc,
-"set_async_wrapper(wrapper)\n\
+PyDoc_STRVAR(set_coroutine_wrapper_doc,
+"set_coroutine_wrapper(wrapper)\n\
 \n\
 Call wrapper when creating an async function."
 );
@@ -1240,7 +1240,7 @@ static PyMethodDef sys_methods[] = {
     {"call_tracing", sys_call_tracing, METH_VARARGS, call_tracing_doc},
     {"_debugmallocstats", sys_debugmallocstats, METH_NOARGS,
      debugmallocstats_doc},
-    {"set_async_wrapper", sys_set_async_wrapper, METH_O, set_async_wrapper_doc},
+    {"set_coroutine_wrapper", sys_set_coroutine_wrapper, METH_O, set_coroutine_wrapper_doc},
     {NULL,              NULL}           /* sentinel */
 };
 
