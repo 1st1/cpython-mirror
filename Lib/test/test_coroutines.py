@@ -383,7 +383,7 @@ class CoroutineTest(unittest.TestCase):
                 print('never going to happen')
 
         with self.assertRaisesRegex(
-                TypeError, "async for' requires an object.*__aiter__"):
+                TypeError, "async for' requires an object.*__aiter__.*tuple"):
 
             run_async(foo())
 
@@ -397,7 +397,8 @@ class CoroutineTest(unittest.TestCase):
                 print('never going to happen')
 
         with self.assertRaisesRegex(
-                TypeError, "async for' received an invalid object.*__aiter"):
+                TypeError,
+                "async for' received an invalid object.*__aiter.*\: I"):
 
             run_async(foo())
 
@@ -414,7 +415,9 @@ class CoroutineTest(unittest.TestCase):
                 print('never going to happen')
 
         with self.assertRaisesRegex(
-                RuntimeError, "async for' received an invalid object.*__anext"):
+                TypeError,
+                "async for' received an invalid object.*__anext__.*tuple"):
+
             run_async(foo())
 
     def test_for_5(self):
@@ -430,7 +433,8 @@ class CoroutineTest(unittest.TestCase):
                 print('never going to happen')
 
         with self.assertRaisesRegex(
-                RuntimeError, "async for' received an invalid object.*__anext"):
+                TypeError,
+                "async for' received an invalid object.*__anext.*int"):
 
             run_async(foo())
 
