@@ -87,7 +87,7 @@ def_op('INPLACE_TRUE_DIVIDE', 29)
 
 def_op('ASYNC_AITER', 50)       # 1) Resolve __aiter__ from the object on
                                 #    top of the stack,
-                                # 2) call _PyGen_GetAsyncIter on it,
+                                # 2) call _PyGen_GetAwaitableIter on it,
                                 # 3) replace top object on stack with result
                                 #    (result will be handled to YIELD_FROM
                                 #     eventually)
@@ -123,7 +123,7 @@ def_op('PRINT_EXPR', 70)
 def_op('LOAD_BUILD_CLASS', 71)
 def_op('YIELD_FROM', 72)
 
-def_op('GET_ASYNC', 73)        # 1) Call _PyGen_GetAsyncIter on the top object,
+def_op('GET_ASYNC', 73)        # 1) Call _PyGen_GetAwaitableIter on the top object,
                                # 2) and replace it with the result.
 
 def_op('INPLACE_LSHIFT', 75)

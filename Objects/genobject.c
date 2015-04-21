@@ -190,7 +190,6 @@ _PyGen_Send(PyGenObject *gen, PyObject *arg)
 PyDoc_STRVAR(close_doc,
 "close() -> raise GeneratorExit inside generator.");
 
-
 /*
  *   This helper function is used by gen_close and gen_throw to
  *   close a subiterator being delegated to by yield-from.
@@ -463,7 +462,8 @@ gen_repr(PyGenObject *gen)
     if (PyGen_CheckCoroutineExact(gen)) {
         return PyUnicode_FromFormat("<coroutine object %S at %p>",
                                     gen->gi_qualname, gen);
-    } else {
+    }
+    else {
         return PyUnicode_FromFormat("<generator object %S at %p>",
                                     gen->gi_qualname, gen);
     }
@@ -651,15 +651,15 @@ PyGen_NeedsFinalizing(PyGenObject *gen)
 
 
 /*
- *   This helper function returns an iterator for 'o' if
- *   it's an 'async def' function, or if 'o' has an '__await__'
- *   method that returns an iterator.
+ *   This helper function returns an awaitable for 'o':
+ *     - iter(o) if `o` is a coroutine-object;
+ *     - `o.__await__()`.
  *
  *   Raises a RuntimeError if it's not possible to return
- *   an iterator and returns NULL.
+ *   an awaitable and returns NULL.
  */
 PyObject *
-_PyGen_GetAsyncIter(PyObject *o)
+_PyGen_GetAwaitableIter(PyObject *o)
 {
     _Py_IDENTIFIER(__await__);
 
@@ -668,7 +668,7 @@ _PyGen_GetAsyncIter(PyObject *o)
     PyObject *oiter = NULL;
 
     if (PyGen_CheckCoroutineExact(o)) {
-        // Fast path. It's a central function for 'await'.
+        /* Fast path. It's a central function for 'await'. */
         return o->ob_type->tp_iter(o);
     }
 
@@ -676,10 +676,11 @@ _PyGen_GetAsyncIter(PyObject *o)
     if (oiter == NULL) {
         if (PyErr_Occurred())
             PyErr_Clear();
-    } else {
+    }
+    else {
         if (PyGen_CheckCoroutineExact(oiter)) {
-            // It's an async def method, or a function patched
-            // with 'types.coroutine()'.
+            /* It's an async def method, or a function patched
+               with 'types.coroutine()'. */
             return oiter;
         }
 
@@ -699,10 +700,9 @@ _PyGen_GetAsyncIter(PyObject *o)
     }
 
     if (!PyIter_Check(await_obj)) {
-        PyErr_Format(PyExc_RuntimeError,
-                     "__await__ returned non-iterator '%.100R'",
-                     await_obj);
-
+        PyErr_Format(PyExc_TypeError,
+                     "__await__ must return an iterator, %.100s",
+                     Py_TYPE(await_obj)->tp_name);
         Py_DECREF(await_obj);
         return NULL;
     }
@@ -710,9 +710,9 @@ _PyGen_GetAsyncIter(PyObject *o)
     return await_obj;
 
 error:
-    PyErr_Format(PyExc_RuntimeError,
-                 "object %.200R can't be used in 'await' expression",
-                 o);
+    PyErr_Format(PyExc_TypeError,
+                 "object %.100s can't be used in 'await' expression",
+                 Py_TYPE(o)->tp_name);
 
     return NULL;
 }

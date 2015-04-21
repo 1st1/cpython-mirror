@@ -103,13 +103,13 @@ class AsyncFunctionTest(unittest.TestCase):
     def test_await_1(self):
         async def foo():
             await 1
-        with self.assertRaisesRegex(RuntimeError, "object 1 can.t.*await"):
+        with self.assertRaisesRegex(TypeError, "object int can.t.*await"):
             run_async(foo())
 
     def test_await_2(self):
         async def foo():
             await []
-        with self.assertRaisesRegex(RuntimeError, "object \[\] can.t.*await"):
+        with self.assertRaisesRegex(TypeError, "object list can.t.*await"):
             run_async(foo())
 
     def test_await_3(self):
@@ -135,8 +135,8 @@ class AsyncFunctionTest(unittest.TestCase):
         async def foo():
             return (await Awaitable())
 
-        with self.assertRaisesRegex(RuntimeError,
-                                    "__await__ returned non-iterator"):
+        with self.assertRaisesRegex(TypeError,
+                                    "__await__ must return an iterator"):
 
             run_async(foo())
 
@@ -169,7 +169,7 @@ class AsyncFunctionTest(unittest.TestCase):
             return (await Awaitable())
 
         with self.assertRaisesRegex(
-            RuntimeError, "Awaitable object.*used in 'await' expression"):
+            TypeError, "object Awaitable can't be used in 'await' expression"):
 
             run_async(foo())
 
@@ -284,7 +284,7 @@ class AsyncFunctionTest(unittest.TestCase):
                 pass
 
         with self.assertRaisesRegex(
-            RuntimeError, "object 123 can't be used in 'await' expression"):
+            TypeError, "object int can't be used in 'await' expression"):
             # it's important that __aexit__ wasn't called
             run_async(foo())
 
@@ -301,7 +301,7 @@ class AsyncFunctionTest(unittest.TestCase):
                 pass
 
         with self.assertRaisesRegex(
-            RuntimeError, "object 456 can't be used in 'await' expression"):
+            TypeError, "object int can't be used in 'await' expression"):
 
             run_async(foo())
 
@@ -383,7 +383,7 @@ class AsyncFunctionTest(unittest.TestCase):
                 print('never going to happen')
 
         with self.assertRaisesRegex(
-                RuntimeError, "async for' requires an object.*__aiter__"):
+                TypeError, "async for' requires an object.*__aiter__"):
 
             run_async(foo())
 
@@ -397,7 +397,7 @@ class AsyncFunctionTest(unittest.TestCase):
                 print('never going to happen')
 
         with self.assertRaisesRegex(
-                RuntimeError, "async for' received an invalid object.*__aiter"):
+                TypeError, "async for' received an invalid object.*__aiter"):
 
             run_async(foo())
 
