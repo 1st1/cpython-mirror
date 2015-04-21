@@ -389,7 +389,7 @@ class Future:
         return self.result()  # May raise too.
 
     if _PY35:
-        __await__ = __iter__ # for async/await in Python 3.5
+        __await__ = __iter__ # make compatible with 'await' expression
 
 
 def wrap_future(fut, *, loop=None):

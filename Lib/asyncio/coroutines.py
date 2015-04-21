@@ -14,6 +14,9 @@ from . import futures
 from .log import logger
 
 
+_PY35 = sys.version_info >= (3, 5)
+
+
 # Opcode of "yield from" instruction
 _YIELD_FROM = opcode.opmap['YIELD_FROM']
 
@@ -88,7 +91,8 @@ class CoroWrapper:
     def __iter__(self):
         return self
 
-    __await__ = __iter__ # Python 3.5 compatibility
+    if _PY35:
+        __await__ = __iter__ # make compatible with 'await' expression
 
     def __next__(self):
         return next(self.gen)
