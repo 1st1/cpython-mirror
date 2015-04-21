@@ -4365,7 +4365,7 @@ PyEval_SetTrace(Py_tracefunc func, PyObject *arg)
 }
 
 void
-PyEval_SetAsyncWrapper(PyObject *wrapper)
+PyEval_SetCoroutineWrapper(PyObject *wrapper)
 {
     Py_CLEAR(generator_wrapper);
 
