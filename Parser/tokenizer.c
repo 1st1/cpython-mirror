@@ -1510,7 +1510,8 @@ tok_get(struct tok_state *tok, char **p_start, char **p_end)
 
             if (tok->def && tok->deftypestack[tok->def] == 3) {
                 tok->deftypestack[tok->def] = 2;
-            } else {
+            }
+            else {
                 tok->def++;
                 tok->defstack[tok->def] = tok->indent;
                 tok->deftypestack[tok->def] = 1;
@@ -1518,7 +1519,7 @@ tok_get(struct tok_state *tok, char **p_start, char **p_end)
         }
         else if (tok_len == 5) {
             if (memcmp(tok->start, "async", 5) == 0) {
-                memcpy(&ahead_tok, tok, sizeof(struct tok_state));
+                memcpy(&ahead_tok, tok, sizeof(ahead_tok));
 
                 ahead_tok_kind = tok_get(&ahead_tok, &ahead_tok_start,
                                          &ahead_top_end);
