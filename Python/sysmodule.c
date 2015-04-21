@@ -656,10 +656,10 @@ sys_set_async_wrapper(PyObject *self, PyObject *wrapper)
             return NULL;
         }
 
-        PyEval_SetAsyncWrapper(wrapper);
+        PyEval_SetCoroutineWrapper(wrapper);
     }
     else
-        PyEval_SetAsyncWrapper(NULL);
+        PyEval_SetCoroutineWrapper(NULL);
     Py_INCREF(Py_None);
     return Py_None;
 }
