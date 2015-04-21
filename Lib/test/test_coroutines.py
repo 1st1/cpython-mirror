@@ -68,7 +68,7 @@ class AsyncBadSyntaxTest(unittest.TestCase):
             import test.badsyntax_async7
 
 
-class AsyncFunctionTest(unittest.TestCase):
+class CoroutineTest(unittest.TestCase):
 
     def test_func_1(self):
         async def foo():
@@ -515,7 +515,7 @@ class AsyncFunctionTest(unittest.TestCase):
         self.assertEqual(I, 20555255)
 
 
-class AsyncAsyncIOCompatTest(unittest.TestCase):
+class CoroAsyncIOCompatTest(unittest.TestCase):
 
     def test_asyncio_1(self):
         import asyncio
@@ -553,7 +553,7 @@ class AsyncAsyncIOCompatTest(unittest.TestCase):
         self.assertEqual(buffer, [1, 2, 'MyException'])
 
 
-class SysSetAsyncWrapperTest(unittest.TestCase):
+class SysSetCoroWrapperTest(unittest.TestCase):
 
     def test_set_wrapper_1(self):
         import sys
@@ -583,9 +583,9 @@ class SysSetAsyncWrapperTest(unittest.TestCase):
 
 def test_main():
     support.run_unittest(AsyncBadSyntaxTest,
-                         AsyncFunctionTest,
-                         AsyncAsyncIOCompatTest,
-                         SysSetAsyncWrapperTest)
+                         CoroutineTest,
+                         CoroAsyncIOCompatTest,
+                         SysSetCoroWrapperTest)
 
 
 if __name__=="__main__":
