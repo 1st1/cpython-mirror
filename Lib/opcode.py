@@ -85,23 +85,9 @@ def_op('BINARY_TRUE_DIVIDE', 27)
 def_op('INPLACE_FLOOR_DIVIDE', 28)
 def_op('INPLACE_TRUE_DIVIDE', 29)
 
-def_op('ASYNC_AITER', 50)       # 1) Resolve __aiter__ from the object on
-                                #    top of the stack,
-                                # 2) call _PyGen_GetAwaitableIter on it,
-                                # 3) replace top object on stack with result
-                                #    (result will be handled to YIELD_FROM
-                                #     eventually)
-
-def_op('ASYNC_ANEXT', 51)       # 1) Resolve __anext__ from the object
-                                #    on top of the stack and call it,
-                                # 2) push result to the stack (for YIELD_FROM
-                                #    eventually)
-
-def_op('BEFORE_ASYNC_WITH', 52) # 1) Resolve __aenter__ and __aexit__ from
-                                #    the object on top of the stack,
-                                # 2) call __aenter__,
-                                # 3) push result to stack so that YIELD_FROM
-                                #    can chew on it
+def_op('ASYNC_AITER', 50)
+def_op('ASYNC_ANEXT', 51)
+def_op('BEFORE_ASYNC_WITH', 52)
 
 def_op('STORE_MAP', 54)
 def_op('INPLACE_ADD', 55)
@@ -122,9 +108,7 @@ def_op('GET_ITER', 68)
 def_op('PRINT_EXPR', 70)
 def_op('LOAD_BUILD_CLASS', 71)
 def_op('YIELD_FROM', 72)
-
-def_op('GET_AWAITABLE', 73)        # 1) Call _PyGen_GetAwaitableIter on the top object,
-                               # 2) and replace it with the result.
+def_op('GET_AWAITABLE', 73)
 
 def_op('INPLACE_LSHIFT', 75)
 def_op('INPLACE_RSHIFT', 76)
