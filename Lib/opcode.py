@@ -123,7 +123,7 @@ def_op('PRINT_EXPR', 70)
 def_op('LOAD_BUILD_CLASS', 71)
 def_op('YIELD_FROM', 72)
 
-def_op('GET_ASYNC', 73)        # 1) Call _PyGen_GetAwaitableIter on the top object,
+def_op('GET_AWAITABLE', 73)        # 1) Call _PyGen_GetAwaitableIter on the top object,
                                # 2) and replace it with the result.
 
 def_op('INPLACE_LSHIFT', 75)
