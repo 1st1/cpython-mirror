@@ -19,6 +19,7 @@ _CANCELLED = 'CANCELLED'
 _FINISHED = 'FINISHED'
 
 _PY34 = sys.version_info >= (3, 4)
+_PY35 = sys.version_info >= (3, 5)
 
 Error = concurrent.futures._base.Error
 CancelledError = concurrent.futures.CancelledError
@@ -387,7 +388,8 @@ class Future:
         assert self.done(), "yield from wasn't used with future"
         return self.result()  # May raise too.
 
-    __await__ = __iter__ # for async/await in Python 3.5
+    if _PY35:
+        __await__ = __iter__ # for async/await in Python 3.5
 
 
 def wrap_future(fut, *, loop=None):
