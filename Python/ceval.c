@@ -1930,7 +1930,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             _Py_IDENTIFIER(__aiter__);
 
             PyObject *iter = NULL;
-            PyObject *async_aiter = NULL;
+            PyObject *awaitable = NULL;
             PyObject *obj = TOP();
 
             PyObject *aiter_meth = special_lookup(obj, &PyId___aiter__);
@@ -1940,7 +1940,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 SET_TOP(NULL);
 
                 PyErr_SetString(
-                    PyExc_RuntimeError,
+                    PyExc_TypeError,
                     "'async for' requires an object with "
                     "async __aiter__ method");
 
@@ -1955,19 +1955,19 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 goto error;
             }
 
-            async_aiter = _PyGen_GetAsyncIter(iter);
+            awaitable = _PyGen_GetAwaitableIter(iter);
             Py_DECREF(iter);
 
-            if (async_aiter == NULL) {
+            if (awaitable == NULL) {
                 SET_TOP(NULL);
                 PyErr_SetString(
-                    PyExc_RuntimeError,
+                    PyExc_TypeError,
                     "'async for' received an invalid object from __aiter__");
 
                 goto error;
             }
 
-            SET_TOP(async_aiter);
+            SET_TOP(awaitable);
             DISPATCH();
         }
 
@@ -1975,7 +1975,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             _Py_IDENTIFIER(__anext__);
 
             PyObject *next_iter = NULL;
-            PyObject *async_iter = NULL;
+            PyObject *awaitable = NULL;
             PyObject *aiter = TOP();
             PyObject *next_meth = special_lookup(aiter, &PyId___anext__);
 
@@ -1983,7 +1983,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 PyErr_Format(
                     PyExc_RuntimeError,
                     "'async for' requires an iterator with "
-                    "async __anext__ method %R", aiter);
+                    "async __anext__ method %.100s",
+                    Py_TYPE(aiter)->tp_name);
 
                 goto error;
             }
@@ -1995,10 +1996,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 goto error;
             }
 
-            async_iter = _PyGen_GetAsyncIter(next_iter);
+            awaitable = _PyGen_GetAwaitableIter(next_iter);
             Py_DECREF(next_iter);
 
-            if (async_iter == NULL) {
+            if (awaitable == NULL) {
                 PyErr_SetString(
                     PyExc_RuntimeError,
                     "'async for' received an invalid object from __anext__");
@@ -2006,13 +2007,13 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 goto error;
             }
 
-            PUSH(async_iter);
+            PUSH(awaitable);
             DISPATCH();
         }
 
         TARGET(GET_ASYNC) {
             PyObject *iterable = TOP();
-            PyObject *iter = _PyGen_GetAsyncIter(iterable);
+            PyObject *iter = _PyGen_GetAwaitableIter(iterable);
 
             Py_DECREF(iterable);
 
