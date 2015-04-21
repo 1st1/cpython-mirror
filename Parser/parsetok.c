@@ -225,7 +225,6 @@ parsetok(struct tok_state *tok, grammar *g, int start, perrdetail *err_ret,
         }
         else
             started = 1;
-
         len = b - a; /* XXX this may compute NULL - NULL */
         str = (char *) PyObject_MALLOC(len + 1);
         if (str == NULL) {
