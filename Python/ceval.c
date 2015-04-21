@@ -153,7 +153,7 @@ static PyObject * special_lookup(PyObject *, _Py_Identifier *);
     "free variable '%.200s' referenced before assignment" \
     " in enclosing scope"
 
-static PyObject *generator_wrapper = NULL;
+static PyObject *coroutine_wrapper = NULL;
 
 /* Dynamic execution profile */
 #ifdef DYNAMIC_EXECUTION_PROFILE
@@ -3759,9 +3759,9 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
         if (gen == NULL)
             return NULL;
 
-        if (generator_wrapper != NULL && co->co_flags & CO_COROUTINE) {
+        if (coroutine_wrapper != NULL && co->co_flags & CO_COROUTINE) {
             PyObject *wrapped_gen =
-                        PyObject_CallFunction(generator_wrapper, "O", gen);
+                        PyObject_CallFunction(coroutine_wrapper, "O", gen);
 
             Py_DECREF(gen);
             gen = wrapped_gen;
@@ -4205,10 +4205,10 @@ PyEval_SetTrace(Py_tracefunc func, PyObject *arg)
 void
 PyEval_SetCoroutineWrapper(PyObject *wrapper)
 {
-    Py_CLEAR(generator_wrapper);
+    Py_CLEAR(coroutine_wrapper);
 
     Py_XINCREF(wrapper);
-    generator_wrapper = wrapper;
+    coroutine_wrapper = wrapper;
 }
 
 PyObject *
