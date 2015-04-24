@@ -123,7 +123,7 @@ class CoroutineTest(unittest.TestCase):
             return 42
 
         async def foo():
-            return (await bar())
+            return await bar()
 
         self.assertEqual(run_async(foo()), ([], 42))
 
@@ -172,6 +172,27 @@ class CoroutineTest(unittest.TestCase):
             TypeError, "object Awaitable can't be used in 'await' expression"):
 
             run_async(foo())
+
+    def test_await_9(self):
+        async def bar():
+            return 42
+
+        async def foo():
+            return await bar() + await bar()
+
+        self.assertEqual(run_async(foo()), ([], 84))
+
+    def test_await_10(self):
+        async def baz():
+            return 42
+
+        async def bar():
+            return baz()
+
+        async def foo():
+            return await (await bar())
+
+        self.assertEqual(run_async(foo()), ([], 42))
 
     def test_with_1(self):
         class Manager:
