@@ -1980,9 +1980,6 @@ ast_for_atom(struct compiling *c, const node *n)
         if (TYPE(ch) == yield_expr)
             return ast_for_expr(c, ch);
 
-        if (TYPE(ch) == await_expr)
-            return ast_for_expr(c, ch);
-
         /* testlist_comp: test ( comp_for | (',' test)* [','] ) */
         if ((NCH(ch) > 1) && (TYPE(CHILD(ch, 1)) == comp_for))
             return ast_for_genexp(c, ch);
@@ -2063,6 +2060,9 @@ ast_for_atom(struct compiling *c, const node *n)
             return Dict(keys, values, LINENO(n), n->n_col_offset, c->c_arena);
         }
     }
+    case await_expr:
+        return ast_for_expr(c, ch);
+
     default:
         PyErr_Format(PyExc_SystemError, "unhandled atom %d", TYPE(ch));
         return NULL;
@@ -2824,7 +2824,7 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
             return Break(LINENO(n), n->n_col_offset, c->c_arena);
         case continue_stmt:
             return Continue(LINENO(n), n->n_col_offset, c->c_arena);
-        case await_stmt:   /* will reduce to await_expr */
+        //case await_stmt:   /* will reduce to await_expr */
         case yield_stmt: { /* will reduce to yield_expr */
             expr_ty exp = ast_for_expr(c, CHILD(ch, 0));
             if (!exp)

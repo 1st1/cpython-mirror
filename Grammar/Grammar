@@ -40,19 +40,18 @@ stmt: simple_stmt | compound_stmt
 simple_stmt: small_stmt (';' small_stmt)* [';'] NEWLINE
 small_stmt: (expr_stmt | del_stmt | pass_stmt | flow_stmt |
              import_stmt | global_stmt | nonlocal_stmt | assert_stmt)
-expr_stmt: testlist_star_expr (augassign (yield_expr|await_expr|testlist) |
-                     ('=' (yield_expr|await_expr|testlist_star_expr))*)
+expr_stmt: testlist_star_expr (augassign (yield_expr|testlist) |
+                     ('=' (yield_expr|testlist_star_expr))*)
 testlist_star_expr: (test|star_expr) (',' (test|star_expr))* [',']
 augassign: ('+=' | '-=' | '*=' | '@=' | '/=' | '%=' | '&=' | '|=' | '^=' |
             '<<=' | '>>=' | '**=' | '//=')
 # For normal assignments, additional restrictions enforced by the interpreter
 del_stmt: 'del' exprlist
 pass_stmt: 'pass'
-flow_stmt: break_stmt | continue_stmt | return_stmt | raise_stmt | yield_stmt | await_stmt
+flow_stmt: break_stmt | continue_stmt | return_stmt | raise_stmt | yield_stmt
 break_stmt: 'break'
 continue_stmt: 'continue'
 return_stmt: 'return' [testlist]
-await_stmt: await_expr
 yield_stmt: yield_expr
 raise_stmt: 'raise' [test ['from' test]]
 import_stmt: import_name | import_from
@@ -106,10 +105,11 @@ arith_expr: term (('+'|'-') term)*
 term: factor (('*'|'@'|'/'|'%'|'//') factor)*
 factor: ('+'|'-'|'~') factor | power
 power: atom trailer* ['**' factor]
-atom: ('(' [yield_expr|await_expr|testlist_comp] ')' |
+atom: ('(' [yield_expr|testlist_comp] ')' |
        '[' [testlist_comp] ']' |
        '{' [dictorsetmaker] '}' |
-       NAME | NUMBER | STRING+ | '...' | 'None' | 'True' | 'False')
+       NAME | NUMBER | STRING+ | '...' | 'None' | 'True' | 'False' |
+       await_expr)
 testlist_comp: (test|star_expr) ( comp_for | (',' (test|star_expr))* [','] )
 trailer: '(' [arglist] ')' | '[' subscriptlist ']' | '.' NAME
 subscriptlist: subscript (',' subscript)* [',']
