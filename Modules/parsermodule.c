@@ -1041,8 +1041,8 @@ VALIDATER(testlist_comp);       VALIDATER(yield_expr);
 VALIDATER(or_test);
 VALIDATER(test_nocond);         VALIDATER(lambdef_nocond);
 VALIDATER(yield_arg);
-VALIDATER(await_stmt);          VALIDATER(await_expr);
 VALIDATER(async_funcdef);       VALIDATER(async_stmt);
+VALIDATER(atom_expr);
 
 #undef VALIDATER
 
@@ -1623,42 +1623,11 @@ validate_compound_stmt(node *tree)
 }
 
 
-/* await_expr: AWAIT test
- */
 static int
-validate_await_expr(node *tree)
-{
-    int nch = NCH(tree);
-    if (nch != 2)
-        return 0;
-    if (!validate_ntype(tree, await_expr))
-        return 0;
-    if (!validate_ntype(CHILD(tree, 0), AWAIT))
-        return 0;
-    if (!validate_test(CHILD(tree, 1)))
-        return 0;
-    return 1;
-}
-
-/* await_stmt: await_expr
- */
-static int
-validate_await_stmt(node *tree)
-{
-    return (validate_ntype(tree, await_stmt)
-            && validate_numnodes(tree, 1, "await_stmt")
-            && validate_await_expr(CHILD(tree, 0)));
-}
-
-
-static int
-validate_yield_or_await_or_testlist(node *tree, int tse)
+validate_yield_or_testlist(node *tree, int tse)
 {
     if (TYPE(tree) == yield_expr) {
         return validate_yield_expr(tree);
-    }
-    else if (TYPE(tree) == await_expr) {
-        return validate_await_expr(tree);
     }
     else {
         if (tse)
@@ -1680,7 +1649,7 @@ validate_expr_stmt(node *tree)
     if (res && nch == 3
         && TYPE(CHILD(tree, 1)) == augassign) {
         res = validate_numnodes(CHILD(tree, 1), 1, "augassign")
-            && validate_yield_or_await_or_testlist(CHILD(tree, 2), 0);
+            && validate_yield_or_testlist(CHILD(tree, 2), 0);
 
         if (res) {
             char *s = STR(CHILD(CHILD(tree, 1), 0));
@@ -1704,7 +1673,7 @@ validate_expr_stmt(node *tree)
     else {
         for (j = 1; res && (j < nch); j += 2)
             res = validate_equal(CHILD(tree, j))
-                && validate_yield_or_await_or_testlist(CHILD(tree, j + 1), 1);
+                && validate_yield_or_testlist(CHILD(tree, j + 1), 1);
     }
     return (res);
 }
@@ -2475,27 +2444,60 @@ validate_factor(node *tree)
 
 /*  power:
  *
- *  power: atom trailer* ('**' factor)*
+ *  power: atom_expr trailer* ['**' factor]
  */
 static int
 validate_power(node *tree)
 {
-    int pos = 1;
     int nch = NCH(tree);
     int res = (validate_ntype(tree, power) && (nch >= 1)
-               && validate_atom(CHILD(tree, 0)));
+               && validate_atom_expr(CHILD(tree, 0)));
 
-    while (res && (pos < nch) && (TYPE(CHILD(tree, pos)) == trailer))
-        res = validate_trailer(CHILD(tree, pos++));
-    if (res && (pos < nch)) {
-        if (!is_even(nch - pos)) {
+    if (nch > 1) {
+        if (nch != 3) {
             err_string("illegal number of nodes for 'power'");
             return (0);
         }
-        for ( ; res && (pos < (nch - 1)); pos += 2)
-            res = (validate_doublestar(CHILD(tree, pos))
-                   && validate_factor(CHILD(tree, pos + 1)));
+        res = (validate_doublestar(CHILD(tree, 1))
+               && validate_factor(CHILD(tree, 2)));
     }
+
+    return (res);
+}
+
+
+/*  atom_expr:
+ *
+ *  atom_expr: [AWAIT] atom trailer*
+ */
+static int
+validate_atom_expr(node *tree)
+{
+    int start = 0;
+    int nch = NCH(tree);
+    int res;
+    int pos;
+
+    res = validate_ntype(tree, atom_expr) && (nch >= 1);
+    if (!res) {
+        return (res);
+    }
+
+    if (TYPE(CHILD(tree, 0)) == AWAIT) {
+        start = 1;
+        if (nch < 2) {
+            err_string("illegal number of nodes for 'atom_expr'");
+            return (0);
+        }
+    }
+
+    res = validate_atom(CHILD(tree, start));
+    if (res) {
+        pos = start + 1;
+        while (res && (pos < nch) && (TYPE(CHILD(tree, pos)) == trailer))
+            res = validate_trailer(CHILD(tree, pos++));
+    }
+
     return (res);
 }
 
@@ -2519,9 +2521,6 @@ validate_atom(node *tree)
                 switch (TYPE(CHILD(tree, 1))) {
                     case yield_expr:
                         res = validate_yield_expr(CHILD(tree, 1));
-                        break;
-                    case await_expr:
-                        res = validate_await_expr(CHILD(tree, 1));
                         break;
                     default:
                         res = validate_testlist_comp(CHILD(tree, 1));
@@ -3213,16 +3212,12 @@ validate_node(node *tree)
                     && ((TYPE(CHILD(tree, 0)) == break_stmt)
                         || (TYPE(CHILD(tree, 0)) == continue_stmt)
                         || (TYPE(CHILD(tree, 0)) == yield_stmt)
-                        || (TYPE(CHILD(tree, 0)) == await_stmt)
                         || (TYPE(CHILD(tree, 0)) == return_stmt)
                         || (TYPE(CHILD(tree, 0)) == raise_stmt)));
             if (res)
                 next = CHILD(tree, 0);
             else if (nch == 1)
                 err_string("illegal flow_stmt type");
-            break;
-          case await_stmt:
-            res = validate_await_stmt(tree);
             break;
           case yield_stmt:
             res = validate_yield_stmt(tree);
@@ -3304,9 +3299,6 @@ validate_node(node *tree)
             break;
           case yield_expr:
             res = validate_yield_expr(tree);
-            break;
-          case await_expr:
-            res = validate_await_expr(tree);
             break;
           case test:
             res = validate_test(tree);

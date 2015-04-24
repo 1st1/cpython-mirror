@@ -2073,9 +2073,6 @@ ast_for_atom(struct compiling *c, const node *n)
         if (TYPE(ch) == yield_expr)
             return ast_for_expr(c, ch);
 
-        if (TYPE(ch) == await_expr)
-            return ast_for_expr(c, ch);
-
         /* testlist_comp: test ( comp_for | (',' test)* [','] ) */
         if ((NCH(ch) > 1) && (TYPE(CHILD(ch, 1)) == comp_for))
             return ast_for_genexp(c, ch);
@@ -2136,6 +2133,9 @@ ast_for_atom(struct compiling *c, const node *n)
             }
         }
     }
+    // case await_expr:
+    //     return ast_for_expr(c, ch);
+
     default:
         PyErr_Format(PyExc_SystemError, "unhandled atom %d", TYPE(ch));
         return NULL;
@@ -2361,19 +2361,29 @@ ast_for_factor(struct compiling *c, const node *n)
 }
 
 static expr_ty
-ast_for_power(struct compiling *c, const node *n)
+ast_for_atom_expr(struct compiling *c, const node *n)
 {
-    /* power: atom trailer* ('**' factor)*
-     */
-    int i;
+    int i, nch, start = 0;
     expr_ty e, tmp;
-    REQ(n, power);
-    e = ast_for_atom(c, CHILD(n, 0));
+
+    REQ(n, atom_expr);
+    nch = NCH(n);
+
+    if (TYPE(CHILD(n, 0)) == AWAIT) {
+        start = 1;
+        assert(nch > 1);
+    }
+
+    e = ast_for_atom(c, CHILD(n, start));
     if (!e)
         return NULL;
-    if (NCH(n) == 1)
+    if (nch == 1)
         return e;
-    for (i = 1; i < NCH(n); i++) {
+    if (start && nch == 2) {
+        return Await(e, LINENO(n), n->n_col_offset, c->c_arena);
+    }
+
+    for (i = start + 1; i < nch; i++) {
         node *ch = CHILD(n, i);
         if (TYPE(ch) != trailer)
             break;
@@ -2384,6 +2394,28 @@ ast_for_power(struct compiling *c, const node *n)
         tmp->col_offset = e->col_offset;
         e = tmp;
     }
+
+    if (start) {
+        /* there was an AWAIT */
+        return Await(e, LINENO(n), n->n_col_offset, c->c_arena);
+    }
+    else {
+        return e;
+    }
+}
+
+static expr_ty
+ast_for_power(struct compiling *c, const node *n)
+{
+    /* power: atom trailer* ('**' factor)*
+     */
+    expr_ty e;
+    REQ(n, power);
+    e = ast_for_atom_expr(c, CHILD(n, 0));
+    if (!e)
+        return NULL;
+    if (NCH(n) == 1)
+        return e;
     if (TYPE(CHILD(n, NCH(n) - 1)) == factor) {
         expr_ty f = ast_for_expr(c, CHILD(n, NCH(n) - 1));
         if (!f)
@@ -2560,11 +2592,11 @@ ast_for_expr(struct compiling *c, const node *n)
                 return YieldFrom(exp, LINENO(n), n->n_col_offset, c->c_arena);
             return Yield(exp, LINENO(n), n->n_col_offset, c->c_arena);
         }
-        case await_expr: {
-            expr_ty exp = NULL;
-            exp = ast_for_expr(c, CHILD(n, 1));
-            return Await(exp, LINENO(n), n->n_col_offset, c->c_arena);
-        }
+        // case await_expr: {
+        //     expr_ty exp = NULL;
+        //     exp = ast_for_expr(c, CHILD(n, 1));
+        //     return Await(exp, LINENO(n), n->n_col_offset, c->c_arena);
+        // }
         case factor:
             if (NCH(n) == 1) {
                 n = CHILD(n, 0);
@@ -2848,10 +2880,10 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
                 ast_error(c, ch, "assignment to yield expression not possible");
                 return NULL;
             }
-            if (TYPE(ch) == await_expr) {
-                ast_error(c, ch, "assignment to await expression not possible");
-                return NULL;
-            }
+            // if (TYPE(ch) == await_expr) {
+            //     ast_error(c, ch, "assignment to await expression not possible");
+            //     return NULL;
+            // }
             e = ast_for_testlist(c, ch);
             if (!e)
               return NULL;
@@ -2933,7 +2965,7 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
             return Break(LINENO(n), n->n_col_offset, c->c_arena);
         case continue_stmt:
             return Continue(LINENO(n), n->n_col_offset, c->c_arena);
-        case await_stmt:   /* will reduce to await_expr */
+        //case await_stmt:   /* will reduce to await_expr */
         case yield_stmt: { /* will reduce to yield_expr */
             expr_ty exp = ast_for_expr(c, CHILD(ch, 0));
             if (!exp)
