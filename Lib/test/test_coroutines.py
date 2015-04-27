@@ -100,7 +100,77 @@ class CoroutineTest(unittest.TestCase):
 
         self.assertRegex(repr(foo()), '^<coroutine object.* at 0x.*>$')
 
+    def test_func_4(self):
+        async def foo():
+            raise StopIteration
+
+        check = lambda: self.assertRaisesRegex(
+            TypeError, "coroutine-objects do not support iteration")
+
+        with check():
+            list(foo())
+
+        with check():
+            tuple(foo())
+
+        with check():
+            sum(foo())
+
+        with check():
+            iter(foo())
+
+        with check():
+            next(foo())
+
+    def test_func_5(self):
+        @types.coroutine
+        def bar():
+            yield 1
+            yield 2
+
+        async def foo():
+            await bar()
+
+        check = lambda: self.assertRaisesRegex(
+            TypeError, "coroutine-objects do not support iteration")
+
+        with check():
+            for el in foo(): pass
+
+        with check():
+            for el in bar(): pass
+
+    def test_func_6(self):
+        @types.coroutine
+        def bar():
+            yield 1
+            yield 2
+
+        async def foo():
+            await bar()
+
+        f = foo()
+        self.assertEquals(f.send(None), 1)
+        self.assertEquals(f.send(None), 2)
+        with self.assertRaises(StopIteration):
+            f.send(None)
+
+    def test_func_7(self):
+        async def bar():
+            return 10
+
+        def foo():
+            yield from bar()
+
+        f = foo()
+        with self.assertRaisesRegex(
+            TypeError,
+            "cannot 'yield from' a coroutine object from a generator"):
+
+            list(f)
+
     def test_await_1(self):
+
         async def foo():
             await 1
         with self.assertRaisesRegex(TypeError, "object int can.t.*await"):
