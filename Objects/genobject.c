@@ -502,6 +502,14 @@ gen_get_iter(PyObject *op)
 }
 
 
+static PyObject *
+gen_get_awaitable(PyObject *op)
+{
+    Py_INCREF(op);
+    return op;
+}
+
+
 static int
 gen_set_qualname(PyGenObject *op, PyObject *value)
 {
@@ -553,7 +561,7 @@ PyTypeObject PyGen_Type = {
     0,                                          /* tp_print */
     0,                                          /* tp_getattr */
     0,                                          /* tp_setattr */
-    0,                                          /* tp_reserved */
+    gen_get_awaitable,                          /* tp_await */
     (reprfunc)gen_repr,                         /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
@@ -665,6 +673,8 @@ _PyGen_GetAwaitableIter(PyObject *o)
 
     PyObject *await_meth = NULL;
     PyObject *await_obj = NULL;
+    PyTypeObject *type = NULL;
+    getawaitablefunc getter = NULL;
 
     // Check if 'o' is a coroutine object
     if (PyGen_CheckCoroutineExact(o)) {
@@ -672,6 +682,23 @@ _PyGen_GetAwaitableIter(PyObject *o)
         Py_INCREF(o);
         return o;
     }
+
+    // check if 'o' has a tp_await slot
+    type = o->ob_type;
+    getter = type->tp_await;
+    if (getter != NULL) {
+        PyObject *res = (*getter)(o);
+        if (res != NULL && !PyIter_Check(res)) {
+            PyErr_Format(PyExc_TypeError,
+                         "__await__() returned non-iterator "
+                         "of type '%.100s'",
+                         res->ob_type->tp_name);
+            Py_CLEAR(res);
+        }
+        return res;
+    }
+
+    // check if 'o' had '__await__' method in its __dict__
 
     await_meth = _PyObject_GetAttrId(o, &PyId___await__);
     if (await_meth == NULL) {
