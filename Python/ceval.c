@@ -2038,6 +2038,23 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *reciever = TOP();
             int err;
             if (PyGen_CheckExact(reciever)) {
+                if (
+                    (((PyCodeObject*) \
+                        ((PyGenObject*)reciever)->gi_code)->co_flags & CO_COROUTINE)
+                    && !(co->co_flags & CO_COROUTINE))
+                {
+                    // If we're yielding-from a coroutine object from a regular
+                    // generator object - raise an error.
+
+                    Py_CLEAR(v);
+                    Py_CLEAR(reciever);
+                    SET_TOP(NULL);
+
+                    PyErr_SetString(PyExc_TypeError,
+                                    "cannot 'yield from' a coroutine object "
+                                    "from a generator");
+                    goto error;
+                }
                 retval = _PyGen_Send((PyGenObject *)reciever, v);
             } else {
                 _Py_IDENTIFIER(send);
@@ -2774,6 +2791,19 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 #else
             DISPATCH();
 #endif
+        }
+
+        TARGET(GET_YIELD_FROM_ITER) {
+            PyObject *iterable = TOP();
+            PyObject *iter = NULL;
+            if (!PyGen_CheckCoroutineExact(iterable)) {
+                iter = PyObject_GetIter(iterable);
+                Py_DECREF(iterable);
+                SET_TOP(iter);
+                if (iter == NULL)
+                    goto error;
+            }
+            DISPATCH();
         }
 
         TARGET(GET_ITER) {

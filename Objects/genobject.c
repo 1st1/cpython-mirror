@@ -399,6 +399,12 @@ failed_throw:
 static PyObject *
 gen_iternext(PyGenObject *gen)
 {
+    if (PyGen_CheckCoroutineExact(gen)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "coroutine-objects do not support iteration");
+        return NULL;
+    }
+
     return gen_send_ex(gen, NULL, 0);
 }
 
@@ -482,6 +488,20 @@ gen_get_qualname(PyGenObject *op)
     return op->gi_qualname;
 }
 
+static PyObject *
+gen_get_iter(PyObject *op)
+{
+    if (PyGen_CheckCoroutineExact(op)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "coroutine-objects do not support iteration");
+        return NULL;
+    }
+
+    Py_INCREF(op);
+    return op;
+}
+
+
 static int
 gen_set_qualname(PyGenObject *op, PyObject *value)
 {
@@ -551,7 +571,7 @@ PyTypeObject PyGen_Type = {
     0,                                          /* tp_clear */
     0,                                          /* tp_richcompare */
     offsetof(PyGenObject, gi_weakreflist),      /* tp_weaklistoffset */
-    PyObject_SelfIter,                          /* tp_iter */
+    gen_get_iter,                               /* tp_iter */
     (iternextfunc)gen_iternext,                 /* tp_iternext */
     gen_methods,                                /* tp_methods */
     gen_memberlist,                             /* tp_members */
@@ -646,6 +666,7 @@ _PyGen_GetAwaitableIter(PyObject *o)
     PyObject *await_meth = NULL;
     PyObject *await_obj = NULL;
 
+    // Check if 'o' is a coroutine object
     if (PyGen_CheckCoroutineExact(o)) {
         /* Fast path. It's a central function for 'await'. */
         Py_INCREF(o);
