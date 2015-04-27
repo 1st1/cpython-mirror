@@ -2133,9 +2133,6 @@ ast_for_atom(struct compiling *c, const node *n)
             }
         }
     }
-    // case await_expr:
-    //     return ast_for_expr(c, ch);
-
     default:
         PyErr_Format(PyExc_SystemError, "unhandled atom %d", TYPE(ch));
         return NULL;
@@ -2460,9 +2457,9 @@ ast_for_expr(struct compiling *c, const node *n)
        arith_expr: term (('+'|'-') term)*
        term: factor (('*'|'@'|'/'|'%'|'//') factor)*
        factor: ('+'|'-'|'~') factor | power
-       power: atom trailer* ('**' factor)*
+       power: atom_expr ['**' factor]
+       atom_expr: [AWAIT] atom trailer*
        yield_expr: 'yield' [yield_arg]
-       await_expr: AWAIT test
     */
 
     asdl_seq *seq;
@@ -2592,11 +2589,6 @@ ast_for_expr(struct compiling *c, const node *n)
                 return YieldFrom(exp, LINENO(n), n->n_col_offset, c->c_arena);
             return Yield(exp, LINENO(n), n->n_col_offset, c->c_arena);
         }
-        // case await_expr: {
-        //     expr_ty exp = NULL;
-        //     exp = ast_for_expr(c, CHILD(n, 1));
-        //     return Await(exp, LINENO(n), n->n_col_offset, c->c_arena);
-        // }
         case factor:
             if (NCH(n) == 1) {
                 n = CHILD(n, 0);
@@ -2880,10 +2872,6 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
                 ast_error(c, ch, "assignment to yield expression not possible");
                 return NULL;
             }
-            // if (TYPE(ch) == await_expr) {
-            //     ast_error(c, ch, "assignment to await expression not possible");
-            //     return NULL;
-            // }
             e = ast_for_testlist(c, ch);
             if (!e)
               return NULL;
@@ -2948,7 +2936,7 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
 {
     /*
       flow_stmt: break_stmt | continue_stmt | return_stmt | raise_stmt
-                 | yield_stmt | await_stmt
+                 | yield_stmt
       break_stmt: 'break'
       continue_stmt: 'continue'
       return_stmt: 'return' [testlist]
@@ -2965,7 +2953,6 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
             return Break(LINENO(n), n->n_col_offset, c->c_arena);
         case continue_stmt:
             return Continue(LINENO(n), n->n_col_offset, c->c_arena);
-        //case await_stmt:   /* will reduce to await_expr */
         case yield_stmt: { /* will reduce to yield_expr */
             expr_ty exp = ast_for_expr(c, CHILD(ch, 0));
             if (!exp)
