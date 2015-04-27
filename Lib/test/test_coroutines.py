@@ -655,11 +655,35 @@ class SysSetCoroWrapperTest(unittest.TestCase):
         self.assertFalse(wrapped)
 
 
+class CAPITest(unittest.TestCase):
+
+    def test_tp_await_1(self):
+        from _testcapi import awaitType as at
+
+        async def foo():
+            future = at(iter([1]))
+            return (await future)
+
+        self.assertEqual(foo().send(None), 1)
+
+    def test_tp_await_2(self):
+        from _testcapi import awaitType as at
+
+        async def foo():
+            future = at(1)
+            return (await future)
+
+        with self.assertRaisesRegex(
+                TypeError, "__await__.*returned non-iterator of type 'int'"):
+            self.assertEqual(foo().send(None), 1)
+
+
 def test_main():
     support.run_unittest(AsyncBadSyntaxTest,
                          CoroutineTest,
                          CoroAsyncIOCompatTest,
-                         SysSetCoroWrapperTest)
+                         SysSetCoroWrapperTest,
+                         CAPITest)
 
 
 if __name__=="__main__":
