@@ -665,26 +665,11 @@ _PyGen_GetAwaitableIter(PyObject *o)
 
     PyObject *await_meth = NULL;
     PyObject *await_obj = NULL;
-    PyObject *oiter = NULL;
 
     if (PyGen_CheckCoroutineExact(o)) {
         /* Fast path. It's a central function for 'await'. */
-        return o->ob_type->tp_iter(o);
-    }
-
-    oiter = PyObject_GetIter(o);
-    if (oiter == NULL) {
-        if (PyErr_Occurred())
-            PyErr_Clear();
-    }
-    else {
-        if (PyGen_CheckCoroutineExact(oiter)) {
-            /* It's an async def method, or a function patched
-               with 'types.coroutine()'. */
-            return oiter;
-        }
-
-        Py_CLEAR(oiter);
+        Py_INCREF(o);
+        return o;
     }
 
     await_meth = _PyObject_GetAttrId(o, &PyId___await__);
