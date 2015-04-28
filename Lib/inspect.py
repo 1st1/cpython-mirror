@@ -174,7 +174,12 @@ def isgeneratorfunction(object):
 
     See help(isfunction) for attributes listing."""
     return bool((isfunction(object) or ismethod(object)) and
-                object.__code__.co_flags & CO_GENERATOR)
+                object.__code__.co_flags & CO_GENERATOR and
+                not object.__code__.co_flags & CO_COROUTINE)
+
+def iscoroutinefunction(object):
+    return bool((isfunction(object) or ismethod(object)) and
+                object.__code__.co_flags & CO_COROUTINE)
 
 def isgenerator(object):
     """Return true if the object is a generator.
@@ -191,7 +196,12 @@ def isgenerator(object):
         send            resumes the generator and "sends" a value that becomes
                         the result of the current yield-expression
         throw           used to raise an exception inside the generator"""
-    return isinstance(object, types.GeneratorType)
+    return (isinstance(object, types.GeneratorType) and
+            not object.gi_code.co_flags & CO_COROUTINE)
+
+def iscoroutine(object):
+    return (isinstance(object, types.GeneratorType) and
+            object.gi_code.co_flags & CO_COROUTINE)
 
 def istraceback(object):
     """Return true if the object is a traceback.

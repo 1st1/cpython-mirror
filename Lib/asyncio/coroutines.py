@@ -69,7 +69,7 @@ class CoroWrapper:
     # Wrapper for coroutine object in _DEBUG mode.
 
     def __init__(self, gen, func):
-        assert inspect.isgenerator(gen), gen
+        assert inspect.isgenerator(gen) or inspect.iscoroutine(gen), gen
         self.gen = gen
         self.func = func
         self._source_traceback = traceback.extract_stack(sys._getframe(1))
@@ -152,7 +152,8 @@ def coroutine(func):
     If the coroutine is not yielded from before it is destroyed,
     an error message is logged.
     """
-    if inspect.isgeneratorfunction(func):
+    is_coroutine = inspect.iscoroutinefunction(func)
+    if inspect.isgeneratorfunction(func) or is_coroutine:
         coro = func
     else:
         @functools.wraps(func)
@@ -163,7 +164,10 @@ def coroutine(func):
             return res
 
     if types_coroutine:
-        wrapper = types_coroutine(coro)
+        if is_coroutine:
+            wrapper = coro
+        else:
+            wrapper = types_coroutine(coro)
     else:
         if not _DEBUG:
             wrapper = coro
@@ -185,7 +189,8 @@ def coroutine(func):
 
 def iscoroutinefunction(func):
     """Return True if func is a decorated coroutine function."""
-    return getattr(func, '_is_coroutine', False)
+    return (getattr(func, '_is_coroutine', False) or
+            inspect.iscoroutinefunction(func))
 
 
 _COROUTINE_TYPES = (types.GeneratorType, CoroWrapper)
