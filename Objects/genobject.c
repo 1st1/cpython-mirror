@@ -660,10 +660,11 @@ PyGen_NeedsFinalizing(PyGenObject *gen)
 
 /*
  *   This helper function returns an awaitable for 'o':
- *     - iter(o) if `o` is a coroutine-object;
+ *     - `o` if `o` is a coroutine-object;
+ *     - `type(o)->tp_await(o)` if `o` has `tp_await`
  *     - `o.__await__()`.
  *
- *   Raises a RuntimeError if it's not possible to return
+ *   Raises a TypeError if it's not possible to return
  *   an awaitable and returns NULL.
  */
 PyObject *
@@ -692,7 +693,7 @@ _PyGen_GetAwaitableIter(PyObject *o)
             PyErr_Format(PyExc_TypeError,
                          "__await__() returned non-iterator "
                          "of type '%.100s'",
-                         res->ob_type->tp_name);
+                         Py_TYPE(res)->tp_name);
             Py_CLEAR(res);
         }
         return res;
@@ -714,7 +715,7 @@ _PyGen_GetAwaitableIter(PyObject *o)
 
     if (!PyIter_Check(await_obj)) {
         PyErr_Format(PyExc_TypeError,
-                     "__await__ must return an iterator, %.100s",
+                     "__await__() returned non-iterator of type , %.100s",
                      Py_TYPE(await_obj)->tp_name);
         Py_DECREF(await_obj);
         return NULL;

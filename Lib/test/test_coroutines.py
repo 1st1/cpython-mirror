@@ -205,8 +205,8 @@ class CoroutineTest(unittest.TestCase):
         async def foo():
             return (await Awaitable())
 
-        with self.assertRaisesRegex(TypeError,
-                                    "__await__ must return an iterator"):
+        with self.assertRaisesRegex(
+            TypeError, "__await__.*returned non-iterator of type"):
 
             run_async(foo())
 
