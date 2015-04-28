@@ -67,6 +67,10 @@ class AsyncBadSyntaxTest(unittest.TestCase):
 
             import test.badsyntax_async7
 
+    def test_badsyntax_8(self):
+        with self.assertRaisesRegex(SyntaxError, 'invalid syntax'):
+            import test.badsyntax_async8
+
 
 class CoroutineTest(unittest.TestCase):
 
@@ -244,13 +248,24 @@ class CoroutineTest(unittest.TestCase):
             run_async(foo())
 
     def test_await_9(self):
+        def wrap():
+            return bar
+
         async def bar():
             return 42
 
         async def foo():
-            return await bar() + await bar()
+            b = bar()
 
-        self.assertEqual(run_async(foo()), ([], 84))
+            db = {'b':  lambda: wrap}
+
+            class DB:
+                b = wrap
+
+            return (await bar() + await wrap()() + await db['b']()()() +
+                    await bar() * 1000 + await DB.b()())
+
+        self.assertEqual(run_async(foo()), ([], 42168))
 
     def test_await_10(self):
         async def baz():
@@ -263,6 +278,21 @@ class CoroutineTest(unittest.TestCase):
             return await (await bar())
 
         self.assertEqual(run_async(foo()), ([], 42))
+
+    def test_await_11(self):
+        def ident(val):
+            return val
+
+        async def bar():
+            return 'spam'
+
+        async def foo():
+            return ident(val=await bar())
+
+        async def foo2():
+            return await bar(), 'ham'
+
+        self.assertEqual(run_async(foo2()), ([], ('spam', 'ham')))
 
     def test_with_1(self):
         class Manager:
