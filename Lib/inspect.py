@@ -175,7 +175,7 @@ def isgeneratorfunction(object):
     See help(isfunction) for attributes listing."""
     return bool((isfunction(object) or ismethod(object)) and
                 object.__code__.co_flags & CO_GENERATOR and
-                not object.__code__.co_flags & CO_COROUTINE)
+                not object.__code__.co_flags & CO_NATIVE_COROUTINE)
 
 def iscoroutinefunction(object):
     return bool((isfunction(object) or ismethod(object)) and
@@ -197,7 +197,7 @@ def isgenerator(object):
                         the result of the current yield-expression
         throw           used to raise an exception inside the generator"""
     return (isinstance(object, types.GeneratorType) and
-            not object.gi_code.co_flags & CO_COROUTINE)
+            not object.gi_code.co_flags & CO_NATIVE_COROUTINE)
 
 def iscoroutine(object):
     return (isinstance(object, types.GeneratorType) and
