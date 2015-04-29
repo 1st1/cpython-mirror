@@ -285,7 +285,11 @@ class CoroutineTest(unittest.TestCase):
             return (await bar() + await wrap()() + await db['b']()()() +
                     await bar() * 1000 + await DB.b()())
 
+        async def foo2():
+            return -await bar()
+
         self.assertEqual(run_async(foo()), ([], 42168))
+        self.assertEqual(run_async(foo2()), ([], -42))
 
     def test_await_10(self):
         async def baz():
