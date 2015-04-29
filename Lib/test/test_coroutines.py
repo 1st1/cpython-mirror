@@ -126,6 +126,13 @@ class CoroutineTest(unittest.TestCase):
         with check():
             next(foo())
 
+        with check():
+            for i in foo():
+                pass
+
+        with check():
+            [i for i in foo()]
+
     def test_func_5(self):
         @types.coroutine
         def bar():
@@ -143,6 +150,7 @@ class CoroutineTest(unittest.TestCase):
         # the following should pass without an error
         for el in bar():
             self.assertEqual(el, 1)
+        self.assertEqual([el for el in bar()], [1])
         self.assertEqual(tuple(bar()), (1,))
         self.assertEqual(next(iter(bar())), 1)
 
@@ -174,6 +182,16 @@ class CoroutineTest(unittest.TestCase):
             "cannot 'yield from' a coroutine object from a generator"):
 
             list(f)
+
+    def test_func_8(self):
+        @types.coroutine
+        def bar():
+            return (yield from foo())
+
+        async def foo():
+            return 'spam'
+
+        self.assertEqual(run_async(bar()), ([], 'spam') )
 
     def test_await_1(self):
 
