@@ -56,7 +56,8 @@ try:
 except ImportError:
     CO_OPTIMIZED, CO_NEWLOCALS = 0x1, 0x2
     CO_VARARGS, CO_VARKEYWORDS = 0x4, 0x8
-    CO_NESTED, CO_GENERATOR, CO_NOFREE, CO_COROUTINE = 0x10, 0x20, 0x40, 0x80
+    CO_NESTED, CO_GENERATOR, CO_NOFREE, CO_COROUTINE, CO_NATIVE_COROUTINE = \
+                                (0x10, 0x20, 0x40, 0x80, 0x100)
 else:
     mod_dict = globals()
     for k, v in _flag_names.items():

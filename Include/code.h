@@ -53,7 +53,8 @@ typedef struct {
 
 /* The CO_COROUTINE flag is set for coroutine functions (defined with
    ``async def`` keywords) */
-#define CO_COROUTINE        0x0080
+#define CO_COROUTINE            0x0080
+#define CO_NATIVE_COROUTINE     0x0100
 
 /* These are no longer used. */
 #if 0
