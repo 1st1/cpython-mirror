@@ -6266,8 +6266,8 @@ slot_tp_await(PyObject *self)
         Py_DECREF(func);
         return res;
     }
-    PyErr_Format(PyExc_TypeError,
-                 "object %.50s does not have __await__",
+    PyErr_Format(PyExc_AttributeError,
+                 "object %.50s does not have __await__ method",
                  Py_TYPE(self)->tp_name);
     return NULL;
 }
