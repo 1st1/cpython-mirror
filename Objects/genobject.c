@@ -402,7 +402,7 @@ failed_throw:
 static PyObject *
 gen_iternext(PyGenObject *gen)
 {
-    if (PyGen_CheckCoroutineExact(gen)) {
+    if (PyGen_CheckNativeCoroutineExact(gen)) {
         PyErr_SetString(PyExc_TypeError,
                         "coroutine-objects do not support iteration");
         return NULL;
@@ -511,7 +511,7 @@ gen_get_qualname(PyGenObject *op)
 static PyObject *
 gen_get_iter(PyObject *op)
 {
-    if (PyGen_CheckCoroutineExact(op)) {
+    if (PyGen_CheckNativeCoroutineExact(op)) {
         PyErr_SetString(PyExc_TypeError,
                         "coroutine-objects do not support iteration");
         return NULL;

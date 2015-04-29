@@ -130,7 +130,6 @@ class CoroutineTest(unittest.TestCase):
         @types.coroutine
         def bar():
             yield 1
-            yield 2
 
         async def foo():
             await bar()
@@ -141,8 +140,11 @@ class CoroutineTest(unittest.TestCase):
         with check():
             for el in foo(): pass
 
-        with check():
-            for el in bar(): pass
+        # the following should pass without an error
+        for el in bar():
+            self.assertEqual(el, 1)
+        self.assertEqual(tuple(bar()), (1,))
+        self.assertEqual(next(iter(bar())), 1)
 
     def test_func_6(self):
         @types.coroutine

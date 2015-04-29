@@ -2042,7 +2042,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             if (PyGen_CheckExact(reciever)) {
                 if (
                     (((PyCodeObject*) \
-                        ((PyGenObject*)reciever)->gi_code)->co_flags & CO_COROUTINE)
+                        ((PyGenObject*)reciever)->gi_code)->co_flags &
+                                                        CO_NATIVE_COROUTINE)
                     && !(co->co_flags & CO_COROUTINE))
                 {
                     // If we're yielding-from a coroutine object from a regular
