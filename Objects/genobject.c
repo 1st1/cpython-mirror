@@ -690,23 +690,15 @@ PyGen_NeedsFinalizing(PyGenObject *gen)
 PyObject *
 _PyGen_GetAwaitableIter(PyObject *o)
 {
-    _Py_IDENTIFIER(__await__);
-
-    PyObject *await_meth = NULL;
-    PyObject *await_obj = NULL;
-    PyTypeObject *type = NULL;
     getawaitablefunc getter = NULL;
 
-    // Check if 'o' is a coroutine object
     if (PyGen_CheckCoroutineExact(o)) {
         /* Fast path. It's a central function for 'await'. */
         Py_INCREF(o);
         return o;
     }
 
-    // check if 'o' has a tp_await slot
-    type = o->ob_type;
-    getter = type->tp_await;
+    getter = Py_TYPE(o)->tp_await;
     if (getter != NULL) {
         PyObject *res = (*getter)(o);
         if (res != NULL && !PyIter_Check(res)) {
@@ -719,31 +711,6 @@ _PyGen_GetAwaitableIter(PyObject *o)
         return res;
     }
 
-    // check if 'o' had '__await__' method in its __dict__
-
-    await_meth = _PyObject_GetAttrId(o, &PyId___await__);
-    if (await_meth == NULL) {
-        goto error;
-    }
-
-    await_obj = PyObject_CallFunction(await_meth, NULL);
-    Py_DECREF(await_meth);
-
-    if (await_obj == NULL) {
-        goto error;
-    }
-
-    if (!PyIter_Check(await_obj)) {
-        PyErr_Format(PyExc_TypeError,
-                     "__await__() returned non-iterator of type , %.100s",
-                     Py_TYPE(await_obj)->tp_name);
-        Py_DECREF(await_obj);
-        return NULL;
-    }
-
-    return await_obj;
-
-error:
     PyErr_Format(PyExc_TypeError,
                  "object %.100s can't be used in 'await' expression",
                  Py_TYPE(o)->tp_name);

@@ -6255,6 +6255,24 @@ slot_tp_finalize(PyObject *self)
     PyErr_Restore(error_type, error_value, error_traceback);
 }
 
+static PyObject *
+slot_tp_await(PyObject *self)
+{
+    PyObject *func, *res;
+    _Py_IDENTIFIER(__await__);
+
+    func = lookup_method(self, &PyId___await__);
+    if (func != NULL) {
+        res = PyEval_CallObject(func, NULL);
+        Py_DECREF(func);
+        return res;
+    }
+    PyErr_Format(PyExc_TypeError,
+                 "object %.50s does not have __await__",
+                 Py_TYPE(self)->tp_name);
+    return NULL;
+}
+
 
 /*
 Table mapping __foo__ names to tp_foo offsets and slot_tp_foo wrapper functions.
@@ -6319,7 +6337,7 @@ static slotdef slotdefs[] = {
     TPSLOT("__getattr__", tp_getattr, NULL, NULL, ""),
     TPSLOT("__setattr__", tp_setattr, NULL, NULL, ""),
     TPSLOT("__delattr__", tp_setattr, NULL, NULL, ""),
-    TPSLOT("__await__", tp_await, NULL, wrap_unaryfunc, ""),
+    TPSLOT("__await__", tp_await, slot_tp_await, wrap_unaryfunc, ""),
     TPSLOT("__repr__", tp_repr, slot_tp_repr, wrap_unaryfunc,
            "__repr__($self, /)\n--\n\nReturn repr(self)."),
     TPSLOT("__hash__", tp_hash, slot_tp_hash, wrap_hashfunc,
