@@ -718,6 +718,12 @@ class CAPITest(unittest.TestCase):
         self.assertEqual(foo().send(None), 1)
 
     def test_tp_await_2(self):
+        # Test tp_await to __await__ mapping
+        from _testcapi import awaitType as at
+        future = at(iter([1]))
+        self.assertEqual(next(future.__await__()), 1)
+
+    def test_tp_await_3(self):
         from _testcapi import awaitType as at
 
         async def foo():

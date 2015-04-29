@@ -6317,6 +6317,7 @@ static slotdef slotdefs[] = {
     TPSLOT("__getattribute__", tp_getattr, NULL, NULL, ""),
     TPSLOT("__getattr__", tp_getattr, NULL, NULL, ""),
     TPSLOT("__setattr__", tp_setattr, NULL, NULL, ""),
+    TPSLOT("__await__", tp_await, NULL, wrap_unaryfunc, ""),
     TPSLOT("__delattr__", tp_setattr, NULL, NULL, ""),
     TPSLOT("__repr__", tp_repr, slot_tp_repr, wrap_unaryfunc,
            "__repr__($self, /)\n--\n\nReturn repr(self)."),
