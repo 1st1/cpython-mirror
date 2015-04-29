@@ -83,6 +83,11 @@ def generator_function_example(self):
 async def coroutine_function_example(self):
     return 'spam'
 
+@types.coroutine
+def gen_coroutine_function_example(self):
+    yield
+    return 'spam'
+
 
 class TestPredicates(IsTestBase):
     def test_eightteen(self):
@@ -126,6 +131,27 @@ class TestPredicates(IsTestBase):
             self.istest(inspect.ismemberdescriptor, 'datetime.timedelta.days')
         else:
             self.assertFalse(inspect.ismemberdescriptor(datetime.timedelta.days))
+
+    def test_iscoroutine(self):
+        self.assertTrue(
+            inspect.iscoroutinefunction(gen_coroutine_function_example))
+        self.assertTrue(
+            inspect.iscoroutine(gen_coroutine_function_example(1)))
+
+        self.assertTrue(
+            inspect.isgeneratorfunction(gen_coroutine_function_example))
+        self.assertTrue(
+            inspect.isgenerator(gen_coroutine_function_example(1)))
+
+        self.assertTrue(
+            inspect.iscoroutinefunction(coroutine_function_example))
+        self.assertTrue(
+            inspect.iscoroutine(coroutine_function_example(1)))
+
+        self.assertFalse(
+            inspect.isgeneratorfunction(coroutine_function_example))
+        self.assertFalse(
+            inspect.isgenerator(coroutine_function_example(1)))
 
     def test_isroutine(self):
         self.assertTrue(inspect.isroutine(mod.spam))
