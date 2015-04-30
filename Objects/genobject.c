@@ -522,14 +522,6 @@ gen_get_iter(PyObject *op)
 }
 
 
-static PyObject *
-gen_get_awaitable(PyObject *op)
-{
-    Py_INCREF(op);
-    return op;
-}
-
-
 static int
 gen_set_qualname(PyGenObject *op, PyObject *value)
 {
@@ -581,7 +573,7 @@ PyTypeObject PyGen_Type = {
     0,                                          /* tp_print */
     0,                                          /* tp_getattr */
     0,                                          /* tp_setattr */
-    gen_get_awaitable,                          /* tp_await */
+    0,                                          /* tp_await */
     (reprfunc)gen_repr,                         /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
