@@ -178,10 +178,16 @@ def isgeneratorfunction(object):
                 not object.__code__.co_flags & CO_NATIVE_COROUTINE)
 
 def iscoroutinefunction(object):
+    """Return true if the object is a coroutine function.
+
+    Coroutine functions are defined with "async def" syntax,
+    or generators decorated with "types.coroutine".
+    """
     return bool((isfunction(object) or ismethod(object)) and
                 object.__code__.co_flags & CO_COROUTINE)
 
 def isawaitable(object):
+    """Return true if the object can be used in "await" expression."""
     if iscoroutine(object):
         return True
     for base in type(object).__mro__:
@@ -208,6 +214,7 @@ def isgenerator(object):
             not object.gi_code.co_flags & CO_NATIVE_COROUTINE)
 
 def iscoroutine(object):
+    """Return true if the object is a coroutine."""
     return (isinstance(object, types.GeneratorType) and
             object.gi_code.co_flags & CO_COROUTINE)
 
