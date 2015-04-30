@@ -4248,6 +4248,12 @@ PyEval_SetCoroutineWrapper(PyObject *wrapper)
 }
 
 PyObject *
+PyEval_GetCoroutineWrapper()
+{
+    return coroutine_wrapper;
+}
+
+PyObject *
 PyEval_GetBuiltins(void)
 {
     PyFrameObject *current_frame = PyEval_GetFrame();

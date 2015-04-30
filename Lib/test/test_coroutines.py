@@ -749,7 +749,10 @@ class SysSetCoroWrapperTest(unittest.TestCase):
             wrapped = gen
             return gen
 
+        self.assertIsNone(sys.get_coroutine_wrapper())
+
         sys.set_coroutine_wrapper(wrap)
+        self.assertIs(sys.get_coroutine_wrapper(), wrap)
         try:
             f = foo()
             self.assertTrue(wrapped)
@@ -757,6 +760,8 @@ class SysSetCoroWrapperTest(unittest.TestCase):
             self.assertEqual(run_async(f), ([], 'spam'))
         finally:
             sys.set_coroutine_wrapper(None)
+
+        self.assertIsNone(sys.get_coroutine_wrapper())
 
         wrapped = None
         f = foo()
