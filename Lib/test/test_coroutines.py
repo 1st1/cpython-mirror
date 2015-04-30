@@ -318,6 +318,22 @@ class CoroutineTest(unittest.TestCase):
 
         self.assertEqual(run_async(foo2()), ([], ('spam', 'ham')))
 
+    def test_await_12(self):
+        async def coro():
+            return 'spam'
+
+        class Awaitable:
+            def __await__(self):
+                return coro()
+
+        async def foo():
+            return await Awaitable()
+
+        with self.assertRaisesRegex(
+            TypeError, "__await__\(\) returned a coroutine"):
+
+            self.assertEqual(run_async(foo()), ([], 'spam'))
+
     def test_with_1(self):
         class Manager:
             def __init__(self, name):
