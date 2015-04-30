@@ -670,6 +670,24 @@ PyDoc_STRVAR(set_coroutine_wrapper_doc,
 Set a wrapper for coroutine objects."
 );
 
+static PyObject *
+sys_get_coroutine_wrapper(PyObject *self, PyObject *args)
+{
+    PyObject *wrapper = PyEval_GetCoroutineWrapper();
+    if (wrapper == NULL) {
+        wrapper = Py_None;
+    }
+    Py_INCREF(wrapper);
+    return wrapper;
+}
+
+PyDoc_STRVAR(get_coroutine_wrapper_doc,
+"get_coroutine_wrapper()\n\
+\n\
+Return the wrapper for coroutine objects set by sys.set_coroutine_wrapper."
+);
+
+
 static PyTypeObject Hash_InfoType;
 
 PyDoc_STRVAR(hash_info_doc,
@@ -1240,7 +1258,10 @@ static PyMethodDef sys_methods[] = {
     {"call_tracing", sys_call_tracing, METH_VARARGS, call_tracing_doc},
     {"_debugmallocstats", sys_debugmallocstats, METH_NOARGS,
      debugmallocstats_doc},
-    {"set_coroutine_wrapper", sys_set_coroutine_wrapper, METH_O, set_coroutine_wrapper_doc},
+    {"set_coroutine_wrapper", sys_set_coroutine_wrapper, METH_O,
+     set_coroutine_wrapper_doc},
+    {"get_coroutine_wrapper", sys_get_coroutine_wrapper, METH_NOARGS,
+     get_coroutine_wrapper_doc},
     {NULL,              NULL}           /* sentinel */
 };
 
