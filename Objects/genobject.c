@@ -679,10 +679,9 @@ PyGen_NeedsFinalizing(PyGenObject *gen)
 
 
 /*
- *   This helper function returns an awaitable for 'o':
+ *   This helper function returns an awaitable for `o`:
  *     - `o` if `o` is a coroutine-object;
  *     - `type(o)->tp_await(o)` if `o` has `tp_await`
- *     - `o.__await__()`.
  *
  *   Raises a TypeError if it's not possible to return
  *   an awaitable and returns NULL.
@@ -711,6 +710,8 @@ _PyGen_GetAwaitableIter(PyObject *o)
             }
             else {
                 if (PyGen_CheckCoroutineExact(res)) {
+                    /* __await__ must return an *iterator*, not
+                       a coroutine or another awaitable (see PEP 492) */
                     PyErr_SetString(PyExc_TypeError,
                                     "__await__() returned a coroutine");
                     Py_CLEAR(res);
