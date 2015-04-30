@@ -701,12 +701,21 @@ _PyGen_GetAwaitableIter(PyObject *o)
     getter = Py_TYPE(o)->tp_await;
     if (getter != NULL) {
         PyObject *res = (*getter)(o);
-        if (res != NULL && !PyIter_Check(res)) {
-            PyErr_Format(PyExc_TypeError,
-                         "__await__() returned non-iterator "
-                         "of type '%.100s'",
-                         Py_TYPE(res)->tp_name);
-            Py_CLEAR(res);
+        if (res != NULL) {
+            if (!PyIter_Check(res)) {
+                PyErr_Format(PyExc_TypeError,
+                             "__await__() returned non-iterator "
+                             "of type '%.100s'",
+                             Py_TYPE(res)->tp_name);
+                Py_CLEAR(res);
+            }
+            else {
+                if (PyGen_CheckCoroutineExact(res)) {
+                    PyErr_SetString(PyExc_TypeError,
+                                    "__await__() returned a coroutine");
+                    Py_CLEAR(res);
+                }
+            }
         }
         return res;
     }
