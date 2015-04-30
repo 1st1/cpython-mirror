@@ -94,7 +94,7 @@ class TestPredicates(IsTestBase):
         count = len([x for x in dir(inspect) if x.startswith('is')])
         # This test is here for remember you to update Doc/library/inspect.rst
         # which claims there are 16 such functions
-        expected = 18
+        expected = 19
         err_msg = "There are %d (not %d) is* functions" % (count, expected)
         self.assertEqual(count, expected, err_msg)
 
@@ -152,6 +152,26 @@ class TestPredicates(IsTestBase):
             inspect.isgeneratorfunction(coroutine_function_example))
         self.assertFalse(
             inspect.isgenerator(coroutine_function_example(1)))
+
+    def test_isawaitable(self):
+        def gen(): yield
+        self.assertFalse(inspect.isawaitable(gen()))
+
+        self.assertTrue(
+            inspect.isawaitable(coroutine_function_example(1)))
+        self.assertTrue(
+            inspect.isawaitable(gen_coroutine_function_example(1)))
+
+        class Future:
+            def __await__():
+                pass
+        self.assertTrue(inspect.isawaitable(Future()))
+        self.assertFalse(inspect.isawaitable(Future))
+
+        class NotFuture: pass
+        not_fut = NotFuture()
+        not_fut.__await__ = lambda: None
+        self.assertFalse(inspect.isawaitable(not_fut))
 
     def test_isroutine(self):
         self.assertTrue(inspect.isroutine(mod.spam))
