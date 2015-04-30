@@ -181,6 +181,14 @@ def iscoroutinefunction(object):
     return bool((isfunction(object) or ismethod(object)) and
                 object.__code__.co_flags & CO_COROUTINE)
 
+def isawaitable(object):
+    if iscoroutine(object):
+        return True
+    for base in type(object).__mro__:
+        if callable(base.__dict__.get("__await__")):
+            return True
+    return False
+
 def isgenerator(object):
     """Return true if the object is a generator.
 
