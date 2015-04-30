@@ -74,6 +74,10 @@ class AsyncBadSyntaxTest(unittest.TestCase):
 
 class CoroutineTest(unittest.TestCase):
 
+    def test_gen_1(self):
+        def gen(): yield
+        self.assertFalse(hasattr(gen, '__await__'))
+
     def test_func_1(self):
         async def foo():
             return 10
