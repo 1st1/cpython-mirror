@@ -332,18 +332,25 @@ class DOMBuilderFilter:
 del NodeFilter
 
 
-class DocumentLS:
+class DocumentLSMeta(type):
+    @property
+    def async(cls):
+        clsname = cls.__name__
+        warnings.warn(
+            "{cls}.async is deprecated; use {cls}.async_".format(cls=clsname),
+            DeprecationWarning)
+        return False
+
+
+class DocumentLS(metaclass=DocumentLSMeta):
     """Mixin to create documents that conform to the load/save spec."""
 
-    #: This property is deprecated and scheduled to be removed in 3.6.
-    async = False
+    async_ = False
 
     def _get_async(self):
-        warnings.warn("_get_async() method is deprecated", DeprecationWarning)
         return False
 
     def _set_async(self, async):
-        warnings.warn("_set_async() method is deprecated", DeprecationWarning)
         if async:
             raise xml.dom.NotSupportedErr(
                 "asynchronous document loading is not supported")
