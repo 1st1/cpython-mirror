@@ -3,7 +3,7 @@
 __all__ = ['Task',
            'FIRST_COMPLETED', 'FIRST_EXCEPTION', 'ALL_COMPLETED',
            'wait', 'wait_for', 'as_completed', 'sleep', 'async',
-           'gather', 'shield', 'ensure_task',
+           'gather', 'shield', 'ensure_future',
            ]
 
 import concurrent.futures
@@ -506,16 +506,16 @@ def async(coro_or_future, *, loop=None):
 
     If the argument is a Future, it is returned directly.
 
-    This function is deprecated in 3.5. Use asyncio.ensure_task() instead.
+    This function is deprecated in 3.5. Use asyncio.ensure_future() instead.
     """
 
-    warnings.warn("asyncio.async() function is deprecated, use ensure_task()",
+    warnings.warn("asyncio.async() function is deprecated, use ensure_future()",
                   DeprecationWarning)
 
-    return ensure_task(coro_or_future, loop=loop)
+    return ensure_future(coro_or_future, loop=loop)
 
 
-def ensure_task(coro_or_future, *, loop=None):
+def ensure_future(coro_or_future, *, loop=None):
     """Wrap a coroutine in a future.
 
     If the argument is a Future, it is returned directly.

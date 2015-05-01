@@ -89,11 +89,11 @@ class TaskTests(test_utils.TestCase):
         loop.run_until_complete(t)
         loop.close()
 
-    def test_ensure_task_coroutine(self):
+    def test_ensure_future_coroutine(self):
         @asyncio.coroutine
         def notmuch():
             return 'ok'
-        t = asyncio.ensure_task(notmuch(), loop=self.loop)
+        t = asyncio.ensure_future(notmuch(), loop=self.loop)
         self.loop.run_until_complete(t)
         self.assertTrue(t.done())
         self.assertEqual(t.result(), 'ok')
@@ -101,7 +101,7 @@ class TaskTests(test_utils.TestCase):
 
         loop = asyncio.new_event_loop()
         self.set_event_loop(loop)
-        t = asyncio.ensure_task(notmuch(), loop=loop)
+        t = asyncio.ensure_future(notmuch(), loop=loop)
         self.assertIs(t._loop, loop)
         loop.run_until_complete(t)
         loop.close()
