@@ -2024,7 +2024,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
             Py_DECREF(iterable);
 
-            SET_TOP(iter); // Even if it's NULL
+            SET_TOP(iter); /* Even if it's NULL */
 
             if (iter == NULL) {
                 goto error;
@@ -2046,8 +2046,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                                                         CO_NATIVE_COROUTINE)
                     && !(co->co_flags & CO_COROUTINE))
                 {
-                    // If we're yielding-from a coroutine object from a regular
-                    // generator object - raise an error.
+                    /* If we're yielding-from a coroutine object from a regular
+                       generator object - raise an error. */
 
                     Py_CLEAR(v);
                     Py_CLEAR(reciever);
