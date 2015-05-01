@@ -332,19 +332,28 @@ class DOMBuilderFilter:
 del NodeFilter
 
 
-class DocumentLSMeta(type):
-    @property
-    def async(cls):
+class _AsyncDeprecatedProperty:
+    def warn(self, cls):
         clsname = cls.__name__
         warnings.warn(
             "{cls}.async is deprecated; use {cls}.async_".format(cls=clsname),
             DeprecationWarning)
+
+    def __get__(self, instance, cls):
+        self.warn(cls)
+        if instance is not None:
+            return instance.async_
         return False
 
+    def __set__(self, instance, value):
+        self.warn(type(instance))
+        setattr(instance, 'async_', value)
 
-class DocumentLS(metaclass=DocumentLSMeta):
+
+class DocumentLS:
     """Mixin to create documents that conform to the load/save spec."""
 
+    async = _AsyncDeprecatedProperty()
     async_ = False
 
     def _get_async(self):
@@ -373,6 +382,9 @@ class DocumentLS(metaclass=DocumentLSMeta):
         elif snode.ownerDocument is not self:
             raise xml.dom.WrongDocumentErr()
         return snode.toxml()
+
+
+del _AsyncDeprecatedProperty
 
 
 class DOMImplementationLS:
