@@ -89,6 +89,23 @@ class TaskTests(test_utils.TestCase):
         loop.run_until_complete(t)
         loop.close()
 
+    def test_ensure_task_coroutine(self):
+        @asyncio.coroutine
+        def notmuch():
+            return 'ok'
+        t = asyncio.ensure_task(notmuch(), loop=self.loop)
+        self.loop.run_until_complete(t)
+        self.assertTrue(t.done())
+        self.assertEqual(t.result(), 'ok')
+        self.assertIs(t._loop, self.loop)
+
+        loop = asyncio.new_event_loop()
+        self.set_event_loop(loop)
+        t = asyncio.ensure_task(notmuch(), loop=loop)
+        self.assertIs(t._loop, loop)
+        loop.run_until_complete(t)
+        loop.close()
+
     def test_async_future(self):
         f_orig = asyncio.Future(loop=self.loop)
         f_orig.set_result('ko')
