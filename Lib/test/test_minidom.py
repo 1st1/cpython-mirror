@@ -49,6 +49,11 @@ class MinidomTest(unittest.TestCase):
         t = node.wholeText
         self.confirm(t == s, "looking for %r, found %r" % (s, t))
 
+    def testDocumentAsyncAttr(self):
+        with self.assertWarns(DeprecationWarning):
+            self.assertFalse(getattr(Document, 'async', True))
+        self.assertFalse(Document.async_)
+
     def testParseFromBinaryFile(self):
         with open(tstfile, 'rb') as file:
             dom = parse(file)
