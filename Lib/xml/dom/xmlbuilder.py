@@ -1,6 +1,7 @@
 """Implementation of the DOM Level 3 'LS-Load' feature."""
 
 import copy
+import warnings
 import xml.dom
 
 from xml.dom.NodeFilter import NodeFilter
@@ -334,11 +335,15 @@ del NodeFilter
 class DocumentLS:
     """Mixin to create documents that conform to the load/save spec."""
 
+    #: This property is deprecated and scheduled to be removed in 3.6.
     async = False
 
     def _get_async(self):
+        warnings.warn("_get_async() method is deprecated", DeprecationWarning)
         return False
+
     def _set_async(self, async):
+        warnings.warn("_set_async() method is deprecated", DeprecationWarning)
         if async:
             raise xml.dom.NotSupportedErr(
                 "asynchronous document loading is not supported")
