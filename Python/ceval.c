@@ -2037,7 +2037,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *v = POP();
             PyObject *reciever = TOP();
             int err;
-            if (PyGen_CheckExact(reciever)) {
+            if (PyGenCoro_CheckExact(reciever)) {
                 if (
                     (((PyCodeObject*) \
                         ((PyGenObject*)reciever)->gi_code)->co_flags &
@@ -3793,7 +3793,13 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
 
         /* Create a new generator that owns the ready to run frame
          * and return that as the value. */
-        gen = PyGen_NewWithQualName(f, name, qualname);
+        if (co->co_flags & CO_NATIVE_COROUTINE) {
+            gen = PyCoro_NewWithQualName(f, name, qualname);
+        }
+        else {
+            gen = PyGen_NewWithQualName(f, name, qualname);
+        }
+
         if (gen == NULL)
             return NULL;
 

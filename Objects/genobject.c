@@ -198,7 +198,7 @@ gen_close_iter(PyObject *yf)
     PyObject *retval = NULL;
     _Py_IDENTIFIER(close);
 
-    if (PyGen_CheckExact(yf)) {
+    if (PyGenCoro_CheckExact(yf)) {
         retval = gen_close((PyGenObject *)yf, NULL);
         if (retval == NULL)
             return -1;
@@ -298,7 +298,7 @@ gen_throw(PyGenObject *gen, PyObject *args)
                 return gen_send_ex(gen, Py_None, 1);
             goto throw_here;
         }
-        if (PyGen_CheckExact(yf)) {
+        if (PyGenCoro_CheckExact(yf)) {
             gen->gi_running = 1;
             ret = gen_throw((PyGenObject *)yf, args);
             gen->gi_running = 0;
@@ -597,10 +597,67 @@ PyTypeObject PyGen_Type = {
     _PyGen_Finalize,                            /* tp_finalize */
 };
 
+
+PyTypeObject PyCoro_Type = {
+    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    "coroutine",                                /* tp_name */
+    sizeof(PyGenObject),                        /* tp_basicsize */
+    0,                                          /* tp_itemsize */
+    /* methods */
+    (destructor)gen_dealloc,                    /* tp_dealloc */
+    0,                                          /* tp_print */
+    0,                                          /* tp_getattr */
+    0,                                          /* tp_setattr */
+    0,                                          /* tp_await */
+    (reprfunc)gen_repr,                         /* tp_repr */
+    0,                                          /* tp_as_number */
+    0,                                          /* tp_as_sequence */
+    0,                                          /* tp_as_mapping */
+    0,                                          /* tp_hash */
+    0,                                          /* tp_call */
+    0,                                          /* tp_str */
+    PyObject_GenericGetAttr,                    /* tp_getattro */
+    0,                                          /* tp_setattro */
+    0,                                          /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+        Py_TPFLAGS_HAVE_FINALIZE,               /* tp_flags */
+    0,                                          /* tp_doc */
+    (traverseproc)gen_traverse,                 /* tp_traverse */
+    0,                                          /* tp_clear */
+    0,                                          /* tp_richcompare */
+    offsetof(PyGenObject, gi_weakreflist),      /* tp_weaklistoffset */
+    gen_get_iter,                               /* tp_iter */
+    (iternextfunc)gen_iternext,                 /* tp_iternext */
+    gen_methods,                                /* tp_methods */
+    gen_memberlist,                             /* tp_members */
+    gen_getsetlist,                             /* tp_getset */
+    0,                                          /* tp_base */
+    0,                                          /* tp_dict */
+
+    0,                                          /* tp_descr_get */
+    0,                                          /* tp_descr_set */
+    0,                                          /* tp_dictoffset */
+    0,                                          /* tp_init */
+    0,                                          /* tp_alloc */
+    0,                                          /* tp_new */
+    0,                                          /* tp_free */
+    0,                                          /* tp_is_gc */
+    0,                                          /* tp_bases */
+    0,                                          /* tp_mro */
+    0,                                          /* tp_cache */
+    0,                                          /* tp_subclasses */
+    0,                                          /* tp_weaklist */
+    0,                                          /* tp_del */
+    0,                                          /* tp_version_tag */
+    _PyGen_Finalize,                            /* tp_finalize */
+};
+
+
 PyObject *
-PyGen_NewWithQualName(PyFrameObject *f, PyObject *name, PyObject *qualname)
+gen_new(PyFrameObject *f, PyObject *name, PyObject *qualname,
+        PyTypeObject* type)
 {
-    PyGenObject *gen = PyObject_GC_New(PyGenObject, &PyGen_Type);
+    PyGenObject *gen = PyObject_GC_New(PyGenObject, type);
     if (gen == NULL) {
         Py_DECREF(f);
         return NULL;
@@ -623,6 +680,18 @@ PyGen_NewWithQualName(PyFrameObject *f, PyObject *name, PyObject *qualname)
     Py_INCREF(gen->gi_qualname);
     _PyObject_GC_TRACK(gen);
     return (PyObject *)gen;
+}
+
+PyObject *
+PyGen_NewWithQualName(PyFrameObject *f, PyObject *name, PyObject *qualname)
+{
+    return gen_new(f, name, qualname, &PyGen_Type);
+}
+
+PyObject *
+PyCoro_NewWithQualName(PyFrameObject *f, PyObject *name, PyObject *qualname)
+{
+    return gen_new(f, name, qualname, &PyCoro_Type);
 }
 
 PyObject *

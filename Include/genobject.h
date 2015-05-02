@@ -34,22 +34,28 @@ typedef struct {
 } PyGenObject;
 
 PyAPI_DATA(PyTypeObject) PyGen_Type;
+PyAPI_DATA(PyTypeObject) PyCoro_Type;
 
-#define PyGen_Check(op) PyObject_TypeCheck(op, &PyGen_Type)
+#define PyGen_Check(op) (PyObject_TypeCheck(op, &PyGen_Type))
 #define PyGen_CheckExact(op) (Py_TYPE(op) == &PyGen_Type)
 
-#define PyGen_CheckCoroutineExact(op) (PyGen_CheckExact(op) && \
+#define PyGenCoro_CheckExact(op) (Py_TYPE(op) == &PyGen_Type || \
+                                  Py_TYPE(op) == &PyCoro_Type)
+
+#define PyGen_CheckCoroutineExact(op) (PyGenCoro_CheckExact(op) && \
                                        (((PyCodeObject*) \
                                            ((PyGenObject*)op)->gi_code) \
                                          ->co_flags & CO_COROUTINE))
 
-#define PyGen_CheckNativeCoroutineExact(op) (PyGen_CheckExact(op) && \
+#define PyGen_CheckNativeCoroutineExact(op) (PyGenCoro_CheckExact(op) && \
                                        (((PyCodeObject*) \
                                            ((PyGenObject*)op)->gi_code) \
                                          ->co_flags & CO_NATIVE_COROUTINE))
 
 PyAPI_FUNC(PyObject *) PyGen_New(struct _frame *);
 PyAPI_FUNC(PyObject *) PyGen_NewWithQualName(struct _frame *,
+    PyObject *name, PyObject *qualname);
+PyAPI_FUNC(PyObject *) PyCoro_NewWithQualName(struct _frame *,
     PyObject *name, PyObject *qualname);
 PyAPI_FUNC(int) PyGen_NeedsFinalizing(PyGenObject *);
 PyAPI_FUNC(int) _PyGen_FetchStopIterationValue(PyObject **);

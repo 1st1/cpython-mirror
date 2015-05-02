@@ -20,7 +20,7 @@ class AsyncYield:
 
 
 def run_async(coro):
-    assert coro.__class__ is types.GeneratorType
+    #assert coro.__class__ is types.GeneratorType
 
     buffer = []
     result = None
@@ -83,7 +83,8 @@ class CoroutineTest(unittest.TestCase):
             return 10
 
         f = foo()
-        self.assertIsInstance(f, types.GeneratorType)
+        self.assertFalse(isinstance(f, types.GeneratorType))
+        self.assertIsInstance(f, types.CoroutineType)
         self.assertTrue(bool(foo.__code__.co_flags & 0x80))
         self.assertTrue(bool(foo.__code__.co_flags & 0x20))
         self.assertTrue(bool(f.gi_code.co_flags & 0x80))

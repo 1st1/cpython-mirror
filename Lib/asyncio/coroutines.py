@@ -193,7 +193,7 @@ def iscoroutinefunction(func):
             inspect.iscoroutinefunction(func))
 
 
-_COROUTINE_TYPES = (types.GeneratorType, CoroWrapper)
+_COROUTINE_TYPES = (types.GeneratorType, types.CoroutineType, CoroWrapper)
 
 def iscoroutine(obj):
     """Return True if obj is a coroutine object."""

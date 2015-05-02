@@ -74,7 +74,8 @@ class Task(futures.Future):
         super().__init__(loop=loop)
         if self._source_traceback:
             del self._source_traceback[-1]
-        if coro.__class__ is types.GeneratorType:
+        if (coro.__class__ is types.GeneratorType or
+                coro.__class__ is types.CoroutineType):
             self._coro = coro
         else:
             self._coro = iter(coro)  # Use the iterator just in case.

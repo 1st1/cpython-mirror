@@ -19,6 +19,9 @@ def _g():
     yield 1
 GeneratorType = type(_g())
 
+async def _c(): pass
+CoroutineType = type(_c())
+
 class _C:
     def _m(self): pass
 MethodType = type(_C()._m)
