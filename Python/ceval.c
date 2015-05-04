@@ -155,8 +155,6 @@ static PyObject * special_lookup(PyObject *, _Py_Identifier *);
     "free variable '%.200s' referenced before assignment" \
     " in enclosing scope"
 
-static PyObject *coroutine_wrapper = NULL;
-
 /* Dynamic execution profile */
 #ifdef DYNAMIC_EXECUTION_PROFILE
 #ifdef DXPAIRS
@@ -3937,6 +3935,7 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
 
     if (co->co_flags & CO_GENERATOR) {
         PyObject *gen;
+        PyObject *coroutine_wrapper;
 
         /* Don't need to keep the reference to f_back, it will be set
          * when the generator is resumed. */
@@ -3950,10 +3949,13 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
         if (gen == NULL)
             return NULL;
 
-        if (coroutine_wrapper != NULL && co->co_flags & CO_COROUTINE) {
-            PyObject *wrapped =
-                        PyObject_CallFunction(coroutine_wrapper, "N", gen);
-            gen = wrapped;
+        if (co->co_flags & CO_COROUTINE) {
+            coroutine_wrapper = PyEval_GetCoroutineWrapper();
+            if (coroutine_wrapper != NULL) {
+                PyObject *wrapped =
+                            PyObject_CallFunction(coroutine_wrapper, "N", gen);
+                gen = wrapped;
+            }
         }
         return gen;
     }
@@ -4404,16 +4406,19 @@ PyEval_SetTrace(Py_tracefunc func, PyObject *arg)
 void
 PyEval_SetCoroutineWrapper(PyObject *wrapper)
 {
-    Py_CLEAR(coroutine_wrapper);
+    PyThreadState *tstate = PyThreadState_GET();
+
+    Py_CLEAR(tstate->coroutine_wrapper);
 
     Py_XINCREF(wrapper);
-    coroutine_wrapper = wrapper;
+    tstate->coroutine_wrapper = wrapper;
 }
 
 PyObject *
 PyEval_GetCoroutineWrapper()
 {
-    return coroutine_wrapper;
+    PyThreadState *tstate = PyThreadState_GET();
+    return tstate->coroutine_wrapper;
 }
 
 PyObject *
