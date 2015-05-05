@@ -1,5 +1,8 @@
+import contextlib
+import gc
 import types
 import unittest
+import warnings
 from test import support
 
 
@@ -31,6 +34,14 @@ def run_async(coro):
             result = ex.args[0] if ex.args else None
             break
     return buffer, result
+
+
+@contextlib.contextmanager
+def silence_coro_gc():
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        yield
+        support.gc_collect()
 
 
 class AsyncBadSyntaxTest(unittest.TestCase):
@@ -106,7 +117,8 @@ class CoroutineTest(unittest.TestCase):
         async def foo():
             raise StopIteration
 
-        self.assertRegex(repr(foo()), '^<coroutine object.* at 0x.*>$')
+        with silence_coro_gc():
+            self.assertRegex(repr(foo()), '^<coroutine object.* at 0x.*>$')
 
     def test_func_4(self):
         async def foo():
@@ -180,12 +192,11 @@ class CoroutineTest(unittest.TestCase):
         def foo():
             yield from bar()
 
-        f = foo()
-        with self.assertRaisesRegex(
+        with silence_coro_gc(), self.assertRaisesRegex(
             TypeError,
             "cannot 'yield from' a coroutine object from a generator"):
 
-            list(f)
+            list(foo())
 
     def test_func_8(self):
         @types.coroutine
@@ -196,6 +207,15 @@ class CoroutineTest(unittest.TestCase):
             return 'spam'
 
         self.assertEqual(run_async(bar()), ([], 'spam') )
+
+    def test_func_9(self):
+        async def foo(): pass
+
+        with self.assertWarnsRegex(
+            RuntimeWarning, "coroutine '.*test_func_9.*foo' was never awaited"):
+
+            foo()
+            support.gc_collect()
 
     def test_await_1(self):
 
@@ -764,7 +784,8 @@ class SysSetCoroWrapperTest(unittest.TestCase):
         self.assertIsNone(sys.get_coroutine_wrapper())
 
         wrapped = None
-        f = foo()
+        with silence_coro_gc():
+            foo()
         self.assertFalse(wrapped)
 
 
