@@ -2518,14 +2518,10 @@ validate_atom(node *tree)
                    && (validate_rparen(CHILD(tree, nch - 1))));
 
             if (res && (nch == 3)) {
-                switch (TYPE(CHILD(tree, 1))) {
-                    case yield_expr:
-                        res = validate_yield_expr(CHILD(tree, 1));
-                        break;
-                    default:
-                        res = validate_testlist_comp(CHILD(tree, 1));
-                        break;
-                }
+                if (TYPE(CHILD(tree, 1))==yield_expr)
+                    res = validate_yield_expr(CHILD(tree, 1));
+                else
+                    res = validate_testlist_comp(CHILD(tree, 1));
             }
             break;
           case LSQB:
