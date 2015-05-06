@@ -2944,27 +2944,29 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 #endif
         }
 
-        TARGET(GET_YIELD_FROM_ITER) {
+        TARGET(GET_ITER) {
+            /* before: [obj]; after [getiter(obj)] */
             PyObject *iterable = TOP();
-            PyObject *iter = NULL;
-            if (!PyGen_CheckCoroutineExact(iterable)) {
+            PyObject *iter;
+            /* If we have a generator object on top -- keep it there,
+               it's already an iterator.
+
+               This is needed to allow use of 'async def' coroutines
+               in 'yeild from' expression from generator-based coroutines
+               (decorated with types.coroutine()).
+
+               'yield from' is compiled to GET_ITER..YIELD_FROM combination,
+               but since coroutines raise TypeError in their 'tp_iter' we
+               need a way for them to "pass through" the GET_ITER.
+            */
+            if (!PyGen_CheckExact(iterable)) {
+                /* `iterable` is not a generator. */
                 iter = PyObject_GetIter(iterable);
                 Py_DECREF(iterable);
                 SET_TOP(iter);
                 if (iter == NULL)
                     goto error;
             }
-            DISPATCH();
-        }
-
-        TARGET(GET_ITER) {
-            /* before: [obj]; after [getiter(obj)] */
-            PyObject *iterable = TOP();
-            PyObject *iter = PyObject_GetIter(iterable);
-            Py_DECREF(iterable);
-            SET_TOP(iter);
-            if (iter == NULL)
-                goto error;
             PREDICT(FOR_ITER);
             DISPATCH();
         }

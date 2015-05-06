@@ -142,11 +142,11 @@ class CoroutineTest(unittest.TestCase):
         with check():
             next(foo())
 
-        with check():
+        with silence_coro_gc(), check():
             for i in foo():
                 pass
 
-        with check():
+        with silence_coro_gc(), check():
             [i for i in foo()]
 
     def test_func_5(self):
