@@ -69,7 +69,8 @@ struct tok_state {
     int defstack[MAXINDENT];     /* stack if funcs & indents where they
                                     were defined */
     int deftypestack[MAXINDENT]; /* stack of func types
-                                    (0 not func; 1: reg; 2: async) */
+                                    (0 not func; 1: "def name";
+                                     2: "async def name") */
     int def;                     /* Length of stack of func types */
 };
 
