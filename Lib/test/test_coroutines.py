@@ -1,5 +1,6 @@
 import contextlib
 import gc
+import sys
 import types
 import unittest
 import warnings
@@ -758,8 +759,6 @@ class CoroAsyncIOCompatTest(unittest.TestCase):
 class SysSetCoroWrapperTest(unittest.TestCase):
 
     def test_set_wrapper_1(self):
-        import sys
-
         async def foo():
             return 'spam'
 
@@ -787,6 +786,12 @@ class SysSetCoroWrapperTest(unittest.TestCase):
         with silence_coro_gc():
             foo()
         self.assertFalse(wrapped)
+
+    def test_set_wrapper_2(self):
+        self.assertIsNone(sys.get_coroutine_wrapper())
+        with self.assertRaisesRegex(TypeError, "callable expected, got int"):
+            sys.set_coroutine_wrapper(1)
+        self.assertIsNone(sys.get_coroutine_wrapper())
 
 
 class CAPITest(unittest.TestCase):

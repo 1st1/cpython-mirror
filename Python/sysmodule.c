@@ -651,7 +651,7 @@ sys_set_coroutine_wrapper(PyObject *self, PyObject *wrapper)
     if (wrapper != Py_None) {
         if (!PyCallable_Check(wrapper)) {
             PyErr_Format(PyExc_TypeError,
-                         "callable expected, got %s",
+                         "callable expected, got %.50s",
                          Py_TYPE(wrapper)->tp_name);
             return NULL;
         }
