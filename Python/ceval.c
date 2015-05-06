@@ -2028,11 +2028,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 goto error;
             }
 
-            PREDICT(YIELD_FROM);
             DISPATCH();
         }
 
-        PREDICTED_WITH_ARG(YIELD_FROM);
         TARGET(YIELD_FROM) {
             PyObject *v = POP();
             PyObject *reciever = TOP();
