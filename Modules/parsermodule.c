@@ -1622,7 +1622,6 @@ validate_compound_stmt(node *tree)
     return (res);
 }
 
-
 static int
 validate_yield_or_testlist(node *tree, int tse)
 {
