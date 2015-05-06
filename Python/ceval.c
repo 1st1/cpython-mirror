@@ -1926,7 +1926,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             goto fast_block_end;
         }
 
-        TARGET(ASYNC_AITER) {
+        TARGET(GET_AITER) {
             _Py_IDENTIFIER(__aiter__);
 
             PyObject *iter = NULL;
@@ -1974,7 +1974,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
-        TARGET(ASYNC_ANEXT) {
+        TARGET(GET_ANEXT) {
             _Py_IDENTIFIER(__anext__);
 
             PyObject *next_iter = NULL;

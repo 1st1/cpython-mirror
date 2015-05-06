@@ -516,13 +516,13 @@ the original TOS1.
    returns ``o`` if ``o`` is a coroutine object; or resolved ``o.__await__``.
 
 
-.. opcode:: ASYNC_AITER
+.. opcode:: GET_AITER
 
    Implements ``TOS = get_awaitable(TOS.__aiter__())``.  See ``GET_AWAITABLE``
    for details about ``get_awaitable``
 
 
-.. opcode:: ASYNC_ANEXT
+.. opcode:: GET_ANEXT
 
    Implements ``PUSH(get_awaitable(TOS.__anext__()))``.  See ``GET_AWAITABLE``
    for details about ``get_awaitable``
