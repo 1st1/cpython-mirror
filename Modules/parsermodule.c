@@ -2518,9 +2518,9 @@ validate_atom(node *tree)
 
             if (res && (nch == 3)) {
                 if (TYPE(CHILD(tree, 1))==yield_expr)
-                    res = validate_yield_expr(CHILD(tree, 1));
+                        res = validate_yield_expr(CHILD(tree, 1));
                 else
-                    res = validate_testlist_comp(CHILD(tree, 1));
+                        res = validate_testlist_comp(CHILD(tree, 1));
             }
             break;
           case LSQB:
