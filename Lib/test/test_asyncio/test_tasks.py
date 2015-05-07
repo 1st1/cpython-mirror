@@ -1638,7 +1638,7 @@ class TaskTests(test_utils.TestCase):
             return a
 
         def call(arg):
-            cw = asyncio.coroutines.CoroWrapper(foo(), foo)
+            cw = asyncio.coroutines.CoroWrapper(foo())
             cw.send(None)
             try:
                 cw.send(arg)
@@ -1653,7 +1653,7 @@ class TaskTests(test_utils.TestCase):
     def test_corowrapper_weakref(self):
         wd = weakref.WeakValueDictionary()
         def foo(): yield from []
-        cw = asyncio.coroutines.CoroWrapper(foo(), foo)
+        cw = asyncio.coroutines.CoroWrapper(foo())
         wd['cw'] = cw  # Would fail without __weakref__ slot.
         cw.gen = None  # Suppress warning from __del__.
 
@@ -1701,19 +1701,10 @@ class TaskTests(test_utils.TestCase):
 
     @mock.patch('asyncio.coroutines.logger')
     def test_coroutine_never_yielded(self, m_log):
-        if PY35:
-            self.loop.set_debug(True)
-
+        with set_coroutine_debug(True):
             @asyncio.coroutine
             def coro_noop():
                 pass
-
-        else:
-            with set_coroutine_debug(True):
-                asyncio.coroutines._DEBUG = True
-                @asyncio.coroutine
-                def coro_noop():
-                    pass
 
         tb_filename = __file__
         tb_lineno = sys._getframe().f_lineno + 2
@@ -1723,22 +1714,18 @@ class TaskTests(test_utils.TestCase):
 
         self.assertTrue(m_log.error.called)
         message = m_log.error.call_args[0][0]
+        func_filename, func_lineno = test_utils.get_function_source(coro_noop)
+        regex = (r'^<CoroWrapper %s\(\) .* at %s:%s, .*> '
+                    r'was never yielded from\n'
+                 r'Coroutine object created at \(most recent call last\):\n'
+                 r'.*\n'
+                 r'  File "%s", line %s, in test_coroutine_never_yielded\n'
+                 r'    coro_noop\(\)$'
+                 % (re.escape(coro_noop.__qualname__),
+                    re.escape(func_filename), func_lineno,
+                    re.escape(tb_filename), tb_lineno))
 
-        func_filename, func_lineno = test_utils.get_function_source(
-            coro_noop)
-
-        if not PY35: # TODO
-            regex = (r'^<CoroWrapper %s\(\) .* at %s:%s, .*> '
-                        r'was never yielded from\n'
-                     r'Coroutine object created at \(most recent call last\):\n'
-                     r'.*\n'
-                     r'  File "%s", line %s, in test_coroutine_never_yielded\n'
-                     r'    coro_noop\(\)$'
-                     % (re.escape(coro_noop.__qualname__),
-                        re.escape(func_filename), func_lineno,
-                        re.escape(tb_filename), tb_lineno))
-
-            self.assertRegex(message, re.compile(regex, re.DOTALL))
+        self.assertRegex(message, re.compile(regex, re.DOTALL))
 
     def test_task_source_traceback(self):
         self.loop.set_debug(True)

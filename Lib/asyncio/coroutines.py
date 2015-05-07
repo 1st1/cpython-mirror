@@ -34,11 +34,24 @@ _DEBUG = (not sys.flags.ignore_environment
 
 
 try:
-    types_coroutine = types.coroutine
+    types.coroutine
 except AttributeError:
-    native_coroutine = False
+    native_coroutine_support = False
 else:
-    native_coroutine = True
+    native_coroutine_support = True
+
+try:
+    _iscoroutinefunction = inspect.iscoroutinefunction
+except AttributeError:
+    _iscoroutinefunction = lambda func: False
+
+try:
+    inspect.CO_NATIVE_COROUTINE
+except AttributeError:
+    _is_native_coro_code = lambda code: False
+else:
+    _is_native_coro_code = lambda code: (code.co_flags &
+                                         inspect.CO_NATIVE_COROUTINE)
 
 
 # Check for CPython issue #21209
@@ -65,21 +78,23 @@ _YIELD_FROM_BUG = has_yield_from_bug()
 del has_yield_from_bug
 
 
+def debug_wrapper(gen):
+    if _is_native_coro_code(gen.gi_code):
+        return CoroWrapper(gen, None)
+    else:
+        return gen
+
+
 class CoroWrapper:
     # Wrapper for coroutine object in _DEBUG mode.
 
-    def __init__(self, gen, func):
+    def __init__(self, gen, func=None):
         assert inspect.isgenerator(gen) or inspect.iscoroutine(gen), gen
         self.gen = gen
-        self.func = func
+        self.func = func # Used to unwrap @coroutine decorator
         self._source_traceback = traceback.extract_stack(sys._getframe(1))
-
-        if '__name__' not in self.__dict__:
-            self.__name__ = gen.__name__
-            self.__qualname__ = gen.__qualname__
-            self.__doc__ = gen.__doc__
-        # __name__, __qualname__, __doc__ attributes are set by the coroutine()
-        # decorator
+        self.__name__ = getattr(gen, '__name__', None)
+        self.__qualname__ = getattr(gen, '__qualname__', None)
 
     def __repr__(self):
         coro_repr = _format_coroutine(self)
@@ -152,8 +167,13 @@ def coroutine(func):
     If the coroutine is not yielded from before it is destroyed,
     an error message is logged.
     """
-    is_coroutine = inspect.iscoroutinefunction(func)
-    if inspect.isgeneratorfunction(func) or is_coroutine:
+    is_coroutine = _iscoroutinefunction(func)
+    if is_coroutine and _is_native_coro_code(func.__code__):
+        # In Python 3.5 that's all we need to do for coroutines
+        # defiend with "async def".
+        return func
+
+    if inspect.isgeneratorfunction(func):
         coro = func
     else:
         @functools.wraps(func)
@@ -163,25 +183,21 @@ def coroutine(func):
                 res = yield from res
             return res
 
-    if types_coroutine:
-        if is_coroutine:
-            wrapper = coro
+    if not _DEBUG:
+        if native_coroutine_support:
+            wrapper = types.coroutine(coro)
         else:
-            wrapper = types_coroutine(coro)
+            wrapper = coro
     else:
-        if not _DEBUG:
-            wrapper = coro
-        else:
-            @functools.wraps(func)
-            def wrapper(*args, **kwds):
-                w = CoroWrapper(coro(*args, **kwds), func)
-                if w._source_traceback:
-                    del w._source_traceback[-1]
-                w.__name__ = func.__name__
-                if hasattr(func, '__qualname__'):
-                    w.__qualname__ = func.__qualname__
-                w.__doc__ = func.__doc__
-                return w
+        @functools.wraps(func)
+        def wrapper(*args, **kwds):
+            w = CoroWrapper(coro(*args, **kwds), func=func)
+            if w._source_traceback:
+                del w._source_traceback[-1]
+            # Python < 3.5 does not implement __qualname__
+            # on generator objects, so we set it manually:
+            w.__qualname__ = func.__qualname__
+            return w
 
     wrapper._is_coroutine = True  # For iscoroutinefunction().
     return wrapper
@@ -190,7 +206,7 @@ def coroutine(func):
 def iscoroutinefunction(func):
     """Return True if func is a decorated coroutine function."""
     return (getattr(func, '_is_coroutine', False) or
-            inspect.iscoroutinefunction(func))
+            _iscoroutinefunction(func))
 
 
 _COROUTINE_TYPES = (types.GeneratorType, CoroWrapper)
@@ -211,8 +227,7 @@ def _format_coroutine(coro):
 
     filename = coro.gi_code.co_filename
     if (isinstance(coro, CoroWrapper)
-    and not inspect.isgeneratorfunction(coro.func)
-    and coro.func is not None):
+    and not inspect.isgeneratorfunction(coro.func)):
         filename, lineno = events._get_function_source(coro.func)
         if coro.gi_frame is None:
             coro_repr = ('%s done, defined at %s:%s'

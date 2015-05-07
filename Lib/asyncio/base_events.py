@@ -32,7 +32,7 @@ from . import coroutines
 from . import events
 from . import futures
 from . import tasks
-from .coroutines import coroutine, CoroWrapper
+from .coroutines import coroutine
 from .log import logger
 
 
@@ -369,6 +369,8 @@ class BaseEventLoop(events.AbstractEventLoop):
                 self._default_executor = None
                 executor.shutdown(wait=False)
         finally:
+            # It is important to unregister "sys.coroutine_wrapper"
+            # if it was registered.
             self.set_debug(False)
 
     def is_closed(self):
@@ -1202,9 +1204,27 @@ class BaseEventLoop(events.AbstractEventLoop):
 
     def set_debug(self, enabled):
         self._debug = enabled
+        wrapper = coroutines.debug_wrapper
 
-        if hasattr(sys, 'set_coroutine_wrapper'):
+        try:
+            set_wrapper = sys.set_coroutine_wrapper
+        except AttributeError:
+            pass
+        else:
+            current_wrapper = sys.get_coroutine_wrapper()
             if enabled:
-                sys.set_coroutine_wrapper(lambda gen: CoroWrapper(gen, None))
+                if current_wrapper not in (None, wrapper):
+                    warnings.warn(
+                        "loop.set_debug(True): cannot set debug coroutine "
+                        "wrapper; another wrapper is already set %r" %
+                        current_wrapper, RuntimeWarning)
+                else:
+                    set_wrapper(wrapper)
             else:
-                sys.set_coroutine_wrapper(None)
+                if current_wrapper not in (None, wrapper):
+                    warnings.warn(
+                        "loop.set_debug(False): cannot unset debug coroutine "
+                        "wrapper; another wrapper was set %r" %
+                        current_wrapper, RuntimeWarning)
+                else:
+                    set_wrapper(None)
