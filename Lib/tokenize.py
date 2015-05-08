@@ -476,8 +476,9 @@ def _tokenize(readline, encoding):
     contstr, needcont = '', 0
     contline = None
     indents = [0]
-    stashed = None
 
+    # 'stashed' and 'ctx' are used for async/await parsing
+    stashed = None
     ctx = [('sync', 0)]
 
     if encoding is not None:
@@ -502,17 +503,11 @@ def _tokenize(readline, encoding):
             endmatch = endprog.match(line)
             if endmatch:
                 pos = end = endmatch.end(0)
-                if stashed:
-                    yield stashed
-                    stashed = None
                 yield TokenInfo(STRING, contstr + line[:end],
                        strstart, (lnum, end), contline + line)
                 contstr, needcont = '', 0
                 contline = None
             elif needcont and line[-2:] != '\\\n' and line[-3:] != '\\\r\n':
-                if stashed:
-                    yield stashed
-                    stashed = None
                 yield TokenInfo(ERRORTOKEN, contstr + line,
                            strstart, (lnum, len(line)), contline)
                 contstr = ''
@@ -538,10 +533,6 @@ def _tokenize(readline, encoding):
                 pos += 1
             if pos == max:
                 break
-
-            if stashed:
-                yield stashed
-                stashed = None
 
             if line[pos] in '#\r\n':           # skip comments or blank lines
                 if line[pos] == '#':
@@ -588,9 +579,6 @@ def _tokenize(readline, encoding):
 
                 if (initial in numchars or                  # ordinary number
                     (initial == '.' and token != '.' and token != '...')):
-                    if stashed:
-                        yield stashed
-                        stashed = None
                     yield TokenInfo(NUMBER, token, spos, epos, line)
                 elif initial in '\r\n':
                     if stashed:
@@ -628,9 +616,6 @@ def _tokenize(readline, encoding):
                         contline = line
                         break
                     else:                                  # ordinary string
-                        if stashed:
-                            yield stashed
-                            stashed = None
                         yield TokenInfo(STRING, token, spos, epos, line)
                 elif initial.isidentifier():               # ordinary name
                     if token in ('async', 'await'):
@@ -659,6 +644,10 @@ def _tokenize(readline, encoding):
                         else:
                             ctx.append(('sync', indents[-1]))
 
+                    if stashed:
+                        yield stashed
+                        stashed = None
+
                     yield tok
                 elif initial == '\\':                      # continued stmt
                     continued = 1
@@ -672,9 +661,6 @@ def _tokenize(readline, encoding):
                         stashed = None
                     yield TokenInfo(OP, token, spos, epos, line)
             else:
-                if stashed:
-                    yield stashed
-                    stashed = None
                 yield TokenInfo(ERRORTOKEN, line[pos],
                            (lnum, pos), (lnum, pos+1), line)
                 pos += 1
