@@ -8,8 +8,10 @@ Unit tests are in test_collections.
 
 from abc import ABCMeta, abstractmethod
 import sys
+import types
 
-__all__ = ["Hashable", "Iterable", "Iterator", "Generator",
+__all__ = ["Awaitable",
+           "Hashable", "Iterable", "Iterator", "Generator",
            "Sized", "Container", "Callable",
            "Set", "MutableSet",
            "Mapping", "MutableMapping",
@@ -69,6 +71,36 @@ class Hashable(metaclass=ABCMeta):
             for B in C.__mro__:
                 if "__hash__" in B.__dict__:
                     if B.__dict__["__hash__"]:
+                        return True
+                    break
+        return NotImplemented
+
+
+class AwaitableMeta(ABCMeta):
+
+    def __instancecheck__(cls, instance):
+        if (isinstance(instance, types.GeneratorType) and
+            instance.gi_code.co_flags & types._CO_COROUTINE):
+
+            return True
+
+        return super().__instancecheck__(instance)
+
+
+class Awaitable(metaclass=AwaitableMeta):
+
+    __slots__ = ()
+
+    @abstractmethod
+    def __await__(self):
+        yield
+
+    @classmethod
+    def __subclasshook__(cls, C):
+        if cls is Awaitable:
+            for B in C.__mro__:
+                if "__await__" in B.__dict__:
+                    if B.__dict__["__await__"]:
                         return True
                     break
         return NotImplemented

@@ -11,10 +11,11 @@ from random import randrange, shuffle
 import keyword
 import re
 import sys
+import types
 from collections import UserDict
 from collections import ChainMap
 from collections import deque
-from collections.abc import Hashable, Iterable, Iterator, Generator
+from collections.abc import Awaitable, Hashable, Iterable, Iterator, Generator
 from collections.abc import Sized, Container, Callable
 from collections.abc import Set, MutableSet
 from collections.abc import Mapping, MutableMapping, KeysView, ItemsView
@@ -445,6 +446,33 @@ class ABCTestCase(unittest.TestCase):
                             % (type(instance), name))
 
 class TestOneTrickPonyABCs(ABCTestCase):
+
+    def test_Awaitable(self):
+        def gen():
+            yield
+
+        @types.coroutine
+        def coro():
+            yield
+
+        class Foo:
+            pass
+
+        class Bar:
+            def __await__(self):
+                yield
+
+        non_samples = [None, int(), gen(), Foo()]
+        for x in non_samples:
+            self.assertNotIsInstance(x, Awaitable)
+            self.assertFalse(issubclass(type(x), Awaitable), repr(type(x)))
+
+        self.assertIsInstance(Bar(), Awaitable)
+        self.assertTrue(issubclass(Bar, Awaitable))
+
+        c = coro()
+        self.assertIsInstance(c, Awaitable)
+        c.close() # awoid RuntimeWarning that coro() was not awaited
 
     def test_Hashable(self):
         # Check some non-hashables

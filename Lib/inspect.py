@@ -33,6 +33,7 @@ __author__ = ('Ka-Ping Yee <ping@lfw.org>',
 
 import ast
 import dis
+import collections.abc
 import enum
 import importlib.machinery
 import itertools
@@ -188,12 +189,7 @@ def iscoroutinefunction(object):
 
 def isawaitable(object):
     """Return true if the object can be used in "await" expression."""
-    if iscoroutine(object):
-        return True
-    for base in type(object).__mro__:
-        if callable(base.__dict__.get("__await__")):
-            return True
-    return False
+    return isinstance(object, collections.abc.Awaitable)
 
 def isgenerator(object):
     """Return true if the object is a generator.
