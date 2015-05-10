@@ -3986,6 +3986,10 @@ awaitObject_await(awaitObject *ao)
     return ao->ao_iterator;
 }
 
+static PyAsyncMethods awaitType_as_async = {
+    (getawaitablefunc)awaitObject_await    /* am_await */
+};
+
 
 static PyTypeObject awaitType = {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -3996,7 +4000,7 @@ static PyTypeObject awaitType = {
     0,                                  /* tp_print */
     0,                                  /* tp_getattr */
     0,                                  /* tp_setattr */
-    (getawaitablefunc)awaitObject_await,/* tp_await */
+    &awaitType_as_async,                /* tp_as_async */
     0,                                  /* tp_repr */
     0,                                  /* tp_as_number */
     0,                                  /* tp_as_sequence */
@@ -4008,7 +4012,7 @@ static PyTypeObject awaitType = {
     PyObject_GenericSetAttr,            /* tp_setattro */
     0,                                  /* tp_as_buffer */
     0,                                  /* tp_flags */
-    "C level type with tp_await",
+    "C level type with tp_as_async",
     0,                                  /* traverseproc tp_traverse */
     0,                                  /* tp_clear */
     0,                                  /* tp_richcompare */

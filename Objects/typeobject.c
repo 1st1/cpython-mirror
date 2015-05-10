@@ -2506,6 +2506,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
         type->tp_flags |= Py_TPFLAGS_HAVE_GC;
 
     /* Initialize essential fields */
+    type->tp_as_async = &et->as_async;
     type->tp_as_number = &et->as_number;
     type->tp_as_sequence = &et->as_sequence;
     type->tp_as_mapping = &et->as_mapping;
@@ -2751,6 +2752,7 @@ PyType_FromSpecWithBases(PyType_Spec *spec, PyObject *bases)
     }
 
     /* Initialize essential fields */
+    type->tp_as_async = &res->as_async;
     type->tp_as_number = &res->as_number;
     type->tp_as_sequence = &res->as_sequence;
     type->tp_as_mapping = &res->as_mapping;
@@ -4566,6 +4568,7 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 #define COPYSLOT(SLOT) \
     if (!type->SLOT && SLOTDEFINED(SLOT)) type->SLOT = base->SLOT
 
+#define COPYASYNC(SLOT) COPYSLOT(tp_as_async->SLOT)
 #define COPYNUM(SLOT) COPYSLOT(tp_as_number->SLOT)
 #define COPYSEQ(SLOT) COPYSLOT(tp_as_sequence->SLOT)
 #define COPYMAP(SLOT) COPYSLOT(tp_as_mapping->SLOT)
@@ -4613,6 +4616,13 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
         COPYNUM(nb_index);
         COPYNUM(nb_matrix_multiply);
         COPYNUM(nb_inplace_matrix_multiply);
+    }
+
+    if (type->tp_as_async != NULL && base->tp_as_async != NULL) {
+        basebase = base->tp_base;
+        if (basebase->tp_as_async == NULL)
+            basebase = NULL;
+        COPYASYNC(am_await);
     }
 
     if (type->tp_as_sequence != NULL && base->tp_as_sequence != NULL) {
@@ -4884,6 +4894,8 @@ PyType_Ready(PyTypeObject *type)
     /* Some more special stuff */
     base = type->tp_base;
     if (base != NULL) {
+        if (type->tp_as_async == NULL)
+            type->tp_as_async = base->tp_as_async;
         if (type->tp_as_number == NULL)
             type->tp_as_number = base->tp_as_number;
         if (type->tp_as_sequence == NULL)
@@ -6256,7 +6268,7 @@ slot_tp_finalize(PyObject *self)
 }
 
 static PyObject *
-slot_tp_await(PyObject *self)
+slot_am_await(PyObject *self)
 {
     PyObject *func, *res;
     _Py_IDENTIFIER(__await__);
@@ -6289,6 +6301,7 @@ typedef struct wrapperbase slotdef;
 
 #undef TPSLOT
 #undef FLSLOT
+#undef AMSLOT
 #undef ETSLOT
 #undef SQSLOT
 #undef MPSLOT
@@ -6307,6 +6320,8 @@ typedef struct wrapperbase slotdef;
 #define ETSLOT(NAME, SLOT, FUNCTION, WRAPPER, DOC) \
     {NAME, offsetof(PyHeapTypeObject, SLOT), (void *)(FUNCTION), WRAPPER, \
      PyDoc_STR(DOC)}
+#define AMSLOT(NAME, SLOT, FUNCTION, WRAPPER, DOC) \
+    ETSLOT(NAME, as_async.SLOT, FUNCTION, WRAPPER, DOC)
 #define SQSLOT(NAME, SLOT, FUNCTION, WRAPPER, DOC) \
     ETSLOT(NAME, as_sequence.SLOT, FUNCTION, WRAPPER, DOC)
 #define MPSLOT(NAME, SLOT, FUNCTION, WRAPPER, DOC) \
@@ -6337,7 +6352,6 @@ static slotdef slotdefs[] = {
     TPSLOT("__getattr__", tp_getattr, NULL, NULL, ""),
     TPSLOT("__setattr__", tp_setattr, NULL, NULL, ""),
     TPSLOT("__delattr__", tp_setattr, NULL, NULL, ""),
-    TPSLOT("__await__", tp_await, slot_tp_await, wrap_unaryfunc, ""),
     TPSLOT("__repr__", tp_repr, slot_tp_repr, wrap_unaryfunc,
            "__repr__($self, /)\n--\n\nReturn repr(self)."),
     TPSLOT("__hash__", tp_hash, slot_tp_hash, wrap_hashfunc,
@@ -6386,6 +6400,8 @@ static slotdef slotdefs[] = {
            "__new__(type, /, *args, **kwargs)\n--\n\n"
            "Create and return new object.  See help(type) for accurate signature."),
     TPSLOT("__del__", tp_finalize, slot_tp_finalize, (wrapperfunc)wrap_del, ""),
+
+    AMSLOT("__await__", am_await, slot_am_await, wrap_unaryfunc, ""),
 
     BINSLOT("__add__", nb_add, slot_nb_add,
            "+"),
@@ -6538,6 +6554,10 @@ slotptr(PyTypeObject *type, int ioffset)
     else if ((size_t)offset >= offsetof(PyHeapTypeObject, as_number)) {
         ptr = (char *)type->tp_as_number;
         offset -= offsetof(PyHeapTypeObject, as_number);
+    }
+    else if ((size_t)offset >= offsetof(PyHeapTypeObject, as_async)) {
+        ptr = (char *)type->tp_as_async;
+        offset -= offsetof(PyHeapTypeObject, as_async);
     }
     else {
         ptr = (char *)type;

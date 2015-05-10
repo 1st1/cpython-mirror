@@ -585,7 +585,7 @@ PyTypeObject PyGen_Type = {
     0,                                          /* tp_print */
     0,                                          /* tp_getattr */
     0,                                          /* tp_setattr */
-    0,                                          /* tp_await */
+    0,                                          /* tp_as_async */
     (reprfunc)gen_repr,                         /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
@@ -685,7 +685,7 @@ PyGen_NeedsFinalizing(PyGenObject *gen)
 /*
  *   This helper function returns an awaitable for `o`:
  *     - `o` if `o` is a coroutine-object;
- *     - `type(o)->tp_await(o)` if `o` has `tp_await`
+ *     - `type(o)->tp_as_async->am_await(o)`
  *
  *   Raises a TypeError if it's not possible to return
  *   an awaitable and returns NULL.
@@ -694,6 +694,7 @@ PyObject *
 _PyGen_GetAwaitableIter(PyObject *o)
 {
     getawaitablefunc getter = NULL;
+    PyTypeObject *ot;
 
     if (PyGen_CheckCoroutineExact(o)) {
         /* Fast path. It's a central function for 'await'. */
@@ -701,7 +702,10 @@ _PyGen_GetAwaitableIter(PyObject *o)
         return o;
     }
 
-    getter = Py_TYPE(o)->tp_await;
+    ot = Py_TYPE(o);
+    if (ot->tp_as_async != NULL) {
+        getter = ot->tp_as_async->am_await;
+    }
     if (getter != NULL) {
         PyObject *res = (*getter)(o);
         if (res != NULL) {

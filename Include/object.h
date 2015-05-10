@@ -173,6 +173,7 @@ typedef PyObject *(*ssizessizeargfunc)(PyObject *, Py_ssize_t, Py_ssize_t);
 typedef int(*ssizeobjargproc)(PyObject *, Py_ssize_t, PyObject *);
 typedef int(*ssizessizeobjargproc)(PyObject *, Py_ssize_t, Py_ssize_t, PyObject *);
 typedef int(*objobjargproc)(PyObject *, PyObject *, PyObject *);
+typedef PyObject *(*getawaitablefunc) (PyObject *);
 
 #ifndef Py_LIMITED_API
 /* buffer interface */
@@ -301,6 +302,9 @@ typedef struct {
     objobjargproc mp_ass_subscript;
 } PyMappingMethods;
 
+typedef struct {
+    getawaitablefunc am_await;
+} PyAsyncMethods;
 
 typedef struct {
      getbufferproc bf_getbuffer;
@@ -325,7 +329,6 @@ typedef PyObject *(*reprfunc)(PyObject *);
 typedef Py_hash_t (*hashfunc)(PyObject *);
 typedef PyObject *(*richcmpfunc) (PyObject *, PyObject *, int);
 typedef PyObject *(*getiterfunc) (PyObject *);
-typedef PyObject *(*getawaitablefunc) (PyObject *);
 typedef PyObject *(*iternextfunc) (PyObject *);
 typedef PyObject *(*descrgetfunc) (PyObject *, PyObject *, PyObject *);
 typedef int (*descrsetfunc) (PyObject *, PyObject *, PyObject *);
@@ -347,7 +350,7 @@ typedef struct _typeobject {
     printfunc tp_print;
     getattrfunc tp_getattr;
     setattrfunc tp_setattr;
-    getawaitablefunc tp_await; /* formerly known as tp_compare */
+    PyAsyncMethods *tp_as_async; /* formerly known as tp_compare or tp_reserved */
     reprfunc tp_repr;
 
     /* Method suites for standard classes */
@@ -454,6 +457,7 @@ typedef struct _heaptypeobject {
     /* Note: there's a dependency on the order of these members
        in slotptr() in typeobject.c . */
     PyTypeObject ht_type;
+    PyAsyncMethods as_async;
     PyNumberMethods as_number;
     PyMappingMethods as_mapping;
     PySequenceMethods as_sequence; /* as_sequence comes after as_mapping,
