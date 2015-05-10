@@ -8,7 +8,6 @@ Unit tests are in test_collections.
 
 from abc import ABCMeta, abstractmethod
 import sys
-import types
 
 __all__ = ["Awaitable",
            "Hashable", "Iterable", "Iterator", "Generator",
@@ -79,8 +78,10 @@ class Hashable(metaclass=ABCMeta):
 class AwaitableMeta(ABCMeta):
 
     def __instancecheck__(cls, instance):
-        if (isinstance(instance, types.GeneratorType) and
-            instance.gi_code.co_flags & types._CO_COROUTINE):
+        CO_COROUTINE = 0x80
+
+        if (isinstance(instance, generator) and
+            instance.gi_code.co_flags & CO_COROUTINE):
 
             return True
 
