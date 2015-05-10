@@ -483,14 +483,16 @@ Names:
 
 async def async_def():
     await 1
+    async for a in b: pass
+    async with c as d: pass
 
 code_info_async_def = """\
 Name:              async_def
 Filename:          (.*)
 Argument count:    0
 Kw-only arguments: 0
-Number of locals:  0
-Stack size:        2
+Number of locals:  2
+Stack size:        17
 Flags:             OPTIMIZED, NEWLOCALS, GENERATOR, NOFREE, COROUTINE, NATIVE_COROUTINE
 Constants:
    0: None
