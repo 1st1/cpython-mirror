@@ -2950,7 +2950,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                it's already an iterator.
 
                This is needed to allow use of 'async def' coroutines
-               in 'yeild from' expression from generator-based coroutines
+               in 'yield from' expression from generator-based coroutines
                (decorated with types.coroutine()).
 
                'yield from' is compiled to GET_ITER..YIELD_FROM combination,
