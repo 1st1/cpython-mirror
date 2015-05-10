@@ -195,8 +195,10 @@ def coroutine(func):
             if w._source_traceback:
                 del w._source_traceback[-1]
             # Python < 3.5 does not implement __qualname__
-            # on generator objects, so we set it manually:
-            w.__qualname__ = func.__qualname__
+            # on generator objects, so we set it manually.
+            # We use getattr as some callables (such as
+            # functools.partial may lack __qualname__).
+            w.__qualname__ = getattr(func, '__qualname__', None)
             return w
 
     wrapper._is_coroutine = True  # For iscoroutinefunction().
