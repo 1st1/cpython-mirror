@@ -705,6 +705,16 @@ Async/await extension:
     OP         ':'           (1, 16) (1, 17)
     NAME       'pass'        (1, 18) (1, 22)
 
+    >>> dump_tokens("async with a as b: pass")
+    ENCODING   'utf-8'       (0, 0) (0, 0)
+    NAME       'async'       (1, 0) (1, 5)
+    NAME       'with'        (1, 6) (1, 10)
+    NAME       'a'           (1, 11) (1, 12)
+    NAME       'as'          (1, 13) (1, 15)
+    NAME       'b'           (1, 16) (1, 17)
+    OP         ':'           (1, 17) (1, 18)
+    NAME       'pass'        (1, 19) (1, 23)
+
     >>> dump_tokens("async.foo")
     ENCODING   'utf-8'       (0, 0) (0, 0)
     NAME       'async'       (1, 0) (1, 5)
