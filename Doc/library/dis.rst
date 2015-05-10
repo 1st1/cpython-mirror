@@ -644,7 +644,7 @@ iterations of the loop.
    :opcode:`UNPACK_SEQUENCE`).
 
 
-.. opcode:: WITH_CLEANUP_ENTER
+.. opcode:: WITH_CLEANUP_START
 
    Cleans up the stack when a :keyword:`with` statement block exits.  TOS is the
    context manager's :meth:`__exit__` bound method. Below TOS are 1--3 values
@@ -660,7 +660,7 @@ iterations of the loop.
    to the stack.
 
 
-.. opcode:: WITH_CLEANUP_EXIT
+.. opcode:: WITH_CLEANUP_FINISH
 
    Pops exception type and result of 'exit' function call from the stack.
 
