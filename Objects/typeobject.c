@@ -4623,6 +4623,8 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
         if (basebase->tp_as_async == NULL)
             basebase = NULL;
         COPYASYNC(am_await);
+        COPYASYNC(am_aiter);
+        COPYASYNC(am_anext);
     }
 
     if (type->tp_as_sequence != NULL && base->tp_as_sequence != NULL) {
