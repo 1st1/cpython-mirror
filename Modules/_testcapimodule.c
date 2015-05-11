@@ -3987,7 +3987,9 @@ awaitObject_await(awaitObject *ao)
 }
 
 static PyAsyncMethods awaitType_as_async = {
-    (getawaitablefunc)awaitObject_await    /* am_await */
+    (getawaitablefunc)awaitObject_await,    /* am_await */
+    0,                                      /* am_aiter */
+    0                                       /* am_anext */
 };
 
 
