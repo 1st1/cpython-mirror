@@ -415,7 +415,7 @@ failed_throw:
 static PyObject *
 gen_iternext(PyGenObject *gen)
 {
-    if (PyGen_CheckNativeCoroutineExact(gen)) {
+    if (((PyCodeObject*)gen->gi_code)->co_flags & CO_COROUTINE) {
         PyErr_SetString(PyExc_TypeError,
                         "coroutine-objects do not support iteration");
         return NULL;
@@ -522,16 +522,16 @@ gen_get_qualname(PyGenObject *op)
 }
 
 static PyObject *
-gen_get_iter(PyObject *op)
+gen_get_iter(PyGenObject *gen)
 {
-    if (PyGen_CheckNativeCoroutineExact(op)) {
+    if (((PyCodeObject*)gen->gi_code)->co_flags & CO_COROUTINE) {
         PyErr_SetString(PyExc_TypeError,
                         "coroutine-objects do not support iteration");
         return NULL;
     }
 
-    Py_INCREF(op);
-    return op;
+    Py_INCREF(gen);
+    return gen;
 }
 
 
@@ -604,7 +604,7 @@ PyTypeObject PyGen_Type = {
     0,                                          /* tp_clear */
     0,                                          /* tp_richcompare */
     offsetof(PyGenObject, gi_weakreflist),      /* tp_weaklistoffset */
-    gen_get_iter,                               /* tp_iter */
+    (getiterfunc)gen_get_iter,                  /* tp_iter */
     (iternextfunc)gen_iternext,                 /* tp_iternext */
     gen_methods,                                /* tp_methods */
     gen_memberlist,                             /* tp_members */
