@@ -534,7 +534,6 @@ gen_get_iter(PyGenObject *gen)
     return gen;
 }
 
-
 static int
 gen_set_qualname(PyGenObject *op, PyObject *value)
 {
@@ -681,7 +680,6 @@ PyGen_NeedsFinalizing(PyGenObject *gen)
     /* No blocks except loops, it's safe to skip finalization. */
     return 0;
 }
-
 
 /*
  *   This helper function returns an awaitable for `o`:
