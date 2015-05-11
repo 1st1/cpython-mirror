@@ -1755,8 +1755,8 @@ compiler_function(struct compiler *c, stmt_ty s, int is_async)
 
     if (is_async) {
         co->co_flags |= CO_COROUTINE;
-        // An async function is always a generator, even
-        // if there is no 'yield' expressions in it.
+        /* An async function is always a generator, even
+           if there is no 'yield' expressions in it. */
         co->co_flags |= CO_GENERATOR;
     }
 
@@ -2098,8 +2098,8 @@ compiler_async_for(struct compiler *c, stmt_ty s)
     ADDOP(c, POP_TOP);
     ADDOP(c, POP_TOP);
     ADDOP(c, POP_TOP);
-    ADDOP(c, POP_EXCEPT); // for SETUP_EXCEPT
-    ADDOP(c, POP_BLOCK); // for SETUP_LOOP
+    ADDOP(c, POP_EXCEPT); /* for SETUP_EXCEPT */
+    ADDOP(c, POP_BLOCK); /* for SETUP_LOOP */
     ADDOP_JABS(c, JUMP_ABSOLUTE, after_loop_else);
 
 
@@ -2110,7 +2110,7 @@ compiler_async_for(struct compiler *c, stmt_ty s)
     VISIT_SEQ(c, stmt, s->v.AsyncFor.body);
     ADDOP_JABS(c, JUMP_ABSOLUTE, try);
 
-    ADDOP(c, POP_BLOCK); // for SETUP_LOOP
+    ADDOP(c, POP_BLOCK); /* for SETUP_LOOP */
     compiler_pop_fblock(c, LOOP, try);
 
     compiler_use_next_block(c, after_loop);
@@ -3860,7 +3860,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
         if (c->u->u_ste->ste_type != FunctionBlock)
             return compiler_error(c, "'await' outside function");
 
-        // this check won't be triggered while we have AWAIT token
+        /* this check won't be triggered while we have AWAIT token */
         if (c->u->u_scope_type != COMPILER_SCOPE_ASYNC_FUNCTION)
             return compiler_error(c, "'await' outside async function");
 
