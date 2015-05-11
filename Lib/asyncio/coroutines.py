@@ -46,12 +46,12 @@ except AttributeError:
     _iscoroutinefunction = lambda func: False
 
 try:
-    inspect.CO_NATIVE_COROUTINE
+    inspect.CO_COROUTINE
 except AttributeError:
     _is_native_coro_code = lambda code: False
 else:
     _is_native_coro_code = lambda code: (code.co_flags &
-                                         inspect.CO_NATIVE_COROUTINE)
+                                         inspect.CO_COROUTINE)
 
 
 # Check for CPython issue #21209

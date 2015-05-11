@@ -78,10 +78,10 @@ class Hashable(metaclass=ABCMeta):
 class CoroutineMeta(ABCMeta):
 
     def __instancecheck__(cls, instance):
-        CO_COROUTINE = 0x80
+        CO_COROUTINES = 0x80 | 0x100
 
         if (isinstance(instance, generator) and
-            instance.gi_code.co_flags & CO_COROUTINE):
+            instance.gi_code.co_flags & CO_COROUTINES):
 
             return True
 

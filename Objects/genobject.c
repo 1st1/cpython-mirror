@@ -27,7 +27,8 @@ _PyGen_Finalize(PyObject *self)
     /* If `gen` is a coroutine, and if it was never awaited on,
        issue a RuntimeWarning. */
     if (gen->gi_code != NULL
-            && ((PyCodeObject *)gen->gi_code)->co_flags & CO_COROUTINE
+            && ((PyCodeObject *)gen->gi_code)->co_flags & (CO_COROUTINE
+                                                       | CO_GENBASED_COROUTINE)
             && gen->gi_frame != NULL
             && gen->gi_frame->f_lasti == -1
             && !PyErr_Occurred()
@@ -147,7 +148,7 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
          * a leaking StopIteration into RuntimeError (with its cause
          * set appropriately). */
         if ((((PyCodeObject *)gen->gi_code)->co_flags &
-                                        (CO_FUTURE_GENERATOR_STOP | CO_COROUTINE))
+              (CO_FUTURE_GENERATOR_STOP | CO_COROUTINE | CO_GENBASED_COROUTINE))
             && PyErr_ExceptionMatches(PyExc_StopIteration))
         {
             PyObject *exc, *val, *val2, *tb;

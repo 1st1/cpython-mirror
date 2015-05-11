@@ -2038,8 +2038,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 if (
                     (((PyCodeObject*) \
                         ((PyGenObject*)reciever)->gi_code)->co_flags &
-                                                        CO_NATIVE_COROUTINE)
-                    && !(co->co_flags & CO_COROUTINE))
+                                                        CO_COROUTINE)
+                    && !(co->co_flags & (CO_COROUTINE | CO_GENBASED_COROUTINE)))
                 {
                     /* If we're yielding-from a coroutine object from a regular
                        generator object - raise an error. */
@@ -3948,7 +3948,7 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
         if (gen == NULL)
             return NULL;
 
-        if (co->co_flags & CO_COROUTINE) {
+        if (co->co_flags & (CO_COROUTINE | CO_GENBASED_COROUTINE)) {
             coroutine_wrapper = PyEval_GetCoroutineWrapper();
             if (coroutine_wrapper != NULL) {
                 PyObject *wrapped =

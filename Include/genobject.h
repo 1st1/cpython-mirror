@@ -41,12 +41,13 @@ PyAPI_DATA(PyTypeObject) PyGen_Type;
 #define PyGen_CheckCoroutineExact(op) (PyGen_CheckExact(op) && \
                                        (((PyCodeObject*) \
                                            ((PyGenObject*)op)->gi_code) \
-                                         ->co_flags & CO_COROUTINE))
+                                         ->co_flags & (CO_GENBASED_COROUTINE | \
+                                                       CO_COROUTINE)))
 
 #define PyGen_CheckNativeCoroutineExact(op) (PyGen_CheckExact(op) && \
                                        (((PyCodeObject*) \
                                            ((PyGenObject*)op)->gi_code) \
-                                         ->co_flags & CO_NATIVE_COROUTINE))
+                                         ->co_flags & CO_COROUTINE))
 
 PyAPI_FUNC(PyObject *) PyGen_New(struct _frame *);
 PyAPI_FUNC(PyObject *) PyGen_NewWithQualName(struct _frame *,
