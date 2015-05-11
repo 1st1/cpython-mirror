@@ -75,7 +75,7 @@ class Hashable(metaclass=ABCMeta):
         return NotImplemented
 
 
-class CoroutineMeta(ABCMeta):
+class _CoroutineMeta(ABCMeta):
 
     def __instancecheck__(cls, instance):
         CO_COROUTINES = 0x80 | 0x100
@@ -88,7 +88,7 @@ class CoroutineMeta(ABCMeta):
         return super().__instancecheck__(instance)
 
 
-class Coroutine(metaclass=CoroutineMeta):
+class Coroutine(metaclass=_CoroutineMeta):
 
     __slots__ = ()
 
@@ -123,7 +123,7 @@ class Coroutine(metaclass=CoroutineMeta):
             raise RuntimeError("coroutine ignored GeneratorExit")
 
 
-class Awaitable(metaclass=CoroutineMeta):
+class Awaitable(metaclass=_CoroutineMeta):
 
     __slots__ = ()
 
