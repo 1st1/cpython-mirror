@@ -44,7 +44,7 @@ del sys, _f, _g, _C,                              # Not for export
 
 
 _CO_GENERATOR = 0x20
-_CO_GENBASED_COROUTINE = 0x100
+_CO_ITERABLE_COROUTINE = 0x100
 
 def coroutine(func):
     """Convert regular generator function to a coroutine."""
@@ -58,7 +58,7 @@ def coroutine(func):
     co = func.__code__
     func.__code__ = CodeType(
         co.co_argcount, co.co_kwonlyargcount, co.co_nlocals, co.co_stacksize,
-        co.co_flags | _CO_GENBASED_COROUTINE,
+        co.co_flags | _CO_ITERABLE_COROUTINE,
         co.co_code,
         co.co_consts, co.co_names, co.co_varnames, co.co_filename, co.co_name,
         co.co_firstlineno, co.co_lnotab, co.co_freevars, co.co_cellvars)

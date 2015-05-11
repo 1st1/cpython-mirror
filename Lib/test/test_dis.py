@@ -493,7 +493,7 @@ Argument count:    0
 Kw-only arguments: 0
 Number of locals:  2
 Stack size:        17
-Flags:             OPTIMIZED, NEWLOCALS, GENERATOR, NOFREE, COROUTINE, NATIVE_COROUTINE
+Flags:             OPTIMIZED, NEWLOCALS, GENERATOR, NOFREE, COROUTINE
 Constants:
    0: None
    1: 1"""

@@ -85,7 +85,7 @@ COMPILER_FLAG_NAMES = {
     32: "GENERATOR",
     64: "NOFREE",
    128: "COROUTINE",
-   256: "GENBASED_COROUTINE",
+   256: "ITERABLE_COROUTINE",
 }
 
 def pretty_flags(flags):

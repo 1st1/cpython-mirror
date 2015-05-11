@@ -185,7 +185,7 @@ def iscoroutinefunction(object):
     or generators decorated with "types.coroutine".
     """
     return bool((isfunction(object) or ismethod(object)) and
-                object.__code__.co_flags & (CO_GENBASED_COROUTINE |
+                object.__code__.co_flags & (CO_ITERABLE_COROUTINE |
                                             CO_COROUTINE))
 
 def isawaitable(object):
@@ -213,7 +213,7 @@ def isgenerator(object):
 def iscoroutine(object):
     """Return true if the object is a coroutine."""
     return (isinstance(object, types.GeneratorType) and
-            object.gi_code.co_flags & (CO_COROUTINE | CO_GENBASED_COROUTINE))
+            object.gi_code.co_flags & (CO_COROUTINE | CO_ITERABLE_COROUTINE))
 
 def istraceback(object):
     """Return true if the object is a traceback.
