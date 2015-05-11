@@ -1927,32 +1927,31 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         }
 
         TARGET(GET_AITER) {
-            _Py_IDENTIFIER(__aiter__);
-
+            getaiterfunc getter = NULL;
             PyObject *iter = NULL;
             PyObject *awaitable = NULL;
             PyObject *obj = TOP();
+            PyTypeObject *type = Py_TYPE(obj);
 
-            PyObject *aiter_meth = special_lookup(obj, &PyId___aiter__);
+            if (type->tp_as_async != NULL)
+                getter = type->tp_as_async->am_aiter;
 
-            if (aiter_meth == NULL) {
+            if (getter != NULL) {
+                iter = (*getter)(obj);
+                Py_DECREF(obj);
+                if (iter == NULL) {
+                    SET_TOP(NULL);
+                    goto error;
+                }
+            }
+            else {
                 SET_TOP(NULL);
                 PyErr_Format(
                     PyExc_TypeError,
                     "'async for' requires an object with "
                     "__aiter__ method, got %.100s",
-                    Py_TYPE(obj)->tp_name);
-
+                    type->tp_name);
                 Py_DECREF(obj);
-                goto error;
-            } else
-                Py_DECREF(obj);
-
-            iter = PyObject_CallFunction(aiter_meth, NULL);
-            Py_DECREF(aiter_meth);
-
-            if (iter == NULL) {
-                SET_TOP(NULL);
                 goto error;
             }
 
@@ -1975,27 +1974,27 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         }
 
         TARGET(GET_ANEXT) {
-            _Py_IDENTIFIER(__anext__);
-
+            aiternextfunc getter = NULL;
             PyObject *next_iter = NULL;
             PyObject *awaitable = NULL;
             PyObject *aiter = TOP();
-            PyObject *next_meth = special_lookup(aiter, &PyId___anext__);
+            PyTypeObject *type = Py_TYPE(aiter);
 
-            if (next_meth == NULL) {
+            if (type->tp_as_async != NULL)
+                getter = type->tp_as_async->am_anext;
+
+            if (getter != NULL) {
+                next_iter = (*getter)(aiter);
+                if (next_iter == NULL) {
+                    goto error;
+                }
+            }
+            else {
                 PyErr_Format(
                     PyExc_TypeError,
                     "'async for' requires an iterator with "
                     "__anext__ method, got %.100s",
-                    Py_TYPE(aiter)->tp_name);
-
-                goto error;
-            }
-
-            next_iter = PyObject_CallFunctionObjArgs(next_meth, NULL);
-            Py_DECREF(next_meth);
-
-            if (next_iter == NULL) {
+                    type->tp_name);
                 goto error;
             }
 

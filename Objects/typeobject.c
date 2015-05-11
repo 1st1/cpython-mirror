@@ -6285,6 +6285,41 @@ slot_am_await(PyObject *self)
     return NULL;
 }
 
+static PyObject *
+slot_am_aiter(PyObject *self)
+{
+    PyObject *func, *res;
+    _Py_IDENTIFIER(__aiter__);
+
+    func = lookup_method(self, &PyId___aiter__);
+    if (func != NULL) {
+        res = PyEval_CallObject(func, NULL);
+        Py_DECREF(func);
+        return res;
+    }
+    PyErr_Format(PyExc_AttributeError,
+                 "object %.50s does not have __aiter__ method",
+                 Py_TYPE(self)->tp_name);
+    return NULL;
+}
+
+static PyObject *
+slot_am_anext(PyObject *self)
+{
+    PyObject *func, *res;
+    _Py_IDENTIFIER(__anext__);
+
+    func = lookup_method(self, &PyId___anext__);
+    if (func != NULL) {
+        res = PyEval_CallObject(func, NULL);
+        Py_DECREF(func);
+        return res;
+    }
+    PyErr_Format(PyExc_AttributeError,
+                 "object %.50s does not have __anext__ method",
+                 Py_TYPE(self)->tp_name);
+    return NULL;
+}
 
 /*
 Table mapping __foo__ names to tp_foo offsets and slot_tp_foo wrapper functions.
@@ -6401,7 +6436,12 @@ static slotdef slotdefs[] = {
            "Create and return new object.  See help(type) for accurate signature."),
     TPSLOT("__del__", tp_finalize, slot_tp_finalize, (wrapperfunc)wrap_del, ""),
 
-    AMSLOT("__await__", am_await, slot_am_await, wrap_unaryfunc, ""),
+    AMSLOT("__await__", am_await, slot_am_await, wrap_unaryfunc,
+           "__await__($self, /)\n--\n\nReturn an iterator to be used in await expression."),
+    AMSLOT("__aiter__", am_aiter, slot_am_aiter, wrap_unaryfunc,
+           "__aiter__($self, /)\n--\n\nReturn an awaitable, that resolves in asynchronous iterator."),
+    AMSLOT("__anext__", am_anext, slot_am_anext, wrap_unaryfunc,
+           "__anext__($self, /)\n--\n\nReturn a value or raise StopAsyncIteration."),
 
     BINSLOT("__add__", nb_add, slot_nb_add,
            "+"),

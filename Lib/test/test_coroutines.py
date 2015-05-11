@@ -577,8 +577,11 @@ class CoroutineTest(unittest.TestCase):
                                  ['what?', 'end'])
 
     def test_for_2(self):
+        tup = (1, 2, 3)
+        refs_before = sys.getrefcount(tup)
+
         async def foo():
-            async for i in (1, 2, 3):
+            async for i in tup:
                 print('never going to happen')
 
         with self.assertRaisesRegex(
@@ -586,13 +589,18 @@ class CoroutineTest(unittest.TestCase):
 
             run_async(foo())
 
+        self.assertEqual(sys.getrefcount(tup), refs_before)
+
     def test_for_3(self):
         class I:
             def __aiter__(self):
                 return self
 
+        aiter = I()
+        refs_before = sys.getrefcount(aiter)
+
         async def foo():
-            async for i in I():
+            async for i in aiter:
                 print('never going to happen')
 
         with self.assertRaisesRegex(
@@ -600,6 +608,8 @@ class CoroutineTest(unittest.TestCase):
                 "async for' received an invalid object.*__aiter.*\: I"):
 
             run_async(foo())
+
+        self.assertEqual(sys.getrefcount(aiter), refs_before)
 
     def test_for_4(self):
         class I:
@@ -609,8 +619,11 @@ class CoroutineTest(unittest.TestCase):
             def __anext__(self):
                 return ()
 
+        aiter = I()
+        refs_before = sys.getrefcount(aiter)
+
         async def foo():
-            async for i in I():
+            async for i in aiter:
                 print('never going to happen')
 
         with self.assertRaisesRegex(
@@ -618,6 +631,8 @@ class CoroutineTest(unittest.TestCase):
                 "async for' received an invalid object.*__anext__.*tuple"):
 
             run_async(foo())
+
+        self.assertEqual(sys.getrefcount(aiter), refs_before)
 
     def test_for_5(self):
         class I:
@@ -664,16 +679,24 @@ class CoroutineTest(unittest.TestCase):
 
         ##############
 
+        manager = Manager()
+        iterable = Iterable()
+        mrefs_before = sys.getrefcount(manager)
+        irefs_before = sys.getrefcount(iterable)
+
         async def main():
             nonlocal I
 
-            async with Manager():
-                async for i in Iterable():
+            async with manager:
+                async for i in iterable:
                     I += 1
             I += 1000
 
         run_async(main())
         self.assertEqual(I, 111011)
+
+        self.assertEqual(sys.getrefcount(manager), mrefs_before)
+        self.assertEqual(sys.getrefcount(iterable), irefs_before)
 
         ##############
 
