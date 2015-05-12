@@ -1190,6 +1190,7 @@ class CoroutineTests(unittest.TestCase):
             yield
 
         self.assertFalse(isinstance(gen(), collections.abc.Coroutine))
+        self.assertFalse(isinstance(gen(), collections.abc.Awaitable))
 
         types.coroutine(gen)
         self.assertTrue(gen.__code__.co_flags & inspect.CO_ITERABLE_COROUTINE)
@@ -1199,6 +1200,7 @@ class CoroutineTests(unittest.TestCase):
         self.assertTrue(g.gi_code.co_flags & inspect.CO_ITERABLE_COROUTINE)
         self.assertFalse(g.gi_code.co_flags & inspect.CO_COROUTINE)
         self.assertTrue(isinstance(g, collections.abc.Coroutine))
+        self.assertTrue(isinstance(g, collections.abc.Awaitable))
         g.close() # silence warning
 
 
