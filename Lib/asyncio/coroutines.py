@@ -79,6 +79,10 @@ del has_yield_from_bug
 
 
 def debug_wrapper(gen):
+    # This function is called from 'sys.set_coroutine_wrapper'.
+    # We only wrap here coroutines defined via 'async def' syntax.
+    # Generator-based coroutines are wrapped in @coroutine
+    # decorator.
     if _is_native_coro_code(gen.gi_code):
         return CoroWrapper(gen, None)
     else:
@@ -171,6 +175,8 @@ def coroutine(func):
     if is_coroutine and _is_native_coro_code(func.__code__):
         # In Python 3.5 that's all we need to do for coroutines
         # defiend with "async def".
+        # Wrapping in CoroWrapper will happen via
+        # 'sys.set_coroutine_wrapper' function.
         return func
 
     if inspect.isgeneratorfunction(func):
