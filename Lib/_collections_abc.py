@@ -78,6 +78,10 @@ class Hashable(metaclass=ABCMeta):
 class _CoroutineMeta(ABCMeta):
 
     def __instancecheck__(cls, instance):
+        # 0x80 = CO_COROUTINE
+        # 0x100 = CO_ITERABLE_COROUTINE
+        # We don't want to import 'inspect' module, as
+        # a dependency for 'collections.abc'.
         CO_COROUTINES = 0x80 | 0x100
 
         if (isinstance(instance, generator) and
