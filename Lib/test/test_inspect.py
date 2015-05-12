@@ -18,6 +18,7 @@ import textwrap
 import unicodedata
 import unittest
 import unittest.mock
+import warnings
 
 try:
     from concurrent.futures import ThreadPoolExecutor
@@ -125,8 +126,12 @@ class TestPredicates(IsTestBase):
         self.istest(inspect.isdatadescriptor, 'collections.defaultdict.default_factory')
         self.istest(inspect.isgenerator, '(x for x in range(2))')
         self.istest(inspect.isgeneratorfunction, 'generator_function_example')
-        self.istest(inspect.iscoroutine, 'coroutine_function_example(1)')
-        self.istest(inspect.iscoroutinefunction, 'coroutine_function_example')
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.istest(inspect.iscoroutine, 'coroutine_function_example(1)')
+            self.istest(inspect.iscoroutinefunction, 'coroutine_function_example')
+
         if hasattr(types, 'MemberDescriptorType'):
             self.istest(inspect.ismemberdescriptor, 'datetime.timedelta.days')
         else:
@@ -158,10 +163,13 @@ class TestPredicates(IsTestBase):
         def gen(): yield
         self.assertFalse(inspect.isawaitable(gen()))
 
+        coro = coroutine_function_example(1)
+        gen_coro = gen_coroutine_function_example(1)
+
         self.assertTrue(
-            inspect.isawaitable(coroutine_function_example(1)))
+            inspect.isawaitable(coro))
         self.assertTrue(
-            inspect.isawaitable(gen_coroutine_function_example(1)))
+            inspect.isawaitable(gen_coro))
 
         class Future:
             def __await__():
@@ -173,6 +181,8 @@ class TestPredicates(IsTestBase):
         not_fut = NotFuture()
         not_fut.__await__ = lambda: None
         self.assertFalse(inspect.isawaitable(not_fut))
+
+        coro.close(); gen_coro.close() # silence warnings
 
     def test_isroutine(self):
         self.assertTrue(inspect.isroutine(mod.spam))

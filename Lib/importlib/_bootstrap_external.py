@@ -220,7 +220,8 @@ _code_type = type(_write_atomic.__code__)
 #     Python 3.4a4  3300 (more changes to __qualname__ computation)
 #     Python 3.4rc2 3310 (alter __qualname__ computation)
 #     Python 3.5a0  3320 (matrix multiplication operator)
-#     Python 3.5b1  3330 (PEP 448: Additional Unpacking Generalizations)
+#     Python 3.5b1  3330 (PEP 448: Additional Unpacking Generalizations; and
+#                         PEP 492: Coroutines with async and await syntax)
 #
 # MAGIC must change whenever the bytecode emitted by the compiler may no
 # longer be understood by older implementations of the eval loop (usually

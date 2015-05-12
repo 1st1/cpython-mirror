@@ -87,10 +87,6 @@ class AsyncBadSyntaxTest(unittest.TestCase):
         with self.assertRaisesRegex(SyntaxError, 'invalid syntax'):
             import test.badsyntax_async9
 
-    def test_badsyntax_10(self):
-        with self.assertRaisesRegex(SyntaxError, 'invalid syntax'):
-            import test.badsyntax_async10
-
 
 class CoroutineTest(unittest.TestCase):
 

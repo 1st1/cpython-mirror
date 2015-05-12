@@ -1,5 +1,2 @@
 async def foo():
-    def foo() \
-              -> \
-                await something()):
-        pass
+    [i async for i in els]
