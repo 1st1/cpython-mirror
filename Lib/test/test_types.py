@@ -1192,7 +1192,8 @@ class CoroutineTests(unittest.TestCase):
         self.assertFalse(isinstance(gen(), collections.abc.Coroutine))
         self.assertFalse(isinstance(gen(), collections.abc.Awaitable))
 
-        types.coroutine(gen)
+        self.assertIs(types.coroutine(gen), gen)
+
         self.assertTrue(gen.__code__.co_flags & inspect.CO_ITERABLE_COROUTINE)
         self.assertFalse(gen.__code__.co_flags & inspect.CO_COROUTINE)
 
