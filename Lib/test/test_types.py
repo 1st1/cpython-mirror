@@ -1180,7 +1180,7 @@ class CoroutineTests(unittest.TestCase):
                 pass
         def bar(): pass
 
-        samples = (Foo, Foo(), bar, None, int, 1)
+        samples = [Foo, Foo(), bar, None, int, 1]
         for sample in samples:
             with self.assertRaisesRegex(TypeError, 'expects a generator'):
                 types.coroutine(sample)
