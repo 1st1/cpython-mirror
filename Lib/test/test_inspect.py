@@ -133,25 +133,26 @@ class TestPredicates(IsTestBase):
             self.assertFalse(inspect.ismemberdescriptor(datetime.timedelta.days))
 
     def test_iscoroutine(self):
+        gen_coro = gen_coroutine_function_example(1)
+        coro = coroutine_function_example(1)
+
         self.assertTrue(
             inspect.iscoroutinefunction(gen_coroutine_function_example))
-        self.assertTrue(
-            inspect.iscoroutine(gen_coroutine_function_example(1)))
+        self.assertTrue(inspect.iscoroutine(gen_coro))
 
         self.assertTrue(
             inspect.isgeneratorfunction(gen_coroutine_function_example))
-        self.assertTrue(
-            inspect.isgenerator(gen_coroutine_function_example(1)))
+        self.assertTrue(inspect.isgenerator(gen_coro))
 
         self.assertTrue(
             inspect.iscoroutinefunction(coroutine_function_example))
-        self.assertTrue(
-            inspect.iscoroutine(coroutine_function_example(1)))
+        self.assertTrue(inspect.iscoroutine(coro))
 
         self.assertFalse(
             inspect.isgeneratorfunction(coroutine_function_example))
-        self.assertFalse(
-            inspect.isgenerator(coroutine_function_example(1)))
+        self.assertFalse(inspect.isgenerator(coro))
+
+        coro.close(); gen_coro.close() # silence warnings
 
     def test_isawaitable(self):
         def gen(): yield
