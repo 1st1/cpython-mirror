@@ -204,6 +204,7 @@ def coroutine(func):
             # on generator objects, so we set it manually.
             # We use getattr as some callables (such as
             # functools.partial may lack __qualname__).
+            w.__name__ = getattr(func, '__name__', None)
             w.__qualname__ = getattr(func, '__qualname__', None)
             return w
 
