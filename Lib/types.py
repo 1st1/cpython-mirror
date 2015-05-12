@@ -51,8 +51,9 @@ def coroutine(func):
 
     # TODO: Implement this in C.
 
-    if (not isinstance(func, (FunctionType, MethodType)) and
-            not (object.__code__.co_flags & _CO_GENERATOR)):
+    if (not isinstance(func, (FunctionType, MethodType)) or
+            not isinstance(getattr(func, '__code__', None), CodeType) or
+            not (func.__code__.co_flags & _CO_GENERATOR)):
         raise TypeError('coroutine() expects a generator function')
 
     co = func.__code__
