@@ -730,7 +730,7 @@ _PyGen_GetAwaitableIter(PyObject *o)
 
     PyErr_Format(PyExc_TypeError,
                  "object %.100s can't be used in 'await' expression",
-                 Py_TYPE(o)->tp_name);
+                 ot->tp_name);
 
     return NULL;
 }
