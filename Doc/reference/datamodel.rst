@@ -616,6 +616,16 @@ Callable types
       exception is raised and the iterator will have reached the end of the set of
       values to be returned.
 
+   Coroutine functions
+      .. index::
+         single: coroutine; function
+
+      A function or method which is defined using :keyword:`async def` is called
+      a :dfn:`coroutine function`.  Such a function, when called, returns a
+      :term:`coroutine` object.  It may contain :keyword:`await` expressions,
+      as well as :keyword:`async with` and :keyword:`async for` statements. See
+      also :ref:`coroutines` section.
+
    Built-in functions
       .. index::
          object: built-in function
@@ -2252,6 +2262,50 @@ provides significant scope for speed optimisations within the
 interpreter, at the cost of some flexibility in the handling of
 special methods (the special method *must* be set on the class
 object itself in order to be consistently invoked by the interpreter).
+
+
+.. _coroutines:
+
+Coroutines
+==========
+
+.. index::
+   single: coroutine
+
+
+Awaitable Objects
+-----------------
+
+.. method:: object.__await__(self)
+   [__await__ STUB]
+
+.. versionadded:: 3.5
+
+
+Asyncronous Iterators
+---------------------
+
+.. method:: object.__aiter__(self)
+   [__aiter__ STUB]
+
+
+.. method:: object.__anext__(self)
+   [__anext__ STUB]
+
+.. versionadded:: 3.5
+
+
+Asyncronous Context Managers
+----------------------------
+
+.. method:: object.__aenter__(self)
+   [__aenter__ STUB]
+
+
+.. method:: object.__aexit__(self, exc_type, exc_value, traceback)
+   [__aexit__ STUB]
+
+.. versionadded:: 3.5
 
 
 .. rubric:: Footnotes

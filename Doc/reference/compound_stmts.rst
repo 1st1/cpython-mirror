@@ -51,6 +51,9 @@ Summarizing:
                 : | `with_stmt`
                 : | `funcdef`
                 : | `classdef`
+                : | `async_with_stmt`
+                : | `async_for_stmt`
+                : | `async_funcdef`
    suite: `stmt_list` NEWLINE | NEWLINE INDENT `statement`+ DEDENT
    statement: `stmt_list` NEWLINE | `compound_stmt`
    stmt_list: `simple_stmt` (";" `simple_stmt`)* [";"]
@@ -658,6 +661,56 @@ can be used to create instance variables with different implementation details.
 
    :pep:`3115` - Metaclasses in Python 3
    :pep:`3129` - Class Decorators
+
+
+Coroutines
+==========
+
+[coroutines intro STUB]
+
+
+.. _`async def`:
+
+Coroutine function definition
+-----------------------------
+
+.. productionlist::
+   async_funcdef: "async" `funcdef`
+
+
+[async def STUB]
+
+.. versionadded:: 3.5
+
+
+.. _`async for`:
+
+The :keyword:`async for` statement
+----------------------------------
+
+.. productionlist::
+   async_for_stmt: "async" `for_stmt`
+
+[async for STUB]
+
+.. versionadded:: 3.5
+
+
+.. _`async with`:
+
+The :keyword:`async with` statement
+-----------------------------------
+
+.. productionlist::
+   async_with_stmt: "async" `with_stmt`
+
+[async with STUB]
+
+.. versionadded:: 3.5
+
+.. seealso::
+
+   :pep:`492` - Coroutines with async and await syntax
 
 
 .. rubric:: Footnotes

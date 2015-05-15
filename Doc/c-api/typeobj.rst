@@ -220,9 +220,12 @@ type objects) *must* have the :attr:`ob_size` field.
    the subtype's :c:member:`~PyTypeObject.tp_setattr` and :c:member:`~PyTypeObject.tp_setattro` are both *NULL*.
 
 
-.. c:member:: void* PyTypeObject.tp_reserved
+.. c:member:: void* PyTypeObject.tp_as_async
 
-   Reserved slot, formerly known as tp_compare.
+   .. versionadded:: 3.5
+
+   .. note::
+      Formerly known as tp_compare and tp_reserved.
 
 
 .. c:member:: reprfunc PyTypeObject.tp_repr
