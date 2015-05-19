@@ -2496,6 +2496,203 @@ class BoundArguments:
         return '<{} ({})>'.format(self.__class__.__name__, ', '.join(args))
 
 
+_BIND_ERROR = 1
+_BIND_POS = 2
+_BIND_VARPOS = 4
+_BIND_KW = 8
+_BIND_VARKW = 16
+
+
+class _BindInstructions:
+    __slots__ = ('code', 'pos', 'varpos', 'kw', 'varkw', 'msg')
+
+    @classmethod
+    def error(cls, msg):
+        inst = cls()
+        inst.code = _BIND_ERROR
+        inst.msg = msg
+        return inst
+
+
+def _signature_bind_impl(parameters, argslen, kwargsset, partial):
+    """Private method. Don't use directly."""
+
+    def _error_func(msg):
+        def _raise():
+            raise TypeError(msg) from None
+        return _raise
+
+    parameters = iter(parameters)
+    parameters_ex = ()
+
+    argi = 0
+    code = 0
+    pos = []
+    varpos = None
+    varkw = None
+    instructions = _BindInstructions()
+
+    while True:
+        # Let's iterate through the positional arguments and corresponding
+        # parameters
+        if argi < argslen:
+            # We have a positional argument to process
+            try:
+                param = next(parameters)
+            except StopIteration:
+                return _error_func('too many positional arguments')
+            else:
+                if param.kind in (_VAR_KEYWORD, _KEYWORD_ONLY):
+                    # Looks like we have no parameter for this positional
+                    # argument
+                    return _error_func('too many positional arguments')
+
+                if param.kind == _VAR_POSITIONAL:
+                    # We have an '*args'-like argument, let's fill it with
+                    # all positional arguments we have left and move on to
+                    # the next phase
+                    varpos = (slice(argi, argslen), param.name)
+                    break
+
+                if param.name in kwargsset:
+                    return _error_func(
+                        'multiple values for argument {arg!r}'.format(
+                            arg=param.name))
+
+                pos.append(param.name)
+                argi += 1
+        else:
+            # No more positional arguments
+            try:
+                param = next(parameters)
+            except StopIteration:
+                # No more parameters. That's it. Just need to check that
+                # we have no `kwargs` after this while loop
+                break
+            else:
+                if param.kind == _VAR_POSITIONAL:
+                    # That's OK, just empty *args.  Let's start parsing
+                    # kwargs
+                    break
+                elif param.name in kwargsset:
+                    if param.kind == _POSITIONAL_ONLY:
+                        msg = '{arg!r} parameter is positional only, ' \
+                              'but was passed as a keyword'
+                        msg = msg.format(arg=param.name)
+                        return _error_func(msg)
+                    parameters_ex = (param,)
+                    break
+                elif (param.kind == _VAR_KEYWORD or
+                                            param.default is not _empty):
+                    # That's fine too - we have a default value for this
+                    # parameter.  So, lets start parsing `kwargs`, starting
+                    # with the current parameter
+                    parameters_ex = (param,)
+                    break
+                else:
+                    # No default, not VAR_KEYWORD, not VAR_POSITIONAL,
+                    # not in `kwargs`
+                    if partial:
+                        parameters_ex = (param,)
+                        break
+                    else:
+                        msg = 'missing a required argument: {arg!r}'
+                        msg = msg.format(arg=param.name)
+                        return _error_func(msg)
+
+    kwargsmap = set()
+
+    # Now, we iterate through the remaining parameters to process
+    # keyword arguments
+    kwargs_param = None
+    for param in itertools.chain(parameters_ex, parameters):
+        if param.kind == _VAR_KEYWORD:
+            # Memorize that we have a '**kwargs'-like parameter
+            kwargs_param = param
+            continue
+
+        if param.kind == _VAR_POSITIONAL:
+            # Named arguments don't refer to '*args'-like parameters.
+            # We only arrive here if the positional arguments ended
+            # before reaching the last parameter before *args.
+            continue
+
+        param_name = param.name
+        if param_name in kwargsset:
+            if param.kind == _POSITIONAL_ONLY:
+                # This should never happen in case of a properly built
+                # Signature object (but let's have this check here
+                # to ensure correct behaviour just in case)
+                return _error_func(
+                            '{arg!r} parameter is positional only, '
+                            'but was passed as a keyword'. \
+                            format(arg=param.name))
+
+            kwargsmap.add(param_name)
+
+        else:
+            # We have no value for this parameter.  It's fine though,
+            # if it has a default value, or it is an '*args'-like
+            # parameter, left alone by the processing of positional
+            # arguments.
+            if (not partial and param.kind != _VAR_POSITIONAL and
+                                                param.default is _empty):
+                return _error_func(
+                            'missing a required argument: {arg!r}'. \
+                            format(arg=param_name))
+
+    if pos:
+        code |= _BIND_POS
+        instructions.pos = pos
+
+    if varpos:
+        code |= _BIND_VARPOS
+        instructions.varpos = varpos
+
+    if kwargsmap:
+        code |= _BIND_KW
+        instructions.kw = kwargsmap
+
+    varkwmap = kwargsset - kwargsmap
+    if varkwmap:
+        if kwargs_param is not None:
+            # Process our '**kwargs'-like parameter
+            code |= _BIND_VARKW
+            varkw = (varkwmap, kwargs_param.name)
+        else:
+            return _error_func(
+                        'got an unexpected keyword argument {arg!r}'.format(
+                        arg=next(iter(varkwmap))))
+
+    instructions.code = code
+
+    args = []
+    buf = []
+
+    if pos:
+        for name in pos:
+            args.append(name)
+            buf.append('("' + name + '", ' + name + ')')
+    if varpos:
+        args.append('*' + varpos[1])
+        buf.append('("' + varpos[1] + '", ' + varpos[1] + ')')
+    if kwargsmap:
+        for name in kwargsmap:
+            args.append(name)
+            buf.append('("' + name + '", ' + name + ')')
+    if varkw:
+        args.append('**' + varkw[1])
+        buf.append('("' + varkw[1] + '", ' + varkw[1] + ')')
+
+    func = 'def _bind(' + ', '.join(args) + '):\n' + \
+           '    return (' + ', '.join(buf) + ')'
+
+    ns = {}
+    exec(func, ns, ns)
+
+    return ns['_bind']
+
+
 class Signature:
     """A Signature object represents the overall signature of a function.
     It stores a Parameter object for each parameter accepted by the
@@ -2519,7 +2716,7 @@ class Signature:
         to parameters (simulating 'functools.partial' behavior.)
     """
 
-    __slots__ = ('_return_annotation', '_parameters')
+    __slots__ = ('_return_annotation', '_parameters', '_bind_impl')
 
     _parameter_cls = Parameter
     _bound_arguments_cls = BoundArguments
@@ -2715,6 +2912,19 @@ class Signature:
 
     def _bind(self, args, kwargs, *, partial=False):
         """Private method. Don't use directly."""
+
+        if 1:
+            try:
+                cache_func = self._bind_impl
+            except AttributeError:
+                cache_func = functools.lru_cache()(
+                    functools.partial(_signature_bind_impl,
+                                      self.parameters.values()))
+                self._bind_impl = cache_func
+
+            func = cache_func(len(args), frozenset(kwargs), partial)
+            arguments = OrderedDict(func(*args, **kwargs))
+            return self._bound_arguments_cls(self, arguments)
 
         arguments = OrderedDict()
 
