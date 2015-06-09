@@ -53,6 +53,11 @@ dict_items = type({}.items())
 mappingproxy = type(type.__dict__)
 generator = type((lambda: (yield))())
 
+async def _coro(): pass
+_coro = _coro()
+coroutine = type(_coro)
+_coro.close() # Prevent ResourceWarning
+
 
 ### ONE-TRICK PONIES ###
 
@@ -78,17 +83,12 @@ class Hashable(metaclass=ABCMeta):
 class _AwaitableMeta(ABCMeta):
 
     def __instancecheck__(cls, instance):
-        # 0x80 = CO_COROUTINE
         # 0x100 = CO_ITERABLE_COROUTINE
         # We don't want to import 'inspect' module, as
         # a dependency for 'collections.abc'.
-        CO_COROUTINES = 0x80 | 0x100
-
         if (isinstance(instance, generator) and
-            instance.gi_code.co_flags & CO_COROUTINES):
-
+            instance.gi_code.co_flags & 0x100):
             return True
-
         return super().__instancecheck__(instance)
 
 
@@ -109,6 +109,9 @@ class Awaitable(metaclass=_AwaitableMeta):
                         return True
                     break
         return NotImplemented
+
+
+Awaitable.register(coroutine)
 
 
 class Coroutine(Awaitable):
@@ -157,6 +160,9 @@ class Coroutine(Awaitable):
                     return NotImplemented
             return True
         return NotImplemented
+
+
+Coroutine.register(coroutine)
 
 
 class AsyncIterable(metaclass=ABCMeta):

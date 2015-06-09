@@ -24,7 +24,7 @@ class AsyncYield:
 
 
 def run_async(coro):
-    assert coro.__class__ is types.GeneratorType
+    assert coro.__class__ in {types.GeneratorType, types.CoroutineType}
 
     buffer = []
     result = None
@@ -121,7 +121,7 @@ class CoroutineTest(unittest.TestCase):
             return 10
 
         f = foo()
-        self.assertIsInstance(f, types.GeneratorType)
+        self.assertIsInstance(f, types.CoroutineType)
         self.assertTrue(bool(foo.__code__.co_flags & 0x80))
         self.assertTrue(bool(foo.__code__.co_flags & 0x20))
         self.assertTrue(bool(f.gi_code.co_flags & 0x80))
@@ -152,7 +152,7 @@ class CoroutineTest(unittest.TestCase):
             raise StopIteration
 
         check = lambda: self.assertRaisesRegex(
-            TypeError, "coroutine-objects do not support iteration")
+            TypeError, "'coroutine' object is not iterable")
 
         with check():
             list(foo())
@@ -165,9 +165,6 @@ class CoroutineTest(unittest.TestCase):
 
         with check():
             iter(foo())
-
-        with check():
-            next(foo())
 
         with silence_coro_gc(), check():
             for i in foo():
@@ -185,7 +182,7 @@ class CoroutineTest(unittest.TestCase):
             await bar()
 
         check = lambda: self.assertRaisesRegex(
-            TypeError, "coroutine-objects do not support iteration")
+            TypeError, "'coroutine' object is not iterable")
 
         with check():
             for el in foo(): pass

@@ -38,12 +38,6 @@ PyAPI_DATA(PyTypeObject) PyGen_Type;
 #define PyGen_Check(op) PyObject_TypeCheck(op, &PyGen_Type)
 #define PyGen_CheckExact(op) (Py_TYPE(op) == &PyGen_Type)
 
-#define PyGen_CheckCoroutineExact(op) (PyGen_CheckExact(op) && \
-                                       (((PyCodeObject*) \
-                                           ((PyGenObject*)op)->gi_code) \
-                                         ->co_flags & (CO_ITERABLE_COROUTINE | \
-                                                       CO_COROUTINE)))
-
 PyAPI_FUNC(PyObject *) PyGen_New(struct _frame *);
 PyAPI_FUNC(PyObject *) PyGen_NewWithQualName(struct _frame *,
     PyObject *name, PyObject *qualname);
@@ -52,7 +46,13 @@ PyAPI_FUNC(int) _PyGen_FetchStopIterationValue(PyObject **);
 PyObject *_PyGen_Send(PyGenObject *, PyObject *);
 PyAPI_FUNC(void) _PyGen_Finalize(PyObject *self);
 
-PyObject *_PyGen_GetAwaitableIter(PyObject *o);
+#ifndef Py_LIMITED_API
+PyAPI_DATA(PyTypeObject) PyCoro_Type;
+#define PyCoro_CheckExact(op) (Py_TYPE(op) == &PyCoro_Type)
+PyAPI_FUNC(PyObject *) _PyCoro_GetAwaitableIter(PyObject *o);
+PyAPI_FUNC(PyObject *) PyCoro_NewWithQualName(struct _frame *,
+    PyObject *name, PyObject *qualname);
+#endif
 
 #ifdef __cplusplus
 }

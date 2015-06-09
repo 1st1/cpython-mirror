@@ -19,6 +19,11 @@ def _g():
     yield 1
 GeneratorType = type(_g())
 
+async def _c(): pass
+_c = _c()
+CoroutineType = type(_c)
+_c.close() # Prevent ResourceWarning
+
 class _C:
     def _m(self): pass
 MethodType = type(_C()._m)
@@ -40,7 +45,7 @@ except TypeError:
 GetSetDescriptorType = type(FunctionType.__code__)
 MemberDescriptorType = type(FunctionType.__globals__)
 
-del sys, _f, _g, _C,                              # Not for export
+del sys, _f, _g, _C, _c,                           # Not for export
 
 
 # Provide a PEP 3115 compliant mechanism for class creation
@@ -167,26 +172,30 @@ def coroutine(func):
     # We don't want to import 'dis' or 'inspect' just for
     # these constants.
     CO_GENERATOR = 0x20
+    CO_COROUTINE = 0x80
     CO_ITERABLE_COROUTINE = 0x100
 
     if not callable(func):
         raise TypeError('types.coroutine() expects a callable')
 
     if (isinstance(func, FunctionType) and
-        isinstance(getattr(func, '__code__', None), CodeType) and
-        (func.__code__.co_flags & CO_GENERATOR)):
+        isinstance(getattr(func, '__code__', None), CodeType)):
 
-        # TODO: Implement this in C.
-        co = func.__code__
-        func.__code__ = CodeType(
-            co.co_argcount, co.co_kwonlyargcount, co.co_nlocals,
-            co.co_stacksize,
-            co.co_flags | CO_ITERABLE_COROUTINE,
-            co.co_code,
-            co.co_consts, co.co_names, co.co_varnames, co.co_filename,
-            co.co_name, co.co_firstlineno, co.co_lnotab, co.co_freevars,
-            co.co_cellvars)
-        return func
+        if func.__code__.co_flags & CO_COROUTINE:
+            return func
+
+        if func.__code__.co_flags & CO_GENERATOR:
+            # TODO: Implement this in C.
+            co = func.__code__
+            func.__code__ = CodeType(
+                co.co_argcount, co.co_kwonlyargcount, co.co_nlocals,
+                co.co_stacksize,
+                co.co_flags | CO_ITERABLE_COROUTINE,
+                co.co_code,
+                co.co_consts, co.co_names, co.co_varnames, co.co_filename,
+                co.co_name, co.co_firstlineno, co.co_lnotab, co.co_freevars,
+                co.co_cellvars)
+            return func
 
     # The following code is primarily to support functions that
     # return generator-like objects (for instance generators
@@ -218,6 +227,8 @@ def coroutine(func):
     @_functools.wraps(func)
     def wrapped(*args, **kwargs):
         coro = func(*args, **kwargs)
+        if coro.__class__ is CoroutineType:
+            return coro
         if coro.__class__ is GeneratorType:
             return GeneratorWrapper(coro)
         # slow checks
