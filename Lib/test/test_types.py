@@ -1210,6 +1210,21 @@ class CoroutineTests(unittest.TestCase):
                                     'callable wrapped .* non-coroutine'):
             foo()
 
+    def test_async_def(self):
+        # Test that types.coroutine passes 'async def' coroutines
+        # without modification
+
+        async def foo(): pass
+        foo_flags = foo.__code__.co_flags
+        self.assertIs(foo, types.coroutine(foo))
+        self.assertEqual(foo.__code__.co_flags, foo_flags)
+
+        @types.coroutine
+        def bar(): return foo()
+        coro = bar()
+        self.assertEqual(coro.gi_code.co_flags, foo_flags)
+        coro.close()
+
     def test_duck_coro(self):
         class CoroLike:
             def send(self): pass
