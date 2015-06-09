@@ -3938,7 +3938,7 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
         /* Create a new generator that owns the ready to run frame
          * and return that as the value. */
         if (co->co_flags & CO_COROUTINE) {
-            gen = PyCoro_NewWithQualName(f, name, qualname);
+            gen = PyCoro_New(f, name, qualname);
         } else {
             gen = PyGen_NewWithQualName(f, name, qualname);
         }

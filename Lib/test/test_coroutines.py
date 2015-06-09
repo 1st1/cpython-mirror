@@ -37,6 +37,25 @@ def run_async(coro):
     return buffer, result
 
 
+def run_async__await__(coro):
+    assert coro.__class__ is types.CoroutineType
+    aw = coro.__await__()
+    buffer = []
+    result = None
+    i = 0
+    while True:
+        try:
+            if i % 2:
+                buffer.append(next(aw))
+            else:
+                buffer.append(aw.send(None))
+            i += 1
+        except StopIteration as ex:
+            result = ex.args[0] if ex.args else None
+            break
+    return buffer, result
+
+
 @contextlib.contextmanager
 def silence_coro_gc():
     with warnings.catch_warnings():
@@ -127,6 +146,8 @@ class CoroutineTest(unittest.TestCase):
         self.assertTrue(bool(f.gi_code.co_flags & 0x80))
         self.assertTrue(bool(f.gi_code.co_flags & 0x20))
         self.assertEqual(run_async(f), ([], 10))
+
+        self.assertEqual(run_async__await__(foo()), ([], 10))
 
         def bar(): pass
         self.assertFalse(bool(bar.__code__.co_flags & 0x80))
@@ -241,6 +262,41 @@ class CoroutineTest(unittest.TestCase):
             foo()
             support.gc_collect()
 
+    def test_func_10(self):
+        N = 0
+
+        @types.coroutine
+        def gen():
+            nonlocal N
+            try:
+                a = yield
+                yield (a ** 2)
+            except ZeroDivisionError:
+                N += 100
+                raise
+            finally:
+                N += 1
+
+        async def foo():
+            await gen()
+
+        coro = foo()
+        aw = coro.__await__()
+        self.assertIs(aw, iter(aw))
+        next(aw)
+        self.assertEqual(aw.send(10), 100)
+
+        self.assertEqual(N, 0)
+        aw.close()
+        self.assertEqual(N, 1)
+
+        coro = foo()
+        aw = coro.__await__()
+        next(aw)
+        with self.assertRaises(ZeroDivisionError):
+            aw.throw(ZeroDivisionError, None, None)
+        self.assertEqual(N, 102)
+
     def test_await_1(self):
 
         async def foo():
@@ -259,6 +315,7 @@ class CoroutineTest(unittest.TestCase):
             await AsyncYieldFrom([1, 2, 3])
 
         self.assertEqual(run_async(foo()), ([1, 2, 3], None))
+        self.assertEqual(run_async__await__(foo()), ([1, 2, 3], None))
 
     def test_await_4(self):
         async def bar():

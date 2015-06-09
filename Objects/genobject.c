@@ -681,11 +681,18 @@ PyGen_NeedsFinalizing(PyGenObject *gen)
 
 /* Coroutine Object */
 
+static PyTypeObject PyCoroWrapper_Type;
+
+typedef struct {
+    PyObject_HEAD
+    PyGenObject *cw_coroutine;
+} PyCoroWrapper;
+
 static int
 gen_is_coroutine(PyObject *o)
 {
     if (PyGen_CheckExact(o)) {
-        PyCodeObject *code = ((PyGenObject*)o)->gi_code;
+        PyCodeObject *code = (PyCodeObject *)((PyGenObject*)o)->gi_code;
         if (code->co_flags & CO_ITERABLE_COROUTINE) {
             return 1;
         }
@@ -707,7 +714,7 @@ _PyCoro_GetAwaitableIter(PyObject *o)
     unaryfunc getter = NULL;
     PyTypeObject *ot;
 
-    if (PyCoro_CheckExact(o) || gen_is_coroutine(o)) {
+    if (/*PyCoro_CheckExact(o) || */gen_is_coroutine(o)) {
         /* 'o' is a coroutine. */
         Py_INCREF(o);
         return o;
@@ -750,6 +757,19 @@ coro_repr(PyGenObject *gen)
                                 gen->gi_qualname, gen);
 }
 
+static PyObject *
+coro_await(PyGenObject *gen)
+{
+    PyCoroWrapper *cw = PyObject_GC_New(PyCoroWrapper, &PyCoroWrapper_Type);
+    if (cw == NULL) {
+        return NULL;
+    }
+    Py_INCREF(gen);
+    cw->cw_coroutine = gen;
+    _PyObject_GC_TRACK(cw);
+    return (PyObject *)cw;
+}
+
 static PyGetSetDef coro_getsetlist[] = {
     {"__name__", (getter)gen_get_name, (setter)gen_set_name,
      PyDoc_STR("name of the coroutine")},
@@ -772,6 +792,12 @@ static PyMethodDef coro_methods[] = {
     {NULL, NULL}        /* Sentinel */
 };
 
+static PyAsyncMethods coro_as_async = {
+    (unaryfunc)coro_await,                      /* am_await */
+    0,                                          /* am_aiter */
+    0                                           /* am_anext */
+};
+
 PyTypeObject PyCoro_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
     "coroutine",                                /* tp_name */
@@ -782,7 +808,7 @@ PyTypeObject PyCoro_Type = {
     0,                                          /* tp_print */
     0,                                          /* tp_getattr */
     0,                                          /* tp_setattr */
-    0,                                          /* tp_as_async */
+    &coro_as_async,                             /* tp_as_async */
     (reprfunc)coro_repr,                        /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
@@ -807,7 +833,6 @@ PyTypeObject PyCoro_Type = {
     coro_getsetlist,                            /* tp_getset */
     0,                                          /* tp_base */
     0,                                          /* tp_dict */
-
     0,                                          /* tp_descr_get */
     0,                                          /* tp_descr_set */
     0,                                          /* tp_dictoffset */
@@ -826,8 +851,96 @@ PyTypeObject PyCoro_Type = {
     _PyGen_Finalize,                            /* tp_finalize */
 };
 
+static void
+coro_wrapper_dealloc(PyCoroWrapper *cw)
+{
+    _PyObject_GC_UNTRACK((PyObject *)cw);
+    Py_CLEAR(cw->cw_coroutine);
+    PyObject_GC_Del(cw);
+}
+
+static PyObject *
+coro_wrapper_iternext(PyCoroWrapper *cw)
+{
+    return gen_send_ex(cw->cw_coroutine, NULL, 0);
+}
+
+static PyObject *
+coro_wrapper_send(PyCoroWrapper *cw, PyObject *arg)
+{
+    return gen_send_ex(cw->cw_coroutine, arg, 0);
+}
+
+static PyObject *
+coro_wrapper_throw(PyCoroWrapper *cw, PyObject *args)
+{
+    return gen_throw(cw->cw_coroutine, args);
+}
+
+static PyObject *
+coro_wrapper_close(PyCoroWrapper *cw, PyObject *args)
+{
+    return gen_close(cw->cw_coroutine, args);
+}
+
+static int
+coro_wrapper_traverse(PyCoroWrapper *cw, visitproc visit, void *arg)
+{
+    Py_VISIT(cw->cw_coroutine);
+    return 0;
+}
+
+static PyMethodDef coro_wrapper_methods[] = {
+    {"send",(PyCFunction)coro_wrapper_send, METH_O, send_doc},
+    {"throw",(PyCFunction)coro_wrapper_throw, METH_VARARGS, throw_doc},
+    {"close",(PyCFunction)coro_wrapper_close, METH_NOARGS, close_doc},
+    {NULL, NULL}        /* Sentinel */
+};
+
+static PyTypeObject PyCoroWrapper_Type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "coroutine_wrapper",
+    sizeof(PyCoroWrapper),                      /* tp_basicsize */
+    0,                                          /* tp_itemsize */
+    (destructor)coro_wrapper_dealloc,           /* destructor tp_dealloc */
+    0,                                          /* tp_print */
+    0,                                          /* tp_getattr */
+    0,                                          /* tp_setattr */
+    0,                                          /* tp_as_async */
+    0,                                          /* tp_repr */
+    0,                                          /* tp_as_number */
+    0,                                          /* tp_as_sequence */
+    0,                                          /* tp_as_mapping */
+    0,                                          /* tp_hash */
+    0,                                          /* tp_call */
+    0,                                          /* tp_str */
+    PyObject_GenericGetAttr,                    /* tp_getattro */
+    0,                                          /* tp_setattro */
+    0,                                          /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
+    "A wrapper object implementing __await__ for coroutines.",
+    (traverseproc)coro_wrapper_traverse,        /* tp_traverse */
+    0,                                          /* tp_clear */
+    0,                                          /* tp_richcompare */
+    0,                                          /* tp_weaklistoffset */
+    PyObject_SelfIter,                          /* tp_iter */
+    (iternextfunc)coro_wrapper_iternext,        /* tp_iternext */
+    coro_wrapper_methods,                       /* tp_methods */
+    0,                                          /* tp_members */
+    0,                                          /* tp_getset */
+    0,                                          /* tp_base */
+    0,                                          /* tp_dict */
+    0,                                          /* tp_descr_get */
+    0,                                          /* tp_descr_set */
+    0,                                          /* tp_dictoffset */
+    0,                                          /* tp_init */
+    0,                                          /* tp_alloc */
+    0,                                          /* tp_new */
+    PyObject_Del,                               /* tp_free */
+};
+
 PyObject *
-PyCoro_NewWithQualName(PyFrameObject *f, PyObject *name, PyObject *qualname)
+PyCoro_New(PyFrameObject *f, PyObject *name, PyObject *qualname)
 {
     return gen_new_with_qualname(&PyCoro_Type, f, name, qualname);
 }
