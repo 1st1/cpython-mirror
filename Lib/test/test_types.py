@@ -1205,10 +1205,8 @@ class CoroutineTests(unittest.TestCase):
     def test_wrong_func(self):
         @types.coroutine
         def foo():
-            pass
-        with self.assertRaisesRegex(TypeError,
-                                    'callable wrapped .* non-coroutine'):
-            foo()
+            return 'spam'
+        self.assertEqual(foo(), 'spam')
 
     def test_async_def(self):
         # Test that types.coroutine passes 'async def' coroutines
@@ -1251,7 +1249,7 @@ class CoroutineTests(unittest.TestCase):
         def foo():
             return gen
         self.assertIs(foo().__await__(), gen)
-
+        self.assertTrue(isinstance(foo(), collections.abc.Coroutine))
         with self.assertRaises(AttributeError):
             foo().gi_code
 

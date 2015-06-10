@@ -204,11 +204,14 @@ def coroutine(func):
     class GeneratorWrapper:
         def __init__(self, gen):
             self.__wrapped__ = gen
-            self.send = gen.send
-            self.throw = gen.throw
-            self.close = gen.close
             self.__name__ = getattr(gen, '__name__', None)
             self.__qualname__ = getattr(gen, '__qualname__', None)
+        def send(self, val):
+            return self.__wrapped__.send(val)
+        def throw(self, *args):
+            return self.__wrapped__.throw(*args)
+        def close(self):
+            return self.__wrapped__.close()
         @property
         def gi_code(self):
             return self.__wrapped__.gi_code
@@ -222,22 +225,17 @@ def coroutine(func):
             return next(self.__wrapped__)
         def __iter__(self):
             return self.__wrapped__
-        __await__ = __iter__
+        def __await__(self):
+            return self.__wrapped__
 
     @_functools.wraps(func)
     def wrapped(*args, **kwargs):
         coro = func(*args, **kwargs)
         if coro.__class__ is CoroutineType:
             return coro
-        if coro.__class__ is GeneratorType:
+        if (coro.__class__ is GeneratorType or
+                isinstance(coro, _collections_abc.Generator)):
             return GeneratorWrapper(coro)
-        # slow checks
-        if not isinstance(coro, _collections_abc.Coroutine):
-            if isinstance(coro, _collections_abc.Generator):
-                return GeneratorWrapper(coro)
-            raise TypeError(
-                'callable wrapped with types.coroutine() returned '
-                'non-coroutine: {!r}'.format(coro))
         return coro
 
     return wrapped

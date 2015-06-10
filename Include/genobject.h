@@ -49,7 +49,7 @@ PyAPI_FUNC(void) _PyGen_Finalize(PyObject *self);
 #ifndef Py_LIMITED_API
 PyAPI_DATA(PyTypeObject) PyCoro_Type;
 #define PyCoro_CheckExact(op) (Py_TYPE(op) == &PyCoro_Type)
-PyAPI_FUNC(PyObject *) _PyCoro_GetAwaitableIter(PyObject *o);
+PyObject *_PyCoro_GetAwaitableIter(PyObject *o);
 PyAPI_FUNC(PyObject *) PyCoro_New(struct _frame *,
     PyObject *name, PyObject *qualname);
 #endif
