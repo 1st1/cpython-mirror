@@ -683,7 +683,7 @@ PyGen_NeedsFinalizing(PyGenObject *gen)
 
 typedef struct {
     PyObject_HEAD
-    PyGenObject *cw_coroutine;
+    PyCoroObject *cw_coroutine;
 } PyCoroWrapper;
 
 static int
@@ -749,14 +749,14 @@ _PyCoro_GetAwaitableIter(PyObject *o)
 }
 
 static PyObject *
-coro_repr(PyGenObject *gen)
+coro_repr(PyCoroObject *gen)
 {
     return PyUnicode_FromFormat("<coroutine object %S at %p>",
                                 gen->gi_qualname, gen);
 }
 
 static PyObject *
-coro_await(PyGenObject *gen)
+coro_await(PyCoroObject *gen)
 {
     PyCoroWrapper *cw = PyObject_GC_New(PyCoroWrapper, &_PyCoroWrapper_Type);
     if (cw == NULL) {
@@ -777,9 +777,9 @@ static PyGetSetDef coro_getsetlist[] = {
 };
 
 static PyMemberDef coro_memberlist[] = {
-    {"gi_frame",     T_OBJECT, offsetof(PyGenObject, gi_frame),    READONLY},
-    {"gi_running",   T_BOOL,   offsetof(PyGenObject, gi_running),  READONLY},
-    {"gi_code",      T_OBJECT, offsetof(PyGenObject, gi_code),     READONLY},
+    {"gi_frame",     T_OBJECT, offsetof(PyCoroObject, gi_frame),    READONLY},
+    {"gi_running",   T_BOOL,   offsetof(PyCoroObject, gi_running),  READONLY},
+    {"gi_code",      T_OBJECT, offsetof(PyCoroObject, gi_code),     READONLY},
     {NULL}      /* Sentinel */
 };
 
@@ -799,7 +799,7 @@ static PyAsyncMethods coro_as_async = {
 PyTypeObject PyCoro_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
     "coroutine",                                /* tp_name */
-    sizeof(PyGenObject),                        /* tp_basicsize */
+    sizeof(PyCoroObject),                       /* tp_basicsize */
     0,                                          /* tp_itemsize */
     /* methods */
     (destructor)gen_dealloc,                    /* tp_dealloc */
@@ -823,7 +823,7 @@ PyTypeObject PyCoro_Type = {
     (traverseproc)gen_traverse,                 /* tp_traverse */
     0,                                          /* tp_clear */
     0,                                          /* tp_richcompare */
-    offsetof(PyGenObject, gi_weakreflist),      /* tp_weaklistoffset */
+    offsetof(PyCoroObject, gi_weakreflist),     /* tp_weaklistoffset */
     0,                                          /* tp_iter */
     0,                                          /* tp_iternext */
     coro_methods,                               /* tp_methods */
