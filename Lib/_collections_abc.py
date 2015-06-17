@@ -112,9 +112,6 @@ class Awaitable(metaclass=_AwaitableMeta):
         return NotImplemented
 
 
-Awaitable.register(coroutine)
-
-
 class Coroutine(Awaitable):
 
     __slots__ = ()
