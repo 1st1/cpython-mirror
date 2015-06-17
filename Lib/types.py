@@ -169,28 +169,28 @@ import collections.abc as _collections_abc
 def coroutine(func):
     """Convert regular generator function to a coroutine."""
 
-    # We don't want to import 'dis' or 'inspect' just for
-    # these constants.
-    CO_GENERATOR = 0x20
-    CO_COROUTINE = 0x80
-    CO_ITERABLE_COROUTINE = 0x100
-
     if not callable(func):
         raise TypeError('types.coroutine() expects a callable')
 
     if (isinstance(func, FunctionType) and
         isinstance(getattr(func, '__code__', None), CodeType)):
 
-        if func.__code__.co_flags & CO_COROUTINE:
+        co_flags = func.__code__.co_flags
+
+        # Check if 'func' is a coroutine function.
+        # (0x180 == CO_COROUTINE | CO_ITERABLE_COROUTINE)
+        if co_flags & 0x180:
             return func
 
-        if func.__code__.co_flags & CO_GENERATOR:
+        # Check if 'func' is a generator function.
+        # (0x20 == CO_GENERATOR)
+        if co_flags & 0x20:
             # TODO: Implement this in C.
             co = func.__code__
             func.__code__ = CodeType(
                 co.co_argcount, co.co_kwonlyargcount, co.co_nlocals,
                 co.co_stacksize,
-                co.co_flags | CO_ITERABLE_COROUTINE,
+                co.co_flags | 0x100,  # 0x100 == CO_ITERABLE_COROUTINE
                 co.co_code,
                 co.co_consts, co.co_names, co.co_varnames, co.co_filename,
                 co.co_name, co.co_firstlineno, co.co_lnotab, co.co_freevars,
@@ -232,10 +232,17 @@ def coroutine(func):
     def wrapped(*args, **kwargs):
         coro = func(*args, **kwargs)
         if coro.__class__ is CoroutineType:
+            # 'coro' is a native coroutine object.
             return coro
         if (coro.__class__ is GeneratorType or
-                isinstance(coro, _collections_abc.Generator)):
+                (isinstance(coro, _collections_abc.Generator) and
+                 not isinstance(coro, _collections_abc.Coroutine))):
+            # 'coro' is either a pure Python generator, or it implements
+            # collections.abc.Generator (and does not implement
+            # collections.abc.Coroutine).
             return GeneratorWrapper(coro)
+        # 'coro' is either an instance of collections.abc.Coroutine or
+        # some other object -- pass it through.
         return coro
 
     return wrapped
