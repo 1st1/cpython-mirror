@@ -749,21 +749,21 @@ _PyCoro_GetAwaitableIter(PyObject *o)
 }
 
 static PyObject *
-coro_repr(PyCoroObject *gen)
+coro_repr(PyCoroObject *coro)
 {
     return PyUnicode_FromFormat("<coroutine object %S at %p>",
-                                gen->gi_qualname, gen);
+                                coro->gi_qualname, coro);
 }
 
 static PyObject *
-coro_await(PyCoroObject *gen)
+coro_await(PyCoroObject *coro)
 {
     PyCoroWrapper *cw = PyObject_GC_New(PyCoroWrapper, &_PyCoroWrapper_Type);
     if (cw == NULL) {
         return NULL;
     }
-    Py_INCREF(gen);
-    cw->cw_coroutine = gen;
+    Py_INCREF(coro);
+    cw->cw_coroutine = coro;
     _PyObject_GC_TRACK(cw);
     return (PyObject *)cw;
 }
@@ -860,31 +860,31 @@ coro_wrapper_dealloc(PyCoroWrapper *cw)
 static PyObject *
 coro_wrapper_iternext(PyCoroWrapper *cw)
 {
-    return gen_send_ex(cw->cw_coroutine, NULL, 0);
+    return gen_send_ex((PyGenObject *)cw->cw_coroutine, NULL, 0);
 }
 
 static PyObject *
 coro_wrapper_send(PyCoroWrapper *cw, PyObject *arg)
 {
-    return gen_send_ex(cw->cw_coroutine, arg, 0);
+    return gen_send_ex((PyGenObject *)cw->cw_coroutine, arg, 0);
 }
 
 static PyObject *
 coro_wrapper_throw(PyCoroWrapper *cw, PyObject *args)
 {
-    return gen_throw(cw->cw_coroutine, args);
+    return gen_throw((PyGenObject *)cw->cw_coroutine, args);
 }
 
 static PyObject *
 coro_wrapper_close(PyCoroWrapper *cw, PyObject *args)
 {
-    return gen_close(cw->cw_coroutine, args);
+    return gen_close((PyGenObject *)cw->cw_coroutine, args);
 }
 
 static int
 coro_wrapper_traverse(PyCoroWrapper *cw, visitproc visit, void *arg)
 {
-    Py_VISIT(cw->cw_coroutine);
+    Py_VISIT((PyObject *)cw->cw_coroutine);
     return 0;
 }
 
