@@ -87,7 +87,7 @@ class _AwaitableMeta(ABCMeta):
         # 0x100 = CO_ITERABLE_COROUTINE
         # We don't want to import 'inspect' module, as
         # a dependency for 'collections.abc'.
-        if (isinstance(instance, generator) and
+        if (instance.__class__ is generator and
             instance.gi_code.co_flags & 0x100):
             return True
         return super().__instancecheck__(instance)
