@@ -52,11 +52,12 @@ dict_items = type({}.items())
 ## misc ##
 mappingproxy = type(type.__dict__)
 generator = type((lambda: (yield))())
-
+## coroutine ##
 async def _coro(): pass
 _coro = _coro()
 coroutine = type(_coro)
-_coro.close() # Prevent ResourceWarning
+_coro.close()  # Prevent ResourceWarning
+del _coro
 
 
 ### ONE-TRICK PONIES ###

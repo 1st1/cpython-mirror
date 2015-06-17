@@ -297,6 +297,16 @@ class CoroutineTest(unittest.TestCase):
             aw.throw(ZeroDivisionError, None, None)
         self.assertEqual(N, 102)
 
+    def test_func_11(self):
+        async def func(): pass
+        coro = func()
+        # Test that PyCoro_Type and _PyCoroWrapper_Type types were properly
+        # initialized
+        self.assertIn('__await__', dir(coro))
+        self.assertIn('__iter__', dir(coro.__await__()))
+        self.assertIn('coroutine_wrapper', repr(coro.__await__()))
+        coro.close() # avoid RuntimeWarning
+
     def test_await_1(self):
 
         async def foo():

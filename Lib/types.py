@@ -22,7 +22,7 @@ GeneratorType = type(_g())
 async def _c(): pass
 _c = _c()
 CoroutineType = type(_c)
-_c.close() # Prevent ResourceWarning
+_c.close()  # Prevent ResourceWarning
 
 class _C:
     def _m(self): pass

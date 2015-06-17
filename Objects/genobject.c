@@ -681,8 +681,6 @@ PyGen_NeedsFinalizing(PyGenObject *gen)
 
 /* Coroutine Object */
 
-static PyTypeObject PyCoroWrapper_Type;
-
 typedef struct {
     PyObject_HEAD
     PyGenObject *cw_coroutine;
@@ -714,7 +712,7 @@ _PyCoro_GetAwaitableIter(PyObject *o)
     unaryfunc getter = NULL;
     PyTypeObject *ot;
 
-    if (/*PyCoro_CheckExact(o) || */gen_is_coroutine(o)) {
+    if (PyCoro_CheckExact(o) || gen_is_coroutine(o)) {
         /* 'o' is a coroutine. */
         Py_INCREF(o);
         return o;
@@ -760,7 +758,7 @@ coro_repr(PyGenObject *gen)
 static PyObject *
 coro_await(PyGenObject *gen)
 {
-    PyCoroWrapper *cw = PyObject_GC_New(PyCoroWrapper, &PyCoroWrapper_Type);
+    PyCoroWrapper *cw = PyObject_GC_New(PyCoroWrapper, &_PyCoroWrapper_Type);
     if (cw == NULL) {
         return NULL;
     }
@@ -897,8 +895,8 @@ static PyMethodDef coro_wrapper_methods[] = {
     {NULL, NULL}        /* Sentinel */
 };
 
-static PyTypeObject PyCoroWrapper_Type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
+PyTypeObject _PyCoroWrapper_Type = {
+    PyVarObject_HEAD_INIT(&PyType_Type, 0)
     "coroutine_wrapper",
     sizeof(PyCoroWrapper),                      /* tp_basicsize */
     0,                                          /* tp_itemsize */
