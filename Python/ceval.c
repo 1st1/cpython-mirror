@@ -2933,7 +2933,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     SET_TOP(NULL);
                     PyErr_SetString(PyExc_TypeError,
                                     "cannot 'yield from' a coroutine object "
-                                    "from a generator");
+                                    "in a non-coroutine generator");
                     goto error;
                 }
             }

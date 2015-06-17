@@ -239,7 +239,7 @@ class CoroutineTest(unittest.TestCase):
 
         with silence_coro_gc(), self.assertRaisesRegex(
             TypeError,
-            "cannot 'yield from' a coroutine object from a generator"):
+            "cannot 'yield from' a coroutine object in a non-coroutine generator"):
 
             list(foo())
 
