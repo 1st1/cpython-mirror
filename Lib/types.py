@@ -172,8 +172,8 @@ def coroutine(func):
     if not callable(func):
         raise TypeError('types.coroutine() expects a callable')
 
-    if (isinstance(func, FunctionType) and
-        isinstance(getattr(func, '__code__', None), CodeType)):
+    if (func.__class__ is FunctionType and
+        getattr(func, '__code__', None).__class__ is CodeType):
 
         co_flags = func.__code__.co_flags
 
