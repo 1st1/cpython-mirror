@@ -86,8 +86,10 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
     PyObject *result;
 
     if (gen->gi_running) {
-        PyErr_SetString(PyExc_ValueError,
-                        "generator already executing");
+        char *msg = "generator already executing";
+        if PyCoro_CheckExact(gen)
+            msg = "coroutine already executing";
+        PyErr_SetString(PyExc_ValueError, msg);
         return NULL;
     }
     if (f == NULL || f->f_stacktop == NULL) {
@@ -99,9 +101,12 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
 
     if (f->f_lasti == -1) {
         if (arg && arg != Py_None) {
-            PyErr_SetString(PyExc_TypeError,
-                            "can't send non-None value to a "
-                            "just-started generator");
+            char *msg = "can't send non-None value to a "
+                        "just-started generator";
+            if PyCoro_CheckExact(gen)
+                msg = "can't send non-None value to a "
+                      "just-started coroutine";
+            PyErr_SetString(PyExc_TypeError, msg);
             return NULL;
         }
     } else {
@@ -150,6 +155,9 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
         if (((PyCodeObject *)gen->gi_code)->co_flags &
               (CO_FUTURE_GENERATOR_STOP | CO_COROUTINE | CO_ITERABLE_COROUTINE))
         {
+            char *msg = "generator raised StopIteration";
+            if PyCoro_CheckExact(gen)
+                msg = "coroutine raised StopIteration";
             PyObject *exc, *val, *val2, *tb;
             PyErr_Fetch(&exc, &val, &tb);
             PyErr_NormalizeException(&exc, &val, &tb);
@@ -157,8 +165,7 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
                 PyException_SetTraceback(val, tb);
             Py_DECREF(exc);
             Py_XDECREF(tb);
-            PyErr_SetString(PyExc_RuntimeError,
-                "generator raised StopIteration");
+            PyErr_SetString(PyExc_RuntimeError, msg);
             PyErr_Fetch(&exc, &val2, &tb);
             PyErr_NormalizeException(&exc, &val2, &tb);
             Py_INCREF(val);
@@ -288,9 +295,11 @@ gen_close(PyGenObject *gen, PyObject *args)
         PyErr_SetNone(PyExc_GeneratorExit);
     retval = gen_send_ex(gen, Py_None, 1);
     if (retval) {
+        char *msg = "generator ignored GeneratorExit";
+        if (PyCoro_CheckExact(gen))
+            msg = "coroutine ignored GeneratorExit";
         Py_DECREF(retval);
-        PyErr_SetString(PyExc_RuntimeError,
-                        "generator ignored GeneratorExit");
+        PyErr_SetString(PyExc_RuntimeError, msg);
         return NULL;
     }
     if (PyErr_ExceptionMatches(PyExc_StopIteration)
@@ -783,10 +792,21 @@ static PyMemberDef coro_memberlist[] = {
     {NULL}      /* Sentinel */
 };
 
+PyDoc_STRVAR(coro_send_doc,
+"send(arg) -> send 'arg' into coroutine,\n\
+return next yielded value or raise StopIteration.");
+
+PyDoc_STRVAR(coro_throw_doc,
+"throw(typ[,val[,tb]]) -> raise exception in coroutine,\n\
+return next yielded value or raise StopIteration.");
+
+PyDoc_STRVAR(coro_close_doc,
+"close() -> raise GeneratorExit inside coroutine.");
+
 static PyMethodDef coro_methods[] = {
-    {"send",(PyCFunction)_PyGen_Send, METH_O, send_doc},
-    {"throw",(PyCFunction)gen_throw, METH_VARARGS, throw_doc},
-    {"close",(PyCFunction)gen_close, METH_NOARGS, close_doc},
+    {"send",(PyCFunction)_PyGen_Send, METH_O, coro_send_doc},
+    {"throw",(PyCFunction)gen_throw, METH_VARARGS, coro_throw_doc},
+    {"close",(PyCFunction)gen_close, METH_NOARGS, coro_close_doc},
     {NULL, NULL}        /* Sentinel */
 };
 

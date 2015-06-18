@@ -157,7 +157,7 @@ class CoroutineTest(unittest.TestCase):
             raise StopIteration
 
         with self.assertRaisesRegex(
-                RuntimeError, "generator raised StopIteration"):
+                RuntimeError, "coroutine raised StopIteration"):
 
             run_async(foo())
 
@@ -306,6 +306,53 @@ class CoroutineTest(unittest.TestCase):
         self.assertIn('__iter__', dir(coro.__await__()))
         self.assertIn('coroutine_wrapper', repr(coro.__await__()))
         coro.close() # avoid RuntimeWarning
+
+    def test_func_12(self):
+        async def g():
+            i = me.send(None)
+            await foo
+        me = g()
+        with self.assertRaisesRegex(ValueError,
+                                    "coroutine already executing"):
+            me.send(None)
+
+    def test_func_13(self):
+        async def g():
+            pass
+        with self.assertRaisesRegex(
+            TypeError,
+            "can't send non-None value to a just-started coroutine"):
+
+            g().send('spam')
+
+    def test_func_14(self):
+        @types.coroutine
+        def gen():
+            yield
+        async def coro():
+            try:
+                await gen()
+            except GeneratorExit:
+                await gen()
+        c = coro()
+        c.send(None)
+        with self.assertRaisesRegex(RuntimeError,
+                                    "coroutine ignored GeneratorExit"):
+            c.close()
+
+    def test_corotype_1(self):
+        ct = types.CoroutineType
+        self.assertIn('into coroutine', ct.send.__doc__)
+        self.assertIn('inside coroutine', ct.close.__doc__)
+        self.assertIn('in coroutine', ct.throw.__doc__)
+        self.assertIn('of the coroutine', ct.__dict__['__name__'].__doc__)
+        self.assertIn('of the coroutine', ct.__dict__['__qualname__'].__doc__)
+        self.assertEqual(ct.__name__, 'coroutine')
+
+        async def f(): pass
+        c = f()
+        self.assertIn('coroutine object', repr(c))
+        c.close()
 
     def test_await_1(self):
 
