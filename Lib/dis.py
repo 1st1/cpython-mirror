@@ -73,20 +73,17 @@ def distb(tb=None, *, file=None):
         while tb.tb_next: tb = tb.tb_next
     disassemble(tb.tb_frame.f_code, tb.tb_lasti, file=file)
 
+
 # The inspect module interrogates this dictionary to build its
 # list of CO_* constants. It is also used by pretty_flags to
 # turn the co_flags field into a human readable list.
-COMPILER_FLAG_NAMES = {
-     1: "OPTIMIZED",
-     2: "NEWLOCALS",
-     4: "VARARGS",
-     8: "VARKEYWORDS",
-    16: "NESTED",
-    32: "GENERATOR",
-    64: "NOFREE",
-   128: "COROUTINE",
-   256: "ITERABLE_COROUTINE",
-}
+COMPILER_FLAG_NAMES = {}
+_code = (lambda:None).__code__
+for _name in {"OPTIMIZED", "NEWLOCALS", "VARARGS", "VARKEYWORDS",
+              "NESTED", "GENERATOR", "NOFREE", "COROUTINE",
+              "ITERABLE_COROUTINE"}:
+    COMPILER_FLAG_NAMES[getattr(_code, 'CO_' + _name)] = _name
+
 
 def pretty_flags(flags):
     """Return pretty representation of code flags."""

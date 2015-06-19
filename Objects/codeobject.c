@@ -224,6 +224,40 @@ static PyMemberDef code_memberlist[] = {
     {NULL}      /* Sentinel */
 };
 
+
+#define CODE_CO_GETTER(NAME)                        \
+    static PyObject*                                \
+    code_get_##NAME(PyCodeObject* code) {           \
+        return PyLong_FromLong(NAME);               \
+    }
+
+#define CODE_CO_DESCR(NAME)                         \
+    {#NAME, (getter)code_get_##NAME, NULL, NULL}
+
+CODE_CO_GETTER(CO_OPTIMIZED);
+CODE_CO_GETTER(CO_NEWLOCALS);
+CODE_CO_GETTER(CO_VARARGS);
+CODE_CO_GETTER(CO_VARKEYWORDS);
+CODE_CO_GETTER(CO_NESTED);
+CODE_CO_GETTER(CO_GENERATOR);
+CODE_CO_GETTER(CO_NOFREE);
+CODE_CO_GETTER(CO_COROUTINE);
+CODE_CO_GETTER(CO_ITERABLE_COROUTINE);
+
+static PyGetSetDef code_getsetlist[] = {
+    CODE_CO_DESCR(CO_OPTIMIZED),
+    CODE_CO_DESCR(CO_NEWLOCALS),
+    CODE_CO_DESCR(CO_VARARGS),
+    CODE_CO_DESCR(CO_VARKEYWORDS),
+    CODE_CO_DESCR(CO_NESTED),
+    CODE_CO_DESCR(CO_GENERATOR),
+    CODE_CO_DESCR(CO_NOFREE),
+    CODE_CO_DESCR(CO_COROUTINE),
+    CODE_CO_DESCR(CO_ITERABLE_COROUTINE),
+    {NULL} /* Sentinel */
+};
+
+
 /* Helper for code_new: return a shallow copy of a tuple that is
    guaranteed to contain exact strings, by converting string subclasses
    to exact strings and complaining if a non-string is found. */
@@ -531,7 +565,7 @@ PyTypeObject PyCode_Type = {
     0,                                  /* tp_iternext */
     code_methods,                       /* tp_methods */
     code_memberlist,                    /* tp_members */
-    0,                                  /* tp_getset */
+    code_getsetlist,                    /* tp_getset */
     0,                                  /* tp_base */
     0,                                  /* tp_dict */
     0,                                  /* tp_descr_get */
