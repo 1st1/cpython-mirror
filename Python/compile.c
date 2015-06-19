@@ -1753,12 +1753,8 @@ compiler_function(struct compiler *c, stmt_ty s, int is_async)
     Py_DECREF(qualname);
     Py_DECREF(co);
 
-    if (is_async) {
+    if (is_async)
         co->co_flags |= CO_COROUTINE;
-        /* An async function is always a generator, even
-           if there is no 'yield' expressions in it. */
-        co->co_flags |= CO_GENERATOR;
-    }
 
     /* decorators */
     for (i = 0; i < asdl_seq_LEN(decos); i++) {
