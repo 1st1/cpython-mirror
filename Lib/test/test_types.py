@@ -1225,7 +1225,7 @@ class CoroutineTests(unittest.TestCase):
         def bar(): return foo_coro
         coro = bar()
         self.assertIs(foo_coro, coro)
-        self.assertEqual(coro.gi_code.co_flags, foo_flags)
+        self.assertEqual(coro.cr_code.co_flags, foo_flags)
         coro.close()
 
     def test_duck_coro(self):

@@ -12,24 +12,24 @@ struct _frame; /* Avoid including frameobject.h */
 
 /* _PyGenObject_HEAD defines the initial segment of generator
    and coroutine objects. */
-#define _PyGenObject_HEAD                                                   \
+#define _PyGenObject_HEAD(prefix)                                           \
     PyObject_HEAD                                                           \
-    /* The gi_ prefix is intended to remind of generator-iterator. */       \
     /* Note: gi_frame can be NULL if the generator is "finished" */         \
-    struct _frame *gi_frame;                                                \
+    struct _frame *prefix##_frame;                                          \
     /* True if generator is being executed. */                              \
-    char gi_running;                                                        \
+    char prefix##_running;                                                  \
     /* The code object backing the generator */                             \
-    PyObject *gi_code;                                                      \
+    PyObject *prefix##_code;                                                \
     /* List of weak reference. */                                           \
-    PyObject *gi_weakreflist;                                               \
+    PyObject *prefix##_weakreflist;                                         \
     /* Name of the generator. */                                            \
-    PyObject *gi_name;                                                      \
+    PyObject *prefix##_name;                                                \
     /* Qualified name of the generator. */                                  \
-    PyObject *gi_qualname;
+    PyObject *prefix##_qualname;
 
 typedef struct {
-    _PyGenObject_HEAD
+    /* The gi_ prefix is intended to remind of generator-iterator. */
+    _PyGenObject_HEAD(gi)
 } PyGenObject;
 
 PyAPI_DATA(PyTypeObject) PyGen_Type;
@@ -47,7 +47,7 @@ PyAPI_FUNC(void) _PyGen_Finalize(PyObject *self);
 
 #ifndef Py_LIMITED_API
 typedef struct {
-    _PyGenObject_HEAD
+    _PyGenObject_HEAD(cr)
 } PyCoroObject;
 
 PyAPI_DATA(PyTypeObject) PyCoro_Type;

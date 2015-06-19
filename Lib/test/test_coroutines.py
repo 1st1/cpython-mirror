@@ -143,8 +143,8 @@ class CoroutineTest(unittest.TestCase):
         self.assertIsInstance(f, types.CoroutineType)
         self.assertTrue(bool(foo.__code__.co_flags & 0x80))
         self.assertFalse(bool(foo.__code__.co_flags & 0x20))
-        self.assertTrue(bool(f.gi_code.co_flags & 0x80))
-        self.assertFalse(bool(f.gi_code.co_flags & 0x20))
+        self.assertTrue(bool(f.cr_code.co_flags & 0x80))
+        self.assertFalse(bool(f.cr_code.co_flags & 0x20))
         self.assertEqual(run_async(f), ([], 10))
 
         self.assertEqual(run_async__await__(foo()), ([], 10))

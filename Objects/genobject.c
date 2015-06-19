@@ -760,7 +760,7 @@ static PyObject *
 coro_repr(PyCoroObject *coro)
 {
     return PyUnicode_FromFormat("<coroutine object %S at %p>",
-                                coro->gi_qualname, coro);
+                                coro->cr_qualname, coro);
 }
 
 static PyObject *
@@ -785,9 +785,9 @@ static PyGetSetDef coro_getsetlist[] = {
 };
 
 static PyMemberDef coro_memberlist[] = {
-    {"gi_frame",     T_OBJECT, offsetof(PyCoroObject, gi_frame),    READONLY},
-    {"gi_running",   T_BOOL,   offsetof(PyCoroObject, gi_running),  READONLY},
-    {"gi_code",      T_OBJECT, offsetof(PyCoroObject, gi_code),     READONLY},
+    {"cr_frame",     T_OBJECT, offsetof(PyCoroObject, cr_frame),    READONLY},
+    {"cr_running",   T_BOOL,   offsetof(PyCoroObject, cr_running),  READONLY},
+    {"cr_code",      T_OBJECT, offsetof(PyCoroObject, cr_code),     READONLY},
     {NULL}      /* Sentinel */
 };
 
@@ -842,7 +842,7 @@ PyTypeObject PyCoro_Type = {
     (traverseproc)gen_traverse,                 /* tp_traverse */
     0,                                          /* tp_clear */
     0,                                          /* tp_richcompare */
-    offsetof(PyCoroObject, gi_weakreflist),     /* tp_weaklistoffset */
+    offsetof(PyCoroObject, cr_weakreflist),     /* tp_weaklistoffset */
     0,                                          /* tp_iter */
     0,                                          /* tp_iternext */
     coro_methods,                               /* tp_methods */
