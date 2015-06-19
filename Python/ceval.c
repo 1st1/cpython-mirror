@@ -3917,7 +3917,7 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
     if (co->co_flags & (CO_GENERATOR | CO_COROUTINE)) {
         PyObject *gen;
         PyObject *coro_wrapper = tstate->coroutine_wrapper;
-        int is_coro = co->co_flags & (CO_COROUTINE | CO_ITERABLE_COROUTINE);
+        int is_coro = co->co_flags & CO_COROUTINE;
 
         if (is_coro && tstate->in_coroutine_wrapper) {
             assert(coro_wrapper != NULL);
@@ -3937,7 +3937,7 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
 
         /* Create a new generator that owns the ready to run frame
          * and return that as the value. */
-        if (co->co_flags & CO_COROUTINE) {
+        if (is_coro) {
             gen = PyCoro_New(f, name, qualname);
         } else {
             gen = PyGen_NewWithQualName(f, name, qualname);

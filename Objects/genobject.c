@@ -27,8 +27,7 @@ _PyGen_Finalize(PyObject *self)
     /* If `gen` is a coroutine, and if it was never awaited on,
        issue a RuntimeWarning. */
     if (gen->gi_code != NULL
-            && ((PyCodeObject *)gen->gi_code)->co_flags & (CO_COROUTINE
-                                                       | CO_ITERABLE_COROUTINE)
+            && ((PyCodeObject *)gen->gi_code)->co_flags & CO_COROUTINE
             && gen->gi_frame != NULL
             && gen->gi_frame->f_lasti == -1
             && !PyErr_Occurred()

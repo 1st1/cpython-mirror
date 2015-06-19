@@ -89,10 +89,7 @@ def debug_wrapper(gen):
     # We only wrap here coroutines defined via 'async def' syntax.
     # Generator-based coroutines are wrapped in @coroutine
     # decorator.
-    if _is_native_coro_code(gen.gi_code):
-        return CoroWrapper(gen, None)
-    else:
-        return gen
+    return CoroWrapper(gen, None)
 
 
 class CoroWrapper:

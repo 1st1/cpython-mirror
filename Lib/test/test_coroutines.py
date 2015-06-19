@@ -1126,6 +1126,24 @@ class SysSetCoroWrapperTest(unittest.TestCase):
         finally:
             sys.set_coroutine_wrapper(None)
 
+    def test_set_wrapper_4(self):
+        @types.coroutine
+        def foo():
+            return 'spam'
+
+        wrapped = None
+        def wrap(gen):
+            nonlocal wrapped
+            wrapped = gen
+            return gen
+
+        sys.set_coroutine_wrapper(wrap)
+        try:
+            foo()
+            self.assertIs(wrapped, None)
+        finally:
+            sys.set_coroutine_wrapper(None)
+
 
 class CAPITest(unittest.TestCase):
 
