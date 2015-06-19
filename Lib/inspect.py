@@ -1598,6 +1598,53 @@ def getgeneratorlocals(generator):
     else:
         return {}
 
+
+# ------------------------------------------------ coroutine introspection
+
+CORO_CREATED = 'CORO_CREATED'
+CORO_RUNNING = 'CORO_RUNNING'
+CORO_SUSPENDED = 'CORO_SUSPENDED'
+CORO_CLOSED = 'CORO_CLOSED'
+
+def getcoroutinestate(coroutine):
+    """Get current state of a coroutine object.
+
+    Possible states are:
+      CORO_CREATED: Waiting to start execution.
+      CORO_RUNNING: Currently being executed by the interpreter.
+      CORO_SUSPENDED: Currently suspended at an await expression.
+      CORO_CLOSED: Execution has completed.
+    """
+    if not isinstance(coroutine, types.CoroutineType):
+        raise TypeError(
+            '{!r} is not a Python coroutine'.format(coroutine))
+    if coroutine.cr_running:
+        return CORO_RUNNING
+    if coroutine.cr_frame is None:
+        return CORO_CLOSED
+    if coroutine.cr_frame.f_lasti == -1:
+        return CORO_CREATED
+    return CORO_SUSPENDED
+
+
+def getcoroutinelocals(coroutine):
+    """
+    Get the mapping of coroutine local variables to their current values.
+
+    A dict is returned, with the keys the local variable names and values the
+    bound values."""
+
+    if not isinstance(coroutine, types.CoroutineType):
+        raise TypeError(
+            '{!r} is not a Python coroutine'.format(coroutine))
+
+    frame = getattr(coroutine, "cr_frame", None)
+    if frame is not None:
+        return frame.f_locals
+    else:
+        return {}
+
+
 ###############################################################################
 ### Function Signature Object (PEP 362)
 ###############################################################################

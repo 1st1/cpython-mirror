@@ -1126,8 +1126,8 @@ code execution::
            pass
 
 
-Current State of a Generator
-----------------------------
+Current State of Generators and Coroutines
+------------------------------------------
 
 When implementing coroutine schedulers and for other advanced uses of
 generators, it is useful to determine whether a generator is currently
@@ -1146,6 +1146,18 @@ generator to be determined easily.
     * GEN_CLOSED: Execution has completed.
 
    .. versionadded:: 3.2
+
+.. function:: getcoroutinestate(coroutine)
+
+   Get current state of a coroutine object.
+
+   Possible states are:
+    * CORO_CREATED: Waiting to start execution.
+    * CORO_RUNNING: Currently being executed by the interpreter.
+    * CORO_SUSPENDED: Currently suspended at an await expression.
+    * CORO_CLOSED: Execution has completed.
+
+   .. versionadded:: 3.5
 
 The current internal state of the generator can also be queried. This is
 mostly useful for testing purposes, to ensure that internal state is being
@@ -1170,6 +1182,13 @@ updated as expected:
       return an empty dictionary.
 
    .. versionadded:: 3.3
+
+.. function:: getcorotuinelocals(coroutine)
+
+   This function is analogous to :func:`~inspect.getgeneratorlocals`, but
+   works for coroutine objects created by :keyword:`async def` functions.
+
+   .. versionadded:: 3.5
 
 
 .. _inspect-module-cli:
