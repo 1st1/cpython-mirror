@@ -141,9 +141,9 @@ class TestPredicates(IsTestBase):
         gen_coro = gen_coroutine_function_example(1)
         coro = coroutine_function_example(1)
 
-        self.assertTrue(
+        self.assertFalse(
             inspect.iscoroutinefunction(gen_coroutine_function_example))
-        self.assertTrue(inspect.iscoroutine(gen_coro))
+        self.assertFalse(inspect.iscoroutine(gen_coro))
 
         self.assertTrue(
             inspect.isgeneratorfunction(gen_coroutine_function_example))

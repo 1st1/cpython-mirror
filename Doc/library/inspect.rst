@@ -289,29 +289,16 @@ attributes:
 
 .. function:: iscoroutinefunction(object)
 
-   Return true if the object is a :term:`coroutine function`.
-
-   Coroutine functions are defined with an ``async def`` syntax,
-   or are generators decorated with :func:`types.coroutine`
-   or :func:`asyncio.coroutine`.
-
-   The function will return false for plain Python generator
-   functions.
+   Return true if the object is a :term:`coroutine function`
+   (a function defined with an :keyword:`async def` syntax).
 
    .. versionadded:: 3.5
 
 
 .. function:: iscoroutine(object)
 
-   Return true if the object is a :term:`coroutine`.
-
-   Coroutines are results of calls of coroutine functions or
-   generator functions decorated with :func:`types.coroutine`
-   or :func:`asyncio.coroutine`.
-
-   The function will return false for plain python generators.
-
-   See also :class:`collections.abc.Coroutine`.
+   Return true if the object is a :term:`coroutine` created by an
+   :keyword:`async def` function.
 
    .. versionadded:: 3.5
 
@@ -1149,7 +1136,10 @@ generator to be determined easily.
 
 .. function:: getcoroutinestate(coroutine)
 
-   Get current state of a coroutine object.
+   Get current state of a coroutine object.  The function is intended to be
+   used with coroutine objects created by :keyword:`async def` functions, but
+   will accept any coroutine-like object that has ``cr_running`` and
+   ``cr_frame`` attributes.
 
    Possible states are:
     * CORO_CREATED: Waiting to start execution.

@@ -175,8 +175,7 @@ def isgeneratorfunction(object):
 
     See help(isfunction) for attributes listing."""
     return bool((isfunction(object) or ismethod(object)) and
-                object.__code__.co_flags & CO_GENERATOR and
-                not object.__code__.co_flags & CO_COROUTINE)
+                object.__code__.co_flags & CO_GENERATOR)
 
 def iscoroutinefunction(object):
     """Return true if the object is a coroutine function.
@@ -185,8 +184,7 @@ def iscoroutinefunction(object):
     or generators decorated with "types.coroutine".
     """
     return bool((isfunction(object) or ismethod(object)) and
-                object.__code__.co_flags & (CO_ITERABLE_COROUTINE |
-                                            CO_COROUTINE))
+                object.__code__.co_flags & CO_COROUTINE)
 
 def isawaitable(object):
     """Return true if the object can be used in "await" expression."""
@@ -207,12 +205,11 @@ def isgenerator(object):
         send            resumes the generator and "sends" a value that becomes
                         the result of the current yield-expression
         throw           used to raise an exception inside the generator"""
-    return (isinstance(object, types.GeneratorType) and
-            not object.gi_code.co_flags & CO_COROUTINE)
+    return isinstance(object, types.GeneratorType)
 
 def iscoroutine(object):
     """Return true if the object is a coroutine."""
-    return isinstance(object, collections.abc.Coroutine)
+    return isinstance(object, types.CoroutineType)
 
 def istraceback(object):
     """Return true if the object is a traceback.
@@ -1615,9 +1612,6 @@ def getcoroutinestate(coroutine):
       CORO_SUSPENDED: Currently suspended at an await expression.
       CORO_CLOSED: Execution has completed.
     """
-    if not isinstance(coroutine, types.CoroutineType):
-        raise TypeError(
-            '{!r} is not a Python coroutine'.format(coroutine))
     if coroutine.cr_running:
         return CORO_RUNNING
     if coroutine.cr_frame is None:
@@ -1634,7 +1628,7 @@ def getcoroutinelocals(coroutine):
     A dict is returned, with the keys the local variable names and values the
     bound values."""
 
-    if not isinstance(coroutine, types.CoroutineType):
+    if not iscoroutine(coroutine):
         raise TypeError(
             '{!r} is not a Python coroutine'.format(coroutine))
 
