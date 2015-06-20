@@ -531,6 +531,9 @@ inspect
   and :func:`~inspect.isawaitable` functions.  (Contributed by Yury Selivanov
   in :issue:`24017`.)
 
+* New :func:`~inspect.getcoroutinelocals` and :func:`~inspect.getcoroutinestate`
+  functions.  (Contributed by Yury Selivanov in :issue:`24400`.)
+
 ipaddress
 ---------
 

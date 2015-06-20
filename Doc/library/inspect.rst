@@ -1183,7 +1183,7 @@ updated as expected:
 
    .. versionadded:: 3.3
 
-.. function:: getcorotuinelocals(coroutine)
+.. function:: getcoroutinelocals(coroutine)
 
    This function is analogous to :func:`~inspect.getgeneratorlocals`, but
    works for coroutine objects created by :keyword:`async def` functions.
