@@ -1140,7 +1140,10 @@ class SysSetCoroWrapperTest(unittest.TestCase):
         sys.set_coroutine_wrapper(wrap)
         try:
             foo()
-            self.assertIs(wrapped, None)
+            self.assertIs(
+                wrapped, None,
+                "generator-based coroutine was wrapped via "
+                "sys.set_coroutine_wrapper")
         finally:
             sys.set_coroutine_wrapper(None)
 
