@@ -348,8 +348,8 @@ result back on the stack.
 
 .. opcode:: GET_YIELD_FROM_ITER
 
-   If ``TOS`` is a :term:`generator` or :term:`coroutine` object it is left
-   as is.  Otherwise, implements ``TOS = iter(TOS)``.
+   If ``TOS`` is a :term:`generator iterator` or :term:`coroutine` object
+   it is left as is.  Otherwise, implements ``TOS = iter(TOS)``.
 
    .. versionadded:: 3.5
 
