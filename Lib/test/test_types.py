@@ -1286,6 +1286,7 @@ class CoroutineTests(unittest.TestCase):
                      'gi_running', 'gi_frame'):
             self.assertIs(getattr(foo(), name),
                           getattr(gen, name))
+        self.assertIs(foo().cr_code, gen.gi_code)
 
     def test_genfunc(self):
         def gen():

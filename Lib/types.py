@@ -221,6 +221,9 @@ def coroutine(func):
         @property
         def gi_running(self):
             return self.__wrapped__.gi_running
+        cr_code = gi_code
+        cr_frame = gi_frame
+        cr_running = gi_running
         def __next__(self):
             return next(self.__wrapped__)
         def __iter__(self):
@@ -237,8 +240,8 @@ def coroutine(func):
         if (coro.__class__ is GeneratorType or
                 (isinstance(coro, _collections_abc.Generator) and
                  not isinstance(coro, _collections_abc.Coroutine))):
-            # 'coro' is either a pure Python generator, or it implements
-            # collections.abc.Generator (and does not implement
+            # 'coro' is either a pure Python generator iterator, or it
+            # implements collections.abc.Generator (and does not implement
             # collections.abc.Coroutine).
             return GeneratorWrapper(coro)
         # 'coro' is either an instance of collections.abc.Coroutine or
