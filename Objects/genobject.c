@@ -86,7 +86,7 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
 
     if (gen->gi_running) {
         char *msg = "generator already executing";
-        if PyCoro_CheckExact(gen)
+        if (PyCoro_CheckExact(gen))
             msg = "coroutine already executing";
         PyErr_SetString(PyExc_ValueError, msg);
         return NULL;
@@ -102,7 +102,7 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
         if (arg && arg != Py_None) {
             char *msg = "can't send non-None value to a "
                         "just-started generator";
-            if PyCoro_CheckExact(gen)
+            if (PyCoro_CheckExact(gen))
                 msg = "can't send non-None value to a "
                       "just-started coroutine";
             PyErr_SetString(PyExc_TypeError, msg);
@@ -154,10 +154,10 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
         if (((PyCodeObject *)gen->gi_code)->co_flags &
               (CO_FUTURE_GENERATOR_STOP | CO_COROUTINE | CO_ITERABLE_COROUTINE))
         {
-            char *msg = "generator raised StopIteration";
-            if PyCoro_CheckExact(gen)
-                msg = "coroutine raised StopIteration";
             PyObject *exc, *val, *val2, *tb;
+            char *msg = "generator raised StopIteration";
+            if (PyCoro_CheckExact(gen))
+                msg = "coroutine raised StopIteration";
             PyErr_Fetch(&exc, &val, &tb);
             PyErr_NormalizeException(&exc, &val, &tb);
             if (tb != NULL)

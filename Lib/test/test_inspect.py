@@ -1800,12 +1800,6 @@ class TestGetCoroutineState(unittest.TestCase):
         self.assertEqual(inspect.getcoroutinelocals(coro),
                          {'a': None, 'gencoro': gencoro, 'b': 'spam'})
 
-    def test_getcoroutinelocals_error(self):
-        self.assertRaises(TypeError, inspect.getcoroutinelocals, 1)
-        self.assertRaises(TypeError, inspect.getcoroutinelocals, lambda x: (yield))
-        self.assertRaises(TypeError, inspect.getcoroutinelocals, set)
-        self.assertRaises(TypeError, inspect.getcoroutinelocals, (2,3))
-
 
 class MySignature(inspect.Signature):
     # Top-level to make it picklable;

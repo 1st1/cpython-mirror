@@ -1627,11 +1627,6 @@ def getcoroutinelocals(coroutine):
 
     A dict is returned, with the keys the local variable names and values the
     bound values."""
-
-    if not iscoroutine(coroutine):
-        raise TypeError(
-            '{!r} is not a Python coroutine'.format(coroutine))
-
     frame = getattr(coroutine, "cr_frame", None)
     if frame is not None:
         return frame.f_locals
