@@ -198,7 +198,8 @@ static int compiler_async_with(struct compiler *, stmt_ty, int);
 static int compiler_async_for(struct compiler *, stmt_ty);
 static int compiler_call_helper(struct compiler *c, Py_ssize_t n,
                                 asdl_seq *args,
-                                asdl_seq *keywords);
+                                asdl_seq *keywords,
+                                int is_method);
 static int compiler_try_except(struct compiler *, stmt_ty);
 static int compiler_set_qualname(struct compiler *);
 
@@ -1878,7 +1879,8 @@ compiler_class(struct compiler *c, stmt_ty s)
     /* 5. generate the rest of the code for the call */
     if (!compiler_call_helper(c, 2,
                               s->v.ClassDef.bases,
-                              s->v.ClassDef.keywords))
+                              s->v.ClassDef.keywords,
+                              0 /* is_method */))
         return 0;
 
     /* 6. apply decorators */
@@ -3208,7 +3210,7 @@ compiler_compare(struct compiler *c, expr_ty e)
 }
 
 static int
-maybe_optimize_method_call(struct compiler *c, expr_ty e)
+should_optimize_method_call(struct compiler *c, expr_ty e)
 {
     Py_ssize_t argsl, i;
     expr_ty meth = e->v.Call.func;
@@ -3216,33 +3218,38 @@ maybe_optimize_method_call(struct compiler *c, expr_ty e)
 
     if (meth->kind != Attribute_kind || meth->v.Attribute.ctx != Load ||
             (e->v.Call.keywords && asdl_seq_LEN(e->v.Call.keywords)))
-        return -1;
+        return 0;
 
     argsl = asdl_seq_LEN(args);
     for (i = 0; i < argsl; i++) {
         expr_ty elt = asdl_seq_GET(args, i);
         if (elt->kind == Starred_kind) {
-            return -1;
+            return 0;
         }
     }
 
-    VISIT(c, expr, meth->v.Attribute.value);
-    ADDOP_NAME(c, LOAD_METHOD, meth->v.Attribute.attr, names);
-    VISIT_SEQ(c, expr, e->v.Call.args);
-    ADDOP_I(c, CALL_METHOD, asdl_seq_LEN(e->v.Call.args));
     return 1;
 }
 
 static int
 compiler_call(struct compiler *c, expr_ty e)
 {
-    if (maybe_optimize_method_call(c, e) > 0)
-        return 1;
+    int is_method = (e->v.Call.func->kind != Attribute_kind ||
+                     e->v.Call.func->v.Attribute.ctx != Load);
 
-    VISIT(c, expr, e->v.Call.func);
+    is_method = should_optimize_method_call(c, e);
+
+    if (is_method) {
+        VISIT(c, expr, e->v.Call.func->v.Attribute.value);
+        ADDOP_NAME(c, LOAD_METHOD, e->v.Call.func->v.Attribute.attr, names);
+    } else {
+        VISIT(c, expr, e->v.Call.func);
+    }
+
     return compiler_call_helper(c, 0,
                                 e->v.Call.args,
-                                e->v.Call.keywords);
+                                e->v.Call.keywords,
+                                is_method);
 }
 
 static int
@@ -3325,7 +3332,8 @@ static int
 compiler_call_helper(struct compiler *c,
                      Py_ssize_t n, /* Args already pushed */
                      asdl_seq *args,
-                     asdl_seq *keywords)
+                     asdl_seq *keywords,
+                     int is_method)
 {
     int code = 0;
     Py_ssize_t nelts, i, nseen, nkw;

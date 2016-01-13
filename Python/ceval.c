@@ -3213,10 +3213,12 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 PUSH(NULL);  /* CALL_METHOD expects it. */
             }
 
+            PUSH(NULL);  /* marker */
             DISPATCH();
         }
 
         TARGET(CALL_METHOD) {
+            goto error;
             PyObject **sp, *res, *obj, *meth;
             int nargs = oparg;
 
@@ -3252,15 +3254,50 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         }
 
         TARGET(CALL_FUNCTION) {
-            PyObject **sp, *res;
+            PyObject **sp, *res, *obj, *meth;
+            int is_meth = 0;
+
             PCALL(PCALL_ALL);
-            sp = stack_pointer;
+
+            if (oparg < 0xff && PEEK(oparg + 1) == NULL) {
+                is_meth = 1;
+
+                obj = PEEK(oparg + 2);
+                meth = PEEK(oparg + 3);
+
+                if (obj == NULL) {
+                    SET_VALUE(oparg + 1, meth);
+
+                    sp = stack_pointer;
 #ifdef WITH_TSC
-            res = call_function(&sp, oparg, &intr0, &intr1);
+                    res = call_function(&sp, oparg, &intr0, &intr1);
 #else
-            res = call_function(&sp, oparg);
+                    res = call_function(&sp, oparg);
 #endif
-            stack_pointer = sp;
+                    stack_pointer = sp - 2;
+                } else {
+                    SET_VALUE(oparg + 1, obj);
+                    SET_VALUE(oparg + 2, meth);
+
+                    sp = stack_pointer;
+#ifdef WITH_TSC
+                    res = call_function(&sp, oparg + 1, &intr0, &intr1);
+#else
+                    res = call_function(&sp, oparg + 1);
+#endif
+                    stack_pointer = sp - 1;
+                }
+            }
+            else {
+                sp = stack_pointer;
+#ifdef WITH_TSC
+                res = call_function(&sp, oparg, &intr0, &intr1);
+#else
+                res = call_function(&sp, oparg);
+#endif
+                stack_pointer = sp;
+            }
+
             PUSH(res);
             if (res == NULL)
                 goto error;
