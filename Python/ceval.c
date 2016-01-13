@@ -3192,11 +3192,20 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dictmeth;
 
             if (tp->tp_getattro == PyObject_GenericGetAttr) {
+                /* Fast path, `obj` has a standard attribute
+                   resolution */
                 meth = _PyType_Lookup(tp, name);
                 if (meth != NULL && PyFunction_Check(meth)) {
-                    dictptr = _PyObject_GetDictPtr(obj);
+                    /* There is some Python *method* defined on obj's type
+                       with under a `name` name.
 
+                       We now have to check if this method was shadowed
+                       in obj's __dict__.
+                    */
+
+                    dictptr = _PyObject_GetDictPtr(obj);
                     if (dictptr == NULL || *dictptr == NULL) {
+                        /* `obj` doesn't have a __dict__ */
                         Py_INCREF(meth);
                         SET_TOP(meth);  /* `obj` was on top before */
                         PUSH(obj);
@@ -3208,6 +3217,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     dictmeth = PyDict_GetItem(dict, name);
 
                     if (dictmeth == NULL) {
+                        /* `obj` does have a __dict__, but there is no
+                           item for the `name` key */
                         Py_DECREF(dict);
                         Py_INCREF(meth);
                         SET_TOP(meth);  /* `obj` was on top before */
@@ -3215,6 +3226,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                         DISPATCH();
                     }
                     else {
+                        /* `obj` has a __dict__ and there is an item
+                           for the `name` key; use it */
                         Py_INCREF(dictmeth);
                         Py_DECREF(dict);
                         SET_TOP(dictmeth);
@@ -3222,6 +3235,23 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                         PUSH(NULL);  /* CALL_METHOD expects it */
                         DISPATCH();
                     }
+                }
+
+                if (meth != NULL) {
+                    /* Some descriptor is defined in obj's type
+                       (but it's not a Python function) */
+
+                    meth = __PyObject_GenericGetAttrWithDictDescr(
+                        obj, name, NULL, meth);
+
+                    Py_DECREF(obj);
+                    SET_TOP(meth);
+
+                    if (meth == NULL)
+                        goto error;
+
+                    PUSH(NULL);  /* CALL_METHOD expects it */
+                    DISPATCH();
                 }
             }
 

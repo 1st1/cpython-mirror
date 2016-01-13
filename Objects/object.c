@@ -1022,13 +1022,11 @@ _PyObject_NextNotImplemented(PyObject *self)
     return NULL;
 }
 
-/* Generic GetAttr functions - put these in your tp_[gs]etattro slot */
 
 PyObject *
-_PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name, PyObject *dict)
+__PyObject_GenericGetAttrWithDictDescr(PyObject *obj, PyObject *name, PyObject *dict, PyObject *descr)
 {
     PyTypeObject *tp = Py_TYPE(obj);
-    PyObject *descr = NULL;
     PyObject *res = NULL;
     descrgetfunc f;
     Py_ssize_t dictoffset;
@@ -1048,7 +1046,10 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name, PyObject *dict)
             goto done;
     }
 
-    descr = _PyType_Lookup(tp, name);
+    if (descr == NULL) {
+        descr = _PyType_Lookup(tp, name);
+    }
+
     Py_XINCREF(descr);
 
     f = NULL;
@@ -1112,10 +1113,21 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name, PyObject *dict)
     return res;
 }
 
+
+/* Generic GetAttr functions - put these in your tp_[gs]etattro slot */
+
+
+PyObject *
+_PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name, PyObject *dict)
+{
+    return __PyObject_GenericGetAttrWithDictDescr(obj, name, dict, NULL);
+}
+
+
 PyObject *
 PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 {
-    return _PyObject_GenericGetAttrWithDict(obj, name, NULL);
+    return __PyObject_GenericGetAttrWithDictDescr(obj, name, NULL, NULL);
 }
 
 int
