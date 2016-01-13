@@ -3232,32 +3232,33 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         }
 
         TARGET(CALL_METHOD) {
-            PyObject **sp, *res, *obj, *meth;
-            int nargs = oparg;
+            PyObject **sp, *res, *obj;
 
-            obj = PEEK(nargs + 1);
-            meth = PEEK(nargs + 2);
-
-            if (obj == NULL) {
-                SET_VALUE(nargs + 1, meth);
-                SET_VALUE(nargs + 2, NULL);
-            } else {
-                nargs++;
-            }
+            assert(oparg <= 0xff); /* Only positional arguments */
 
             PCALL(PCALL_ALL);
             sp = stack_pointer;
-#ifdef WITH_TSC
-            res = call_function(&sp, nargs, &intr0, &intr1);
-#else
-            res = call_function(&sp, nargs);
-#endif
-            stack_pointer = sp;
 
-
+            obj = PEEK(oparg + 1);
             if (obj == NULL) {
-                assert(TOP() == NULL);
-                POP();
+                PyObject *meth;
+                meth = PEEK(oparg + 2);
+                SET_VALUE(oparg + 1, meth);
+
+#ifdef WITH_TSC
+                res = call_function(&sp, oparg, &intr0, &intr1);
+#else
+                res = call_function(&sp, oparg);
+#endif
+                stack_pointer = sp;
+                POP(); /* Account for `obj` that wasn't consumed. */
+            } else {
+#ifdef WITH_TSC
+                res = call_function(&sp, oparg + 1, &intr0, &intr1);
+#else
+                res = call_function(&sp, oparg + 1);
+#endif
+                stack_pointer = sp;
             }
 
             PUSH(res);
