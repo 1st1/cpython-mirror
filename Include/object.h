@@ -557,6 +557,11 @@ PyAPI_FUNC(void) PyObject_CallFinalizer(PyObject *);
 PyAPI_FUNC(int) PyObject_CallFinalizerFromDealloc(PyObject *);
 #endif
 
+/* Private API for the LOAD_METHOD opcode. */
+int
+__PyObject_GetMethod(PyObject *, PyObject *, PyObject **);
+
+
 /* Same as PyObject_Generic{Get,Set}Attr, but passing the attributes
    dict as the last parameter. */
 PyAPI_FUNC(PyObject *)

@@ -1022,6 +1022,107 @@ _PyObject_NextNotImplemented(PyObject *self)
     return NULL;
 }
 
+
+/* Private API for the LOAD_METHOD opcode.
+   Return 1 if method is found.
+   `method` will point to the resolved attribute in any case. */
+int
+__PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method)
+{
+    PyTypeObject *tp = Py_TYPE(obj);
+    PyObject *descr = NULL;
+    descrgetfunc f;
+    Py_ssize_t dictoffset;
+    PyObject **dictptr;
+    PyObject *dict = NULL;
+    int meth_found = 0;
+    int res = 0;
+
+    assert(*method == NULL);
+
+    if (!PyUnicode_Check(name)){
+        PyErr_Format(PyExc_TypeError,
+                     "attribute name must be string, not '%.200s'",
+                     name->ob_type->tp_name);
+        return 0;
+    }
+    else
+        Py_INCREF(name);
+
+    if (tp->tp_dict == NULL) {
+        if (PyType_Ready(tp) < 0)
+            goto done;
+    }
+
+    descr = _PyType_Lookup(tp, name);
+    Py_XINCREF(descr);
+
+    f = NULL;
+    if (descr != NULL) {
+        if (PyFunction_Check(descr)) {
+            /* A python method. */
+            meth_found = 1;
+        } else {
+            f = descr->ob_type->tp_descr_get;
+            if (f != NULL && PyDescr_IsData(descr)) {
+                *method = f(descr, obj, (PyObject *)obj->ob_type);
+                goto done;
+            }
+        }
+    }
+
+    /* Inline _PyObject_GetDictPtr */
+    dictoffset = tp->tp_dictoffset;
+    if (dictoffset != 0) {
+        if (dictoffset < 0) {
+            Py_ssize_t tsize;
+            size_t size;
+
+            tsize = ((PyVarObject *)obj)->ob_size;
+            if (tsize < 0)
+                tsize = -tsize;
+            size = _PyObject_VAR_SIZE(tp, tsize);
+
+            dictoffset += (long)size;
+            assert(dictoffset > 0);
+            assert(dictoffset % SIZEOF_VOID_P == 0);
+        }
+        dictptr = (PyObject **) ((char *)obj + dictoffset);
+        dict = *dictptr;
+    }
+
+    if (dict != NULL) {
+        Py_INCREF(dict);
+        *method = PyDict_GetItem(dict, name);
+        if (*method != NULL) {
+            Py_INCREF(*method);
+            Py_DECREF(dict);
+            goto done;
+        }
+        Py_DECREF(dict);
+    }
+
+    if (f != NULL) {
+        *method = f(descr, obj, (PyObject *)Py_TYPE(obj));
+        goto done;
+    }
+
+    if (descr != NULL) {
+        res = meth_found;
+        *method = descr;
+        descr = NULL;
+        goto done;
+    }
+
+    PyErr_Format(PyExc_AttributeError,
+                 "'%.50s' object has no attribute '%U'",
+                 tp->tp_name, name);
+  done:
+    Py_XDECREF(descr);
+    Py_DECREF(name);
+    return res;
+}
+
 /* Generic GetAttr functions - put these in your tp_[gs]etattro slot */
 
 PyObject *

@@ -3200,55 +3200,35 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(LOAD_METHOD) {
             PyObject *name = GETITEM(names, oparg);
             PyObject *obj = TOP();
-            PyTypeObject *tp = Py_TYPE(obj);
-            PyObject *meth;
-            PyObject **dictptr;
-            PyObject *dict;
-            PyObject *dictmeth;
+            PyObject *meth = NULL;
 
-            if (tp->tp_getattro == PyObject_GenericGetAttr) {
-                meth = _PyType_Lookup(tp, name);
-                if (meth != NULL && PyFunction_Check(meth)) {
-                    dictptr = _PyObject_GetDictPtr(obj);
+            if (Py_TYPE(obj)->tp_getattro == PyObject_GenericGetAttr) {
+                int meth_found;
+                meth_found = __PyObject_GetMethod(obj, name, &meth);
 
-                    if (dictptr == NULL || *dictptr == NULL) {
-                        Py_INCREF(meth);
-                        SET_TOP(meth);  /* `obj` was on top before */
-                        PUSH(obj);
-                        DISPATCH();
-                    }
-
-                    dict = *dictptr;
-                    Py_INCREF(dict);
-                    dictmeth = PyDict_GetItem(dict, name);
-
-                    if (dictmeth == NULL) {
-                        Py_DECREF(dict);
-                        Py_INCREF(meth);
-                        SET_TOP(meth);  /* `obj` was on top before */
-                        PUSH(obj);
-                        DISPATCH();
-                    }
-                    else {
-                        Py_INCREF(dictmeth);
-                        Py_DECREF(dict);
-                        SET_TOP(dictmeth);
-                        Py_DECREF(obj);
-                        PUSH(NULL);  /* CALL_METHOD expects it */
-                        DISPATCH();
-                    }
+                SET_TOP(meth);  /* replace `obj` on top; OK if NULL */
+                if (meth == NULL) {
+                    Py_DECREF(obj);
+                    goto error;
                 }
+
+                if (meth_found) {
+                    PUSH(obj);  /* Push `obj` back to the stack */
+                    DISPATCH();
+                } else {
+                    Py_DECREF(obj);
+                    PUSH(NULL);
+                    DISPATCH();
+                }
+            } else {
+                meth = PyObject_GetAttr(obj, name);
+                Py_DECREF(obj);
+                SET_TOP(meth);
+                if (meth == NULL)
+                    goto error;
+                PUSH(NULL);  /* CALL_METHOD expects it */
+                DISPATCH();
             }
-
-            meth = PyObject_GetAttr(obj, name);
-            Py_DECREF(obj);
-            SET_TOP(meth);
-
-            if (meth == NULL)
-                goto error;
-
-            PUSH(NULL);  /* CALL_METHOD expects it */
-            DISPATCH();
         }
 
         TARGET(CALL_METHOD) {
