@@ -1023,16 +1023,21 @@ _PyObject_NextNotImplemented(PyObject *self)
 }
 
 
-/* Private API for the LOAD_METHOD opcode.
-   Return 1 if method is found.
-   `method` will point to the resolved attribute in any case. */
+/* Specialized version of _PyObject_GenericGetAttrWithDict
+   specifically for the LOAD_METHOD opcode.
+
+   Return 1 if a method is found, 0 if it's a regular attribute
+   from __dict__ or something returned by using a descriptor
+   protocol.
+
+    `method` will point to the resolved attribute or NULL.
+*/
 int
 __PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method)
 {
     PyTypeObject *tp = Py_TYPE(obj);
     PyObject *descr = NULL;
     descrgetfunc f;
-    Py_ssize_t dictoffset;
     PyObject **dictptr;
     PyObject *dict = NULL;
     int meth_found = 0;
@@ -1071,25 +1076,9 @@ __PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method)
         }
     }
 
-    /* Inline _PyObject_GetDictPtr */
-    dictoffset = tp->tp_dictoffset;
-    if (dictoffset != 0) {
-        if (dictoffset < 0) {
-            Py_ssize_t tsize;
-            size_t size;
-
-            tsize = ((PyVarObject *)obj)->ob_size;
-            if (tsize < 0)
-                tsize = -tsize;
-            size = _PyObject_VAR_SIZE(tp, tsize);
-
-            dictoffset += (long)size;
-            assert(dictoffset > 0);
-            assert(dictoffset % SIZEOF_VOID_P == 0);
-        }
-        dictptr = (PyObject **) ((char *)obj + dictoffset);
+    dictptr = _PyObject_GetDictPtr(obj);
+    if (dictptr != NULL)
         dict = *dictptr;
-    }
 
     if (dict != NULL) {
         Py_INCREF(dict);
@@ -1123,11 +1112,15 @@ __PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method)
     return res;
 }
 
-/* Generic GetAttr functions - put these in your tp_[gs]etattro slot */
+/* Generic GetAttr functions - put these in your tp_[gs]etattro slot. */
 
 PyObject *
 _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name, PyObject *dict)
 {
+    /* Make sure the logic of __PyObject_GetMethod is in sync with
+       this method.
+    */
+
     PyTypeObject *tp = Py_TYPE(obj);
     PyObject *descr = NULL;
     PyObject *res = NULL;

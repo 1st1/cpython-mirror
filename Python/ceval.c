@@ -3206,19 +3206,18 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 int meth_found;
                 meth_found = __PyObject_GetMethod(obj, name, &meth);
 
-                SET_TOP(meth);  /* replace `obj` on top; OK if NULL */
+                SET_TOP(meth);  /* Replace `obj` on top; OK if NULL. */
                 if (meth == NULL) {
+                    /* Most likely attribute wasn't found. */
                     Py_DECREF(obj);
                     goto error;
                 }
 
                 if (meth_found) {
-                    PUSH(obj);  /* Push `obj` back to the stack */
-                    DISPATCH();
+                    PUSH(obj);  /* Push `obj` back to the stack. */
                 } else {
                     Py_DECREF(obj);
                     PUSH(NULL);
-                    DISPATCH();
                 }
             } else {
                 meth = PyObject_GetAttr(obj, name);
@@ -3226,9 +3225,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 SET_TOP(meth);
                 if (meth == NULL)
                     goto error;
-                PUSH(NULL);  /* CALL_METHOD expects it */
-                DISPATCH();
+                PUSH(NULL);  /* CALL_METHOD expects it. */
             }
+
+            DISPATCH();
         }
 
         TARGET(CALL_METHOD) {
