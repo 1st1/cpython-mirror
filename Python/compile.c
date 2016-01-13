@@ -1023,6 +1023,7 @@ PyCompile_OpcodeStackEffect(int opcode, int oparg)
 #define NARGS(o) (((o) % 256) + 2*(((o) / 256) % 256))
         case CALL_FUNCTION:
             return -NARGS(oparg);
+        case CALL_METHOD:
         case CALL_FUNCTION_VAR:
         case CALL_FUNCTION_KW:
             return -NARGS(oparg)-1;
@@ -1064,6 +1065,8 @@ PyCompile_OpcodeStackEffect(int opcode, int oparg)
             /* If there's a fmt_spec on the stack, we go from 2->1,
                else 1->1. */
             return (oparg & FVS_MASK) == FVS_HAVE_SPEC ? -1 : 0;
+        case LOAD_METHOD:
+            return 2;
         default:
             return PY_INVALID_STACK_EFFECT;
     }
@@ -3182,8 +3185,37 @@ compiler_compare(struct compiler *c, expr_ty e)
 }
 
 static int
+maybe_optimize_method_call(struct compiler *c, expr_ty e)
+{
+    Py_ssize_t argsl, i;
+    expr_ty meth = e->v.Call.func;
+    asdl_seq *args = e->v.Call.args;
+
+    if (meth->kind != Attribute_kind || meth->v.Attribute.ctx != Load ||
+            (e->v.Call.keywords && asdl_seq_LEN(e->v.Call.keywords)))
+        return -1;
+
+    argsl = asdl_seq_LEN(args);
+    for (i = 0; i < argsl; i++) {
+        expr_ty elt = asdl_seq_GET(args, i);
+        if (elt->kind == Starred_kind) {
+            return -1;
+        }
+    }
+
+    VISIT(c, expr, meth->v.Attribute.value);
+    ADDOP_NAME(c, LOAD_METHOD, meth->v.Attribute.attr, names);
+    VISIT_SEQ(c, expr, e->v.Call.args);
+    ADDOP_I(c, CALL_METHOD, asdl_seq_LEN(e->v.Call.args));
+    return 1;
+}
+
+static int
 compiler_call(struct compiler *c, expr_ty e)
 {
+    if (maybe_optimize_method_call(c, e) > 0)
+        return 1;
+
     VISIT(c, expr, e->v.Call.func);
     return compiler_call_helper(c, 0,
                                 e->v.Call.args,

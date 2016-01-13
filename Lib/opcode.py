@@ -214,4 +214,7 @@ def_op('BUILD_SET_UNPACK', 153)
 
 def_op('FORMAT_VALUE', 155)
 
+name_op('LOAD_METHOD', 160)
+def_op('CALL_METHOD', 161)
+
 del def_op, name_op, jrel_op, jabs_op

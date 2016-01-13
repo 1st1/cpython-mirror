@@ -3197,6 +3197,95 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
+        TARGET(LOAD_METHOD) {
+            PyObject *name = GETITEM(names, oparg);
+            PyObject *obj = TOP();
+            PyTypeObject *tp = Py_TYPE(obj);
+            PyObject *meth;
+            PyObject **dictptr;
+            PyObject *dict;
+            PyObject *dictmeth;
+
+            if (tp->tp_getattro == PyObject_GenericGetAttr) {
+                meth = _PyType_Lookup(tp, name);
+                if (meth != NULL && PyFunction_Check(meth)) {
+                    dictptr = _PyObject_GetDictPtr(obj);
+
+                    if (dictptr == NULL || *dictptr == NULL) {
+                        Py_INCREF(meth);
+                        SET_TOP(meth);  /* `obj` was on top before */
+                        PUSH(obj);
+                        DISPATCH();
+                    }
+
+                    dict = *dictptr;
+                    Py_INCREF(dict);
+                    dictmeth = PyDict_GetItem(dict, name);
+
+                    if (dictmeth == NULL) {
+                        Py_DECREF(dict);
+                        Py_INCREF(meth);
+                        SET_TOP(meth);  /* `obj` was on top before */
+                        PUSH(obj);
+                        DISPATCH();
+                    }
+                    else {
+                        Py_INCREF(dictmeth);
+                        Py_DECREF(dict);
+                        SET_TOP(dictmeth);
+                        Py_DECREF(obj);
+                        PUSH(NULL);  /* CALL_METHOD expects it */
+                        DISPATCH();
+                    }
+                }
+            }
+
+            meth = PyObject_GetAttr(obj, name);
+            Py_DECREF(obj);
+            SET_TOP(meth);
+
+            if (meth == NULL)
+                goto error;
+
+            PUSH(NULL);  /* CALL_METHOD expects it */
+            DISPATCH();
+        }
+
+        TARGET(CALL_METHOD) {
+            PyObject **sp, *res, *obj, *meth;
+            int nargs = oparg;
+
+            obj = PEEK(nargs + 1);
+            meth = PEEK(nargs + 2);
+
+            if (obj == NULL) {
+                SET_VALUE(nargs + 1, meth);
+                SET_VALUE(nargs + 2, NULL);
+            } else {
+                nargs++;
+            }
+
+            PCALL(PCALL_ALL);
+            sp = stack_pointer;
+#ifdef WITH_TSC
+            res = call_function(&sp, nargs, &intr0, &intr1);
+#else
+            res = call_function(&sp, nargs);
+#endif
+            stack_pointer = sp;
+
+
+            if (obj == NULL) {
+                assert(TOP() == NULL);
+                POP();
+            }
+
+            PUSH(res);
+            if (res == NULL)
+                goto error;
+            DISPATCH();
+        }
+
         TARGET(CALL_FUNCTION) {
             PyObject **sp, *res;
             PCALL(PCALL_ALL);
