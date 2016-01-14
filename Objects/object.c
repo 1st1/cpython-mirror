@@ -1030,40 +1030,28 @@ _PyObject_NextNotImplemented(PyObject *self)
    from __dict__ or something returned by using a descriptor
    protocol.
 
-    `method` will point to the resolved attribute or NULL.
+   `method` will point to the resolved attribute or NULL.  In the
+   latter case, an error will be set.
 */
 int
 __PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method)
 {
     PyTypeObject *tp = Py_TYPE(obj);
-    PyObject *descr = NULL;
-    descrgetfunc f;
+    PyObject *descr;
+    descrgetfunc f = NULL;
     PyObject **dictptr;
     PyObject *dict = NULL;
+    PyObject *attr;
     int meth_found = 0;
-    int res = 0;
 
     assert(*method == NULL);
 
-    if (!PyUnicode_Check(name)){
-        PyErr_Format(PyExc_TypeError,
-                     "attribute name must be string, not '%.200s'",
-                     name->ob_type->tp_name);
+    if (tp->tp_dict == NULL && PyType_Ready(tp) < 0)
         return 0;
-    }
-    else
-        Py_INCREF(name);
-
-    if (tp->tp_dict == NULL) {
-        if (PyType_Ready(tp) < 0)
-            goto done;
-    }
 
     descr = _PyType_Lookup(tp, name);
-    Py_XINCREF(descr);
-
-    f = NULL;
     if (descr != NULL) {
+        Py_INCREF(descr);
         if (PyFunction_Check(descr)) {
             /* A python method. */
             meth_found = 1;
@@ -1071,7 +1059,8 @@ __PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method)
             f = descr->ob_type->tp_descr_get;
             if (f != NULL && PyDescr_IsData(descr)) {
                 *method = f(descr, obj, (PyObject *)obj->ob_type);
-                goto done;
+                Py_DECREF(descr);
+                return 0;
             }
         }
     }
@@ -1082,34 +1071,37 @@ __PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method)
 
     if (dict != NULL) {
         Py_INCREF(dict);
-        *method = PyDict_GetItem(dict, name);
-        if (*method != NULL) {
-            Py_INCREF(*method);
+        attr = PyDict_GetItem(dict, name);
+        if (attr != NULL) {
+            Py_INCREF(attr);
+            *method = attr;
             Py_DECREF(dict);
-            goto done;
+            Py_XDECREF(descr);
+            return 0;
         }
         Py_DECREF(dict);
     }
 
+    if (meth_found) {
+        *method = descr;
+        return 1;
+    }
+
     if (f != NULL) {
         *method = f(descr, obj, (PyObject *)Py_TYPE(obj));
-        goto done;
+        Py_DECREF(descr);
+        return 0;
     }
 
     if (descr != NULL) {
-        res = meth_found;
         *method = descr;
-        descr = NULL;
-        goto done;
+        return 0;
     }
 
     PyErr_Format(PyExc_AttributeError,
                  "'%.50s' object has no attribute '%U'",
                  tp->tp_name, name);
-  done:
-    Py_XDECREF(descr);
-    Py_DECREF(name);
-    return res;
+    return 0;
 }
 
 /* Generic GetAttr functions - put these in your tp_[gs]etattro slot. */
