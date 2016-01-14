@@ -4851,6 +4851,50 @@ call_function(PyObject ***pp_stack, int oparg
             }
         }
     }
+    else if (Py_TYPE(func) == &PyMethodDescr_Type && nk == 0) {
+        // printf("AAAAAAA\n");
+        PyMethodDef *md = ((PyMethodDescrObject*)func)->d_method;
+        int flags = md->ml_flags;
+        PyThreadState *tstate = PyThreadState_GET();
+
+        if (flags & (METH_NOARGS | METH_O)) {
+            PyCFunction meth = md->ml_meth;
+            if (flags & METH_NOARGS && na == 1) {
+                PyObject *self = EXT_POP(*pp_stack);
+                C_TRACE(x, (*meth)(self,NULL));
+                Py_DECREF(self);
+
+                x = _Py_CheckFunctionResult(func, x, NULL);
+            }
+            else if (flags & METH_O && na == 2) {
+                PyObject *arg = EXT_POP(*pp_stack);
+                PyObject *self = EXT_POP(*pp_stack);
+                C_TRACE(x, (*meth)(self,arg));
+                Py_DECREF(arg);
+                Py_DECREF(self);
+
+                x = _Py_CheckFunctionResult(func, x, NULL);
+            }
+            else {
+                err_args(func, flags, na);
+                x = NULL;
+            }
+        }
+        else {
+            PyObject *callargs = load_args(pp_stack, na - 1);
+            if (callargs != NULL) {
+                PyObject *callself = EXT_POP(*pp_stack);
+                PCALL(PCALL_CFUNCTION);
+                READ_TIMESTAMP(*pintr0);
+                C_TRACE(x, __PyMethodDef_Call(func, md, callself, callargs, NULL));
+                READ_TIMESTAMP(*pintr1);
+                Py_XDECREF(callargs);
+                Py_XDECREF(callself);
+            } else {
+                x = NULL;
+            }
+        }
+    }
     else {
         if (PyMethod_Check(func) && PyMethod_GET_SELF(func) != NULL) {
             /* optimize access to bound methods */

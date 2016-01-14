@@ -78,21 +78,16 @@ PyCFunction_GetFlags(PyObject *op)
 }
 
 PyObject *
-PyCFunction_Call(PyObject *func, PyObject *args, PyObject *kwds)
+__PyMethodDef_Call(PyObject *source, PyMethodDef *md, PyObject *self, PyObject *args, PyObject *kwds)
 {
-    PyCFunctionObject* f = (PyCFunctionObject*)func;
-    PyCFunction meth = PyCFunction_GET_FUNCTION(func);
-    PyObject *self = PyCFunction_GET_SELF(func);
+    PyCFunction meth = md->ml_meth;
+    int flags = md->ml_flags;
     PyObject *arg, *res;
     Py_ssize_t size;
-    int flags;
 
-    /* PyCFunction_Call() must not be called with an exception set,
-       because it may clear it (directly or indirectly) and so the
-       caller loses its exception */
     assert(!PyErr_Occurred());
 
-    flags = PyCFunction_GET_FLAGS(func) & ~(METH_CLASS | METH_STATIC | METH_COEXIST);
+    flags &= ~(METH_CLASS | METH_STATIC | METH_COEXIST);
 
     if (flags == (METH_VARARGS | METH_KEYWORDS)) {
         res = (*(PyCFunctionWithKeywords)meth)(self, args, kwds);
@@ -100,7 +95,7 @@ PyCFunction_Call(PyObject *func, PyObject *args, PyObject *kwds)
     else {
         if (kwds != NULL && PyDict_Size(kwds) != 0) {
             PyErr_Format(PyExc_TypeError, "%.200s() takes no keyword arguments",
-                         f->m_ml->ml_name);
+                         md->ml_name);
             return NULL;
         }
 
@@ -114,7 +109,7 @@ PyCFunction_Call(PyObject *func, PyObject *args, PyObject *kwds)
             if (size != 0) {
                 PyErr_Format(PyExc_TypeError,
                     "%.200s() takes no arguments (%zd given)",
-                    f->m_ml->ml_name, size);
+                    md->ml_name, size);
                 return NULL;
             }
 
@@ -126,7 +121,7 @@ PyCFunction_Call(PyObject *func, PyObject *args, PyObject *kwds)
             if (size != 1) {
                 PyErr_Format(PyExc_TypeError,
                     "%.200s() takes exactly one argument (%zd given)",
-                    f->m_ml->ml_name, size);
+                    md->ml_name, size);
                 return NULL;
             }
 
@@ -142,7 +137,15 @@ PyCFunction_Call(PyObject *func, PyObject *args, PyObject *kwds)
         }
     }
 
-    return _Py_CheckFunctionResult(func, res, NULL);
+    return _Py_CheckFunctionResult(source, res, NULL);
+}
+
+PyObject *
+PyCFunction_Call(PyObject *func, PyObject *args, PyObject *kwds)
+{
+    PyCFunctionObject* f = (PyCFunctionObject*)func;
+    PyObject *self = PyCFunction_GET_SELF(func);
+    return __PyMethodDef_Call(func, f->m_ml, self, args, kwds);
 }
 
 /* Methods (the standard built-in methods, that is) */
