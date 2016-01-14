@@ -3246,9 +3246,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
             obj = PEEK(oparg + 1);
             if (obj == NULL) {
-                PyObject *meth;
-                meth = PEEK(oparg + 2);
-                SET_VALUE(oparg + 1, meth);
+                SET_VALUE(oparg + 1, PEEK(oparg + 2));
 
 #ifdef WITH_TSC
                 res = call_function(&sp, oparg, &intr0, &intr1);
