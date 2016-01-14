@@ -3198,13 +3198,13 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         }
 
         TARGET(LOAD_METHOD) {
+            /* Designed to work in tamdem with CALL_METHOD. */
             PyObject *name = GETITEM(names, oparg);
             PyObject *obj = TOP();
             PyObject *meth = NULL;
 
             if (Py_TYPE(obj)->tp_getattro == PyObject_GenericGetAttr) {
-                int meth_found;
-                meth_found = __PyObject_GetMethod(obj, name, &meth);
+                int meth_found = __PyObject_GetMethod(obj, name, &meth);
 
                 SET_TOP(meth);  /* Replace `obj` on top; OK if NULL. */
                 if (meth == NULL) {
@@ -3214,36 +3214,68 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 }
 
                 if (meth_found) {
-                    PUSH(obj);  /* Push `obj` back to the stack. */
+                    /* The method object is now on top of the stack.
+                       Push `obj` back to the stack. */
+                    PUSH(obj);
                 } else {
+                    /* Not a method (but a regular attr, or something
+                       was returned by a descriptor protocol).  Push
+                       NULL to the top of the stack, to signal
+                       CALL_METHOD that it's not a method call.
+                    */
                     Py_DECREF(obj);
                     PUSH(NULL);
                 }
             } else {
+                /* Fallback if `obj` has a __getattribute__ etc. */
                 meth = PyObject_GetAttr(obj, name);
                 Py_DECREF(obj);
                 SET_TOP(meth);
                 if (meth == NULL)
                     goto error;
-                PUSH(NULL);  /* CALL_METHOD expects it. */
+                /* CALL_METHOD expects an object that the method
+                   is bound to, or a NULL.
+                */
+                PUSH(NULL);
             }
 
             DISPATCH();
         }
 
         TARGET(CALL_METHOD) {
+            /* Designed to work in tamdem with LOAD_METHOD. */
             PyObject **sp, *res, *obj;
 
-            assert(oparg <= 0xff); /* Only positional arguments */
+            assert(oparg <= 0xff); /* Only positional arguments. */
 
             PCALL(PCALL_ALL);
             sp = stack_pointer;
 
             obj = PEEK(oparg + 1);
             if (obj == NULL) {
-                PyObject *meth;
-                meth = PEEK(oparg + 2);
-                SET_VALUE(oparg + 1, meth);
+                /* `obj` is NULL when LOAD_METHOD thinks that it's not
+                   a method call.  Swap the NULL and callable.
+
+                   Stack layout:
+
+                       ... | method | NULL | arg1 | ... | argN
+                                                           ^- TOP()
+                                              ^- (-oparg)
+                                       ^- (-oparg-1)
+                              ^- (-oparg-2)
+
+                   after the next line it will be:
+
+                       ... | NULL | method | arg1 | ... | argN
+                                                           ^- TOP()
+                                              ^- (-oparg)
+                                       ^- (-oparg-1)
+                              ^- (-oparg-2)
+
+                   `method` will be POPed by call_funtion, NULL
+                   will be POPed manually later.
+                */
+                SET_VALUE(oparg + 1, PEEK(oparg + 2));
 
 #ifdef WITH_TSC
                 res = call_function(&sp, oparg, &intr0, &intr1);
@@ -3251,8 +3283,19 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 res = call_function(&sp, oparg);
 #endif
                 stack_pointer = sp;
-                POP(); /* Account for `obj` that wasn't consumed. */
+                POP(); /* POP the NULL. */
             } else {
+                /* This is a method call.  Stack layout:
+
+                     ... | method | obj | arg1 | ... | argN
+                                                        ^- TOP()
+                                           ^- (-oparg)
+                                     ^- (-oparg-1)
+
+                  `obj` and `method` will be POPed by call_function.
+                  We'll be passing `oparg + 1` to call_function, to
+                  make it accept the `obj` as a first argument.
+                */
 #ifdef WITH_TSC
                 res = call_function(&sp, oparg + 1, &intr0, &intr1);
 #else

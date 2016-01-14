@@ -3191,10 +3191,13 @@ maybe_optimize_method_call(struct compiler *c, expr_ty e)
     expr_ty meth = e->v.Call.func;
     asdl_seq *args = e->v.Call.args;
 
+    /* Check that the call node is an attribute access, and that
+       the call doesn't have keyword parameters. */
     if (meth->kind != Attribute_kind || meth->v.Attribute.ctx != Load ||
             (e->v.Call.keywords && asdl_seq_LEN(e->v.Call.keywords)))
         return -1;
 
+    /* Check that there are no *varargs types of arguments. */
     argsl = asdl_seq_LEN(args);
     for (i = 0; i < argsl; i++) {
         expr_ty elt = asdl_seq_GET(args, i);
@@ -3203,6 +3206,7 @@ maybe_optimize_method_call(struct compiler *c, expr_ty e)
         }
     }
 
+    /* Alright, we can optimize the code. */
     VISIT(c, expr, meth->v.Attribute.value);
     ADDOP_NAME(c, LOAD_METHOD, meth->v.Attribute.attr, names);
     VISIT_SEQ(c, expr, e->v.Call.args);
