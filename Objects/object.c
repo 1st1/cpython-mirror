@@ -1044,6 +1044,7 @@ __PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method)
     PyObject *attr;
     int meth_found = 0;
 
+    assert(PyUnicode_Check(name));
     assert(*method == NULL);
 
     if (tp->tp_dict == NULL && PyType_Ready(tp) < 0)
