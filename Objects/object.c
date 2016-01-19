@@ -1055,6 +1055,10 @@ __PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method)
         if (PyFunction_Check(descr) ||
                 Py_TYPE(descr) == &PyMethodDescr_Type) {
             /* A python or builtin method */
+            if (tp->tp_dictoffset == 0) {
+                *method = descr;
+                return 1;
+            }
             meth_found = 1;
         } else {
             f = descr->ob_type->tp_descr_get;
