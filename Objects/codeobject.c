@@ -152,6 +152,12 @@ PyCode_New(int argcount, int kwonlyargcount,
     co->co_lnotab = lnotab;
     co->co_zombieframe = NULL;
     co->co_weakreflist = NULL;
+
+    co->co_opt_flag = 0;
+    co->co_opt_opcodemap = NULL;
+    co->co_opt = NULL;
+    co->co_opt_size = 0;
+
     return co;
 }
 
@@ -361,6 +367,17 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 static void
 code_dealloc(PyCodeObject *co)
 {
+    if (co->co_opt != NULL) {
+        PyMem_FREE(co->co_opt);
+        co->co_opt = NULL;
+    }
+    if (co->co_opt_opcodemap != NULL) {
+        PyMem_FREE(co->co_opt_opcodemap);
+        co->co_opt_opcodemap = NULL;
+    }
+    co->co_opt_flag = 0;
+    co->co_opt_size = 0;
+
     Py_XDECREF(co->co_code);
     Py_XDECREF(co->co_consts);
     Py_XDECREF(co->co_names);

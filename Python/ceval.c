@@ -1118,6 +1118,22 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         Py_XDECREF(traceback); \
     }
 
+/* -- opcode tracing helpers -- */
+
+#define TRACE_IS_TRACING()   (!(co->co_opt_flag & CODE_OPT_TRACED) && \
+                              co->co_opt_opcodemap != NULL)
+
+#define TRACE_IS_OPTIMIZED() (co->co_opt != NULL)
+
+#define TRACE_COUNT_OPCODE() \
+    do { \
+        assert(co->co_opt_opcodemap != NULL); \
+        int offset = INSTR_OFFSET(); \
+        unsigned char *op_cnt = &co->co_opt_opcodemap[offset]; \
+        if (!(*op_cnt & (1 << 7))) \
+            (*op_cnt)++; \
+    } while (0)
+
 /* Start of code */
 
     /* push frame */
@@ -1190,6 +1206,48 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     assert(stack_pointer != NULL);
     f->f_stacktop = NULL;       /* remains NULL unless yield suspends frame */
     f->f_executing = 1;
+
+    if (!(co->co_opt_flag & CODE_OPT_TRACED)) {
+        int opt_flag = ++co->co_opt_flag;
+        if (opt_flag == CODE_OPT_MIN_CALLS) {
+            Py_ssize_t co_size = PyBytes_Size(co->co_code);
+            assert(co_size >= 0);
+            assert(co->co_opt_opcodemap == NULL);
+            co->co_opt_opcodemap = (unsigned char *)PyMem_Calloc(
+                co_size, sizeof(unsigned char));
+            if (co->co_opt_opcodemap == NULL) {
+                goto error;
+            }
+        } else if (opt_flag & CODE_OPT_TRACED) {
+            Py_ssize_t co_size = PyBytes_Size(co->co_code);
+            int opts = 0, i;
+            assert(co_size >= 0);
+            for (i = 0; i < co_size; i++) {
+                if (co->co_opt_opcodemap[i] > CODE_OPT_MIN_OPCODE_CALLS &&
+                    opts < 250)
+                {
+                    co->co_opt_opcodemap[i] = ++opts;
+                } else {
+                    co->co_opt_opcodemap[i] = 0;
+                }
+            }
+
+            if (opts) {
+                assert(co->co_opt == NULL);
+                co->co_opt = (_PyOpCodeOpt *)PyMem_Calloc(
+                    opts, sizeof(_PyOpCodeOpt));
+                if (co->co_opt == NULL) {
+                    goto error;
+                }
+                co->co_opt_size = opts;
+                co->co_opt_flag |= CODE_OPT_OPTIMIZED;
+            } else {
+                PyMem_Free(co->co_opt_opcodemap);
+                co->co_opt_opcodemap = NULL;
+                co->co_opt_flag |= CODE_OPT_NOT_OPTIMIZED;
+            }
+        }
+    }
 
     if (co->co_flags & (CO_GENERATOR | CO_COROUTINE)) {
         if (!throwflag && f->f_exc_type != NULL && f->f_exc_type != Py_None) {
@@ -2359,11 +2417,48 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         }
 
         TARGET(LOAD_GLOBAL) {
-            PyObject *name = GETITEM(names, oparg);
+            PyObject *name;
             PyObject *v;
             if (PyDict_CheckExact(f->f_globals)
                 && PyDict_CheckExact(f->f_builtins))
             {
+                _PyOpCodeOpt *opt = NULL;
+                if (TRACE_IS_OPTIMIZED()) {
+                    unsigned char offset = co->co_opt_opcodemap[INSTR_OFFSET()];
+                    if (offset > 0) {
+                        _PyOpCodeOpt_LoadGlobal *lg;
+
+                        assert(offset <= co->co_opt_size);
+                        opt = &co->co_opt[offset - 1];
+                        assert(opt != NULL);
+
+                        lg = &opt->u.lg;
+
+                        if (opt->optimized > 0) {
+                            if (lg->globals_ver ==
+                                    ((PyDictObject *)f->f_globals)->ma_version
+                                && lg->builtins_ver ==
+                                   ((PyDictObject *)f->f_builtins)->ma_version)
+                            {
+                                PyObject *ptr = lg->ptr;
+
+                                assert(opt->opcode == LOAD_GLOBAL);
+                                assert(ptr != NULL);
+                                Py_INCREF(ptr);
+                                PUSH(ptr);
+                                DISPATCH();
+                            } else {
+                                /* deoptimize */
+                                opt->optimized = -1;
+                                co->co_opt_opcodemap[INSTR_OFFSET()] = 0;
+                            }
+                        }
+                    }
+                } else if (TRACE_IS_TRACING()) {
+                    TRACE_COUNT_OPCODE();
+                }
+
+                name = GETITEM(names, oparg);
                 v = _PyDict_LoadGlobal((PyDictObject *)f->f_globals,
                                        (PyDictObject *)f->f_builtins,
                                        name);
@@ -2376,12 +2471,28 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     }
                     goto error;
                 }
+
+                if (opt != NULL && !opt->optimized) {
+                    _PyOpCodeOpt_LoadGlobal *lg = &opt->u.lg;
+
+                    opt->optimized = 1;
+                    lg->globals_ver =
+                        ((PyDictObject *)f->f_globals)->ma_version;
+                    lg->builtins_ver =
+                        ((PyDictObject *)f->f_builtins)->ma_version;
+                    lg->ptr = v; /* borrowed */
+#ifdef Py_DEBUG
+                    opt->opcode = LOAD_GLOBAL;
+#endif
+                }
+
                 Py_INCREF(v);
             }
             else {
                 /* Slow-path if globals or builtins is not a dict */
 
                 /* namespace 1: globals */
+                name = GETITEM(names, oparg);
                 v = PyObject_GetItem(f->f_globals, name);
                 if (v == NULL) {
                     if (!PyErr_ExceptionMatches(PyExc_KeyError))
@@ -3201,9 +3312,72 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             /* Designed to work in tamdem with CALL_METHOD. */
             PyObject *name = GETITEM(names, oparg);
             PyObject *obj = TOP();
+            PyTypeObject *type = Py_TYPE(obj);
             PyObject *meth = NULL;
+            _PyOpCodeOpt *opt = NULL;
 
-            if (Py_TYPE(obj)->tp_getattro == PyObject_GenericGetAttr) {
+          if (TRACE_IS_OPTIMIZED()) {
+                unsigned char offset = co->co_opt_opcodemap[INSTR_OFFSET()];
+                if (offset > 0) {
+                    assert(offset <= co->co_opt_size);
+                    opt = &co->co_opt[offset - 1];
+                    assert(opt != NULL);
+
+                    if (opt->optimized > 0 &&
+                        PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG))
+                    {
+                        _PyOpCodeOpt_LoadMethod *lm;
+                        lm = &opt->u.lm;
+
+                        if (type->tp_version_tag == lm->tp_version_tag &&
+                            type == lm->type)
+                        {
+                            PyObject **dictptr;
+                            PyObject *dict;
+
+                            assert(lm->meth != NULL);
+                            assert(opt->opcode == LOAD_METHOD);
+
+                            dictptr = _PyObject_GetDictPtr(obj);
+                            if (dictptr == NULL || *dictptr == NULL) {
+                                meth = lm->meth;
+                                Py_INCREF(meth);
+                                SET_TOP(meth);
+                                PUSH(obj);
+                                DISPATCH();
+                            }
+
+                            dict = *dictptr;
+                            Py_INCREF(dict);
+                            meth = PyDict_GetItem(dict, name);
+                            if (meth != NULL) {
+                                /* deoptimize */
+                                opt->optimized = -1;
+                                co->co_opt_opcodemap[INSTR_OFFSET()] = 0;
+
+                                Py_INCREF(meth);
+                                Py_DECREF(dict);
+                                SET_TOP(meth);
+                                PUSH(NULL);
+                                DISPATCH();
+                            }
+                            Py_DECREF(dict);
+
+                            meth = lm->meth;
+                            Py_INCREF(meth);
+                            SET_TOP(meth);
+                            PUSH(obj);
+                            DISPATCH();
+                        } else {
+                            /* deoptimize */
+                            opt->optimized = -1;
+                            co->co_opt_opcodemap[INSTR_OFFSET()] = 0;
+                        }
+                    }
+                }
+            }
+
+            if (type->tp_getattro == PyObject_GenericGetAttr) {
                 int meth_found = __PyObject_GetMethod(obj, name, &meth);
 
                 SET_TOP(meth);  /* Replace `obj` on top; OK if NULL. */
@@ -3217,6 +3391,22 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     /* The method object is now on top of the stack.
                        Push `obj` back to the stack. */
                     PUSH(obj);
+
+                    if (PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG)) {
+                        if (opt != NULL && !opt->optimized) {
+                            _PyOpCodeOpt_LoadMethod *lm = &opt->u.lm;
+
+                            opt->optimized = 1;
+                            lm->type = type;
+                            lm->tp_version_tag = type->tp_version_tag;
+                            lm->meth = meth; /* borrowed */
+#ifdef Py_DEBUG
+                            opt->opcode = LOAD_METHOD;
+#endif
+                        } else if (TRACE_IS_TRACING()) {
+                            TRACE_COUNT_OPCODE();
+                        }
+                    }
                 } else {
                     /* Not a method (but a regular attr, or something
                        was returned by a descriptor protocol).  Push
