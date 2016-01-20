@@ -7,6 +7,37 @@
 extern "C" {
 #endif
 
+
+#define CODE_OPT_TRACED           (1 << 10)
+#define CODE_OPT_MIN_CALLS        (CODE_OPT_TRACED - 100)
+#define CODE_OPT_OPTIMIZED        (1 << 12)
+#define CODE_OPT_NOT_OPTIMIZED    (1 << 13)
+
+#define CODE_OPT_MIN_OPCODE_CALLS 50
+
+typedef struct {
+    PY_UINT64_T globals_ver;
+    PY_UINT64_T builtins_ver;
+    PyObject *ptr;
+} _PyOpCodeOpt_LoadGlobal;
+
+typedef struct {
+    unsigned int tp_version_tag;
+    PyTypeObject *type;
+    PyObject *meth;
+} _PyOpCodeOpt_LoadMethod;
+
+typedef struct {
+    char optimized;
+    union {
+        _PyOpCodeOpt_LoadGlobal lg;
+        _PyOpCodeOpt_LoadMethod lm;
+    } u;
+#ifdef Py_DEBUG
+    unsigned char opcode;
+#endif
+} _PyOpCodeOpt;
+
 /* Bytecode object */
 typedef struct {
     PyObject_HEAD
@@ -35,6 +66,12 @@ typedef struct {
 				   Objects/lnotab_notes.txt for details. */
     void *co_zombieframe;     /* for optimization only (see frameobject.c) */
     PyObject *co_weakreflist;   /* to support weakrefs to code objects */
+
+    /* Opcodes just-in-time cache */
+    unsigned short int co_opt_flag;
+    unsigned char co_opt_size;
+    unsigned char *co_opt_opcodemap;
+    _PyOpCodeOpt *co_opt;
 } PyCodeObject;
 
 /* Masks for co_flags above */
