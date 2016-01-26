@@ -3529,6 +3529,26 @@ get_recursion_depth(PyObject *self, PyObject *args)
     return PyLong_FromLong(tstate->recursion_depth - 1);
 }
 
+static PyObject *
+dict_get_version(PyObject *self, PyObject *args)
+{
+    PyDictObject *dict;
+    PY_UINT64_T version;
+
+    if (!PyArg_ParseTuple(args, "O!", &PyDict_Type, &dict))
+        return NULL;
+
+    version = dict->ma_version;
+
+#ifdef HAVE_LONG_LONG
+    Py_BUILD_ASSERT(sizeof(unsigned PY_LONG_LONG) >= sizeof(version));
+    return PyLong_FromUnsignedLongLong((unsigned PY_LONG_LONG)version);
+#else
+    Py_BUILD_ASSERT(sizeof(size_t) >= sizeof(version));
+    return PyLong_FromSize_t((size_t)version);
+#endif
+}
+
 
 static PyMethodDef TestMethods[] = {
     {"raise_exception",         raise_exception,                 METH_VARARGS},
@@ -3706,6 +3726,7 @@ static PyMethodDef TestMethods[] = {
     {"PyTime_AsMilliseconds", test_PyTime_AsMilliseconds, METH_VARARGS},
     {"PyTime_AsMicroseconds", test_PyTime_AsMicroseconds, METH_VARARGS},
     {"get_recursion_depth", get_recursion_depth, METH_NOARGS},
+    {"dict_get_version", dict_get_version, METH_VARARGS},
     {NULL, NULL} /* sentinel */
 };
 
