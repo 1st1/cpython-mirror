@@ -209,6 +209,13 @@ static PyDictKeyEntry *lookdict_split(PyDictObject *mp, PyObject *key,
 
 static int dictresize(PyDictObject *mp, Py_ssize_t minused);
 
+/* Global counter used to set ma_version field of dictionary.
+ * It is incremented each time that a dictionary is created and each
+ * time that a dictionary is modified. */
+static PY_UINT64_T pydict_global_version = 0;
+
+#define DICT_NEXT_VERSION() (++pydict_global_version )
+
 /* Dictionary reuse scheme to save calls to malloc, free, and memset */
 #ifndef PyDict_MAXFREELIST
 #define PyDict_MAXFREELIST 80
@@ -383,6 +390,7 @@ new_dict(PyDictKeysObject *keys, PyObject **values)
     mp->ma_keys = keys;
     mp->ma_values = values;
     mp->ma_used = 0;
+    mp->ma_version = DICT_NEXT_VERSION();
     return (PyObject *)mp;
 }
 
@@ -802,13 +810,19 @@ insertdict(PyDictObject *mp, PyObject *key, Py_hash_t hash, PyObject *value)
     assert(PyUnicode_CheckExact(key) || mp->ma_keys->dk_lookup == lookdict);
     Py_INCREF(value);
     MAINTAIN_TRACKING(mp, key, value);
+
     old_value = *value_addr;
     if (old_value != NULL) {
         assert(ep->me_key != NULL && ep->me_key != dummy);
         *value_addr = value;
+        /* don't increase the version if the value doesn't change */
+        if (value != old_value)
+            mp->ma_version = DICT_NEXT_VERSION();
         Py_DECREF(old_value); /* which **CAN** re-enter (see issue #22653) */
     }
     else {
+        mp->ma_version = DICT_NEXT_VERSION();
+
         if (ep->me_key == NULL) {
             Py_INCREF(key);
             if (mp->ma_keys->dk_usable <= 0) {
@@ -1278,6 +1292,8 @@ PyDict_DelItem(PyObject *op, PyObject *key)
         _PyErr_SetKeyError(key);
         return -1;
     }
+
+    mp->ma_version = DICT_NEXT_VERSION();
     old_value = *value_addr;
     *value_addr = NULL;
     mp->ma_used--;
@@ -1348,6 +1364,7 @@ PyDict_Clear(PyObject *op)
     mp->ma_keys = Py_EMPTY_KEYS;
     mp->ma_values = empty_values;
     mp->ma_used = 0;
+    mp->ma_version = DICT_NEXT_VERSION();
     /* ...then clear the keys and values */
     if (oldvalues != NULL) {
         n = DK_SIZE(oldkeys);
@@ -1481,8 +1498,11 @@ _PyDict_Pop(PyDictObject *mp, PyObject *key, PyObject *deflt)
         _PyErr_SetKeyError(key);
         return NULL;
     }
+
     *value_addr = NULL;
+    mp->ma_version = DICT_NEXT_VERSION();
     mp->ma_used--;
+
     if (!_PyDict_HasSplitTable(mp)) {
         ENSURE_ALLOWS_DELETIONS(mp);
         old_key = ep->me_key;
@@ -2415,6 +2435,7 @@ PyDict_SetDefault(PyObject *d, PyObject *key, PyObject *defaultobj)
         val = defaultobj;
         mp->ma_keys->dk_usable--;
         mp->ma_used++;
+        mp->ma_version = DICT_NEXT_VERSION();
     }
     return val;
 }
@@ -2513,6 +2534,7 @@ dict_popitem(PyDictObject *mp)
     Py_INCREF(dummy);
     ep->me_key = dummy;
     ep->me_value = NULL;
+    mp->ma_version = DICT_NEXT_VERSION();
     mp->ma_used--;
     assert(mp->ma_keys->dk_entries[0].me_value == NULL);
     mp->ma_keys->dk_entries[0].me_hash = i + 1;  /* next place to start */
@@ -2718,6 +2740,7 @@ dict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         _PyObject_GC_UNTRACK(d);
 
     d->ma_used = 0;
+    d->ma_version = DICT_NEXT_VERSION();
     d->ma_keys = new_keys_object(PyDict_MINSIZE_COMBINED);
     if (d->ma_keys == NULL) {
         Py_DECREF(self);
