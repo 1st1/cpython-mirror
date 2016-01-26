@@ -1241,7 +1241,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 if (co->co_opt == NULL) {
                     goto error;
                 }
+#ifdef Py_DEBUG
                 co->co_opt_size = opts;
+#endif
                 co->co_opt_flag |= CODE_OPT_OPTIMIZED;
             } else {
                 PyMem_Free(co->co_opt_opcodemap);
@@ -3319,7 +3321,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *meth = NULL;
             _PyOpCodeOpt *opt = NULL;
 
-          if (TRACE_IS_OPTIMIZED()) {
+            if (TRACE_IS_OPTIMIZED()) {
                 unsigned char offset = co->co_opt_opcodemap[INSTR_OFFSET()];
                 if (offset > 0) {
                     assert(offset <= co->co_opt_size);

@@ -156,7 +156,9 @@ PyCode_New(int argcount, int kwonlyargcount,
     co->co_opt_flag = 0;
     co->co_opt_opcodemap = NULL;
     co->co_opt = NULL;
+#ifdef Py_DEBUG
     co->co_opt_size = 0;
+#endif
 
     return co;
 }
@@ -376,7 +378,9 @@ code_dealloc(PyCodeObject *co)
         co->co_opt_opcodemap = NULL;
     }
     co->co_opt_flag = 0;
+#ifdef Py_DEBUG
     co->co_opt_size = 0;
+#endif
 
     Py_XDECREF(co->co_code);
     Py_XDECREF(co->co_consts);
