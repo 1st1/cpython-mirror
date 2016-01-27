@@ -5059,7 +5059,6 @@ call_function(PyObject ***pp_stack, int oparg
         }
     }
     else if (Py_TYPE(func) == &PyMethodDescr_Type && nk == 0) {
-        // printf("AAAAAAA\n");
         PyMethodDef *md = ((PyMethodDescrObject*)func)->d_method;
         int flags = md->ml_flags;
         PyThreadState *tstate = PyThreadState_GET();
