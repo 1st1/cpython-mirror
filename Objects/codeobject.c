@@ -371,11 +371,9 @@ code_dealloc(PyCodeObject *co)
 {
     if (co->co_opt != NULL) {
         PyMem_FREE(co->co_opt);
-        co->co_opt = NULL;
     }
     if (co->co_opt_opcodemap != NULL) {
         PyMem_FREE(co->co_opt_opcodemap);
-        co->co_opt_opcodemap = NULL;
     }
     co->co_opt_flag = 0;
 #ifdef Py_DEBUG
