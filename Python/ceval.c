@@ -1118,24 +1118,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         Py_XDECREF(traceback); \
     }
 
-/* -- opcode tracing helpers -- */
-
-#define TRACE_IS_TRACING()   (!(co->co_opt_flag & CODE_OPT_TRACED) && \
-                              co->co_opt_opcodemap != NULL)
-
-#define TRACE_IS_OPTIMIZED() (co->co_opt != NULL)
-
-#define TRACE_COUNT_OPCODE() \
-    do { \
-        int offset; \
-        unsigned char *op_cnt; \
-        assert(co->co_opt_opcodemap != NULL); \
-        offset = INSTR_OFFSET(); \
-        op_cnt = &co->co_opt_opcodemap[offset]; \
-        if (!(*op_cnt & (1 << 7))) \
-            (*op_cnt)++; \
-    } while (0)
-
 /* Start of code */
 
     /* push frame */
@@ -1208,50 +1190,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     assert(stack_pointer != NULL);
     f->f_stacktop = NULL;       /* remains NULL unless yield suspends frame */
     f->f_executing = 1;
-
-    if (!(co->co_opt_flag & CODE_OPT_TRACED)) {
-        int opt_flag = ++co->co_opt_flag;
-        if (opt_flag == CODE_OPT_MIN_CALLS) {
-            Py_ssize_t co_size = PyBytes_Size(co->co_code);
-            assert(co_size >= 0);
-            assert(co->co_opt_opcodemap == NULL);
-            co->co_opt_opcodemap = (unsigned char *)PyMem_Calloc(
-                co_size, sizeof(unsigned char));
-            if (co->co_opt_opcodemap == NULL) {
-                goto error;
-            }
-        } else if (opt_flag & CODE_OPT_TRACED) {
-            Py_ssize_t co_size = PyBytes_Size(co->co_code);
-            int opts = 0, i;
-            assert(co_size >= 0);
-            for (i = 0; i < co_size; i++) {
-                if (co->co_opt_opcodemap[i] > CODE_OPT_MIN_OPCODE_CALLS &&
-                    opts < 250)
-                {
-                    co->co_opt_opcodemap[i] = ++opts;
-                } else {
-                    co->co_opt_opcodemap[i] = 0;
-                }
-            }
-
-            if (opts) {
-                assert(co->co_opt == NULL);
-                co->co_opt = (_PyOpCodeOpt *)PyMem_Calloc(
-                    opts, sizeof(_PyOpCodeOpt));
-                if (co->co_opt == NULL) {
-                    goto error;
-                }
-#ifdef Py_DEBUG
-                co->co_opt_size = opts;
-#endif
-                co->co_opt_flag |= CODE_OPT_OPTIMIZED;
-            } else {
-                PyMem_Free(co->co_opt_opcodemap);
-                co->co_opt_opcodemap = NULL;
-                co->co_opt_flag |= CODE_OPT_NOT_OPTIMIZED;
-            }
-        }
-    }
 
     if (co->co_flags & (CO_GENERATOR | CO_COROUTINE)) {
         if (!throwflag && f->f_exc_type != NULL && f->f_exc_type != Py_None) {
@@ -2427,7 +2365,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 && PyDict_CheckExact(f->f_builtins))
             {
                 _PyOpCodeOpt *opt = NULL;
-                if (TRACE_IS_OPTIMIZED()) {
+                if (co->co_opt != NULL) {
                     unsigned char offset = co->co_opt_opcodemap[INSTR_OFFSET()];
                     if (offset > 0) {
                         _PyOpCodeOpt_LoadGlobal *lg;
@@ -2451,16 +2389,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                                 Py_INCREF(ptr);
                                 PUSH(ptr);
                                 DISPATCH();
-                            } else {
-                                /* deoptimize */
-                                opt->optimized = -1;
-                                co->co_opt_opcodemap[INSTR_OFFSET()] = 0;
-                                opt = NULL;
                             }
                         }
                     }
-                } else if (TRACE_IS_TRACING()) {
-                    TRACE_COUNT_OPCODE();
                 }
 
                 name = GETITEM(names, oparg);
@@ -2477,10 +2408,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     goto error;
                 }
 
-                if (opt != NULL && !opt->optimized) {
+                if (opt != NULL) {
                     _PyOpCodeOpt_LoadGlobal *lg = &opt->u.lg;
 
-                    opt->optimized = 1;
+                    // opt->optimized = 1;
                     lg->globals_ver =
                         ((PyDictObject *)f->f_globals)->ma_version;
                     lg->builtins_ver =
@@ -3321,7 +3252,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *meth = NULL;
             _PyOpCodeOpt *opt = NULL;
 
-            if (TRACE_IS_OPTIMIZED()) {
+            if (co->co_opt != NULL) {
                 unsigned char offset = co->co_opt_opcodemap[INSTR_OFFSET()];
                 if (offset > 0) {
                     assert(offset <= co->co_opt_size);
@@ -3420,8 +3351,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 #ifdef Py_DEBUG
                             opt->opcode = LOAD_METHOD;
 #endif
-                        } else if (TRACE_IS_TRACING()) {
-                            TRACE_COUNT_OPCODE();
                         }
                     }
                 } else {

@@ -1,5 +1,6 @@
 #include "Python.h"
 #include "code.h"
+#include "opcode.h"
 #include "structmember.h"
 
 #define NAME_CHARS \
@@ -57,7 +58,8 @@ PyCode_New(int argcount, int kwonlyargcount,
 {
     PyCodeObject *co;
     unsigned char *cell2arg = NULL;
-    Py_ssize_t i, n_cellvars;
+    unsigned char *opcodes;
+    Py_ssize_t i, n_cellvars, co_size, opts;
 
     /* Check argument types */
     if (argcount < 0 || kwonlyargcount < 0 || nlocals < 0 ||
@@ -153,11 +155,32 @@ PyCode_New(int argcount, int kwonlyargcount,
     co->co_zombieframe = NULL;
     co->co_weakreflist = NULL;
 
-    co->co_opt_flag = 0;
-    co->co_opt_opcodemap = NULL;
-    co->co_opt = NULL;
+    /* opcode cache */
+    co_size = PyBytes_Size(co->co_code);
+    co->co_opt_opcodemap = (unsigned char *)PyMem_Calloc(
+        co_size, sizeof(unsigned char));
+    if (co->co_opt_opcodemap == NULL) {
+        return NULL;
+    }
+    opts = 0;
+    opcodes = (unsigned char*) PyBytes_AS_STRING(co->co_code);
+    for (i = 0; i < co_size; i++) {
+        if (opcodes[i] == LOAD_METHOD || opcodes[i] == LOAD_GLOBAL) {
+            co->co_opt_opcodemap[i] = ++opts;
+        }
+    }
+    if (opts) {
+        co->co_opt = (_PyOpCodeOpt *)PyMem_Calloc(opts, sizeof(_PyOpCodeOpt));
+        if (co->co_opt == NULL) {
+            return NULL;
+        }
+    } else {
+        PyMem_FREE(co->co_opt_opcodemap);
+        co->co_opt_opcodemap = NULL;
+        co->co_opt = NULL;
+    }
 #ifdef Py_DEBUG
-    co->co_opt_size = 0;
+    co->co_opt_size = opts;
 #endif
 
     return co;
@@ -375,7 +398,6 @@ code_dealloc(PyCodeObject *co)
     if (co->co_opt_opcodemap != NULL) {
         PyMem_FREE(co->co_opt_opcodemap);
     }
-    co->co_opt_flag = 0;
 #ifdef Py_DEBUG
     co->co_opt_size = 0;
 #endif
