@@ -68,7 +68,6 @@ typedef struct {
     PyObject *co_weakreflist;   /* to support weakrefs to code objects */
 
     /* Opcodes just-in-time cache */
-    unsigned short int co_opt_flag;
     unsigned char *co_opt_opcodemap;
     _PyOpCodeOpt *co_opt;
 #ifdef Py_DEBUG
