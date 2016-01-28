@@ -167,6 +167,9 @@ PyCode_New(int argcount, int kwonlyargcount,
     for (i = 0; i < co_size; i++) {
         if (opcodes[i] == LOAD_METHOD || opcodes[i] == LOAD_GLOBAL) {
             co->co_opt_opcodemap[i] = ++opts;
+            if (opts > 250) {
+                break;
+            }
         }
     }
     if (opts) {

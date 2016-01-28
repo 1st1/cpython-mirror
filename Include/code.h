@@ -8,13 +8,6 @@ extern "C" {
 #endif
 
 
-#define CODE_OPT_TRACED           (1 << 10)
-#define CODE_OPT_MIN_CALLS        (CODE_OPT_TRACED - 100)
-#define CODE_OPT_OPTIMIZED        (1 << 12)
-#define CODE_OPT_NOT_OPTIMIZED    (1 << 13)
-
-#define CODE_OPT_MIN_OPCODE_CALLS 50
-
 typedef struct {
     PY_UINT64_T globals_ver;
     PY_UINT64_T builtins_ver;
@@ -33,9 +26,6 @@ typedef struct {
         _PyOpCodeOpt_LoadGlobal lg;
         _PyOpCodeOpt_LoadMethod lm;
     } u;
-#ifdef Py_DEBUG
-    unsigned char opcode;
-#endif
 } _PyOpCodeOpt;
 
 /* Bytecode object */

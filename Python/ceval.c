@@ -809,6 +809,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     PyThreadState *tstate = PyThreadState_GET();
     PyCodeObject *co;
 
+    _PyOpCodeOpt *co_opt;
+    unsigned char co_opt_offset;
+
     /* when tracing we set things up so that
 
            not (instr_lb <= current_bytecode_offset < instr_ub)
@@ -1117,6 +1120,33 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         Py_XDECREF(value); \
         Py_XDECREF(traceback); \
     }
+
+#define OPCODE_CACHE_CHECK() \
+    do { \
+        if (co->co_opt != NULL) { \
+            co_opt_offset = co->co_opt_opcodemap[INSTR_OFFSET()]; \
+            if (co_opt_offset > 0) { \
+                assert(co_opt_offset <= co->co_opt_size); \
+                co_opt = &co->co_opt[co_opt_offset - 1]; \
+                assert(co_opt != NULL); \
+                if (co_opt->optimized < 0) { \
+                    co_opt = NULL; \
+                } \
+            } else { \
+                co_opt = NULL; \
+            } \
+        } else { \
+            co_opt = NULL; \
+        } \
+    } while (0)
+
+#define OPCODE_CACHE_DEOPT() \
+    do { \
+        assert(co_opt != NULL); \
+        co_opt->optimized = -1; \
+        co->co_opt_opcodemap[INSTR_OFFSET()] = 0; \
+        co_opt = NULL; \
+    } while (0)
 
 /* Start of code */
 
@@ -2364,33 +2394,20 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             if (PyDict_CheckExact(f->f_globals)
                 && PyDict_CheckExact(f->f_builtins))
             {
-                _PyOpCodeOpt *opt = NULL;
-                if (co->co_opt != NULL) {
-                    unsigned char offset = co->co_opt_opcodemap[INSTR_OFFSET()];
-                    if (offset > 0) {
-                        _PyOpCodeOpt_LoadGlobal *lg;
+                OPCODE_CACHE_CHECK();
+                if (co_opt != NULL && co_opt->optimized > 0) {
+                    _PyOpCodeOpt_LoadGlobal *lg = &co_opt->u.lg;
 
-                        assert(offset <= co->co_opt_size);
-                        opt = &co->co_opt[offset - 1];
-                        assert(opt != NULL);
-
-                        lg = &opt->u.lg;
-
-                        if (opt->optimized > 0) {
-                            if (lg->globals_ver ==
-                                    ((PyDictObject *)f->f_globals)->ma_version
-                                && lg->builtins_ver ==
-                                   ((PyDictObject *)f->f_builtins)->ma_version)
-                            {
-                                PyObject *ptr = lg->ptr;
-
-                                assert(opt->opcode == LOAD_GLOBAL);
-                                assert(ptr != NULL);
-                                Py_INCREF(ptr);
-                                PUSH(ptr);
-                                DISPATCH();
-                            }
-                        }
+                    if (lg->globals_ver ==
+                            ((PyDictObject *)f->f_globals)->ma_version
+                        && lg->builtins_ver ==
+                           ((PyDictObject *)f->f_builtins)->ma_version)
+                    {
+                        PyObject *ptr = lg->ptr;
+                        assert(ptr != NULL);
+                        Py_INCREF(ptr);
+                        PUSH(ptr);
+                        DISPATCH();
                     }
                 }
 
@@ -2408,18 +2425,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     goto error;
                 }
 
-                if (opt != NULL) {
-                    _PyOpCodeOpt_LoadGlobal *lg = &opt->u.lg;
+                if (co_opt != NULL) {
+                    _PyOpCodeOpt_LoadGlobal *lg = &co_opt->u.lg;
 
-                    // opt->optimized = 1;
+                    co_opt->optimized = 1;
                     lg->globals_ver =
                         ((PyDictObject *)f->f_globals)->ma_version;
                     lg->builtins_ver =
                         ((PyDictObject *)f->f_builtins)->ma_version;
                     lg->ptr = v; /* borrowed */
-#ifdef Py_DEBUG
-                    opt->opcode = LOAD_GLOBAL;
-#endif
                 }
 
                 Py_INCREF(v);
@@ -3250,78 +3264,62 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *obj = TOP();
             PyTypeObject *type = Py_TYPE(obj);
             PyObject *meth = NULL;
-            _PyOpCodeOpt *opt = NULL;
 
-            if (co->co_opt != NULL) {
-                unsigned char offset = co->co_opt_opcodemap[INSTR_OFFSET()];
-                if (offset > 0) {
-                    assert(offset <= co->co_opt_size);
-                    opt = &co->co_opt[offset - 1];
-                    assert(opt != NULL);
+            OPCODE_CACHE_CHECK();
+            if (co_opt != NULL && co_opt->optimized > 0) {
+                _PyOpCodeOpt_LoadMethod *lm = &co_opt->u.lm;
 
-                    if (opt->optimized > 0) {
-                        _PyOpCodeOpt_LoadMethod *lm;
-                        lm = &opt->u.lm;
+                if (PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG) &&
+                    type->tp_version_tag == lm->tp_version_tag &&
+                    type == lm->type)
+                {
+                    PyObject **dictptr;
+                    PyObject *dict;
+                    Py_ssize_t dictoffset;
 
-                        if (PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG) &&
-                            type->tp_version_tag == lm->tp_version_tag &&
-                            type == lm->type)
-                        {
-                            PyObject **dictptr;
-                            PyObject *dict;
-                            Py_ssize_t dictoffset;
+                    assert(lm->meth != NULL);
 
-                            assert(lm->meth != NULL);
-                            assert(opt->opcode == LOAD_METHOD);
+                    dictoffset = type->tp_dictoffset;
+                    if (dictoffset != 0) {
+                        if (dictoffset < 0) {
+                            Py_ssize_t tsize;
+                            size_t size;
 
-                            dictoffset = type->tp_dictoffset;
-                            if (dictoffset != 0) {
-                                if (dictoffset < 0) {
-                                    Py_ssize_t tsize;
-                                    size_t size;
+                            tsize = ((PyVarObject *)obj)->ob_size;
+                            if (tsize < 0)
+                                tsize = -tsize;
+                            size = _PyObject_VAR_SIZE(type, tsize);
 
-                                    tsize = ((PyVarObject *)obj)->ob_size;
-                                    if (tsize < 0)
-                                        tsize = -tsize;
-                                    size = _PyObject_VAR_SIZE(type, tsize);
+                            dictoffset += (long)size;
+                            assert(dictoffset > 0);
+                            assert(dictoffset % SIZEOF_VOID_P == 0);
+                        }
+                        dictptr = (PyObject **) ((char *)obj + dictoffset);
+                        dict = *dictptr;
+                        if (dict != NULL) {
+                            Py_INCREF(dict);
+                            meth = PyDict_GetItem(dict, name);
+                            if (meth != NULL) {
+                                OPCODE_CACHE_DEOPT();
 
-                                    dictoffset += (long)size;
-                                    assert(dictoffset > 0);
-                                    assert(dictoffset % SIZEOF_VOID_P == 0);
-                                }
-                                dictptr = (PyObject **) ((char *)obj + dictoffset);
-                                dict = *dictptr;
-                                if (dict != NULL) {
-                                    Py_INCREF(dict);
-                                    meth = PyDict_GetItem(dict, name);
-                                    if (meth != NULL) {
-                                        /* deoptimize */
-                                        opt->optimized = -1;
-                                        co->co_opt_opcodemap[INSTR_OFFSET()] = 0;
-
-                                        Py_INCREF(meth);
-                                        Py_DECREF(dict);
-                                        SET_TOP(meth);
-                                        PUSH(NULL);
-                                        DISPATCH();
-                                    } else {
-                                        Py_DECREF(dict);
-                                    }
-                                }
+                                Py_INCREF(meth);
+                                Py_DECREF(dict);
+                                SET_TOP(meth);
+                                PUSH(NULL);
+                                DISPATCH();
+                            } else {
+                                Py_DECREF(dict);
                             }
-
-                            meth = lm->meth;
-                            Py_INCREF(meth);
-                            SET_TOP(meth);
-                            PUSH(obj);
-                            DISPATCH();
-                        } else {
-                            /* deoptimize */
-                            opt->optimized = -1;
-                            co->co_opt_opcodemap[INSTR_OFFSET()] = 0;
-                            opt = NULL;
                         }
                     }
+
+                    meth = lm->meth;
+                    Py_INCREF(meth);
+                    SET_TOP(meth);
+                    PUSH(obj);
+                    DISPATCH();
+                } else {
+                    OPCODE_CACHE_DEOPT();
                 }
             }
 
@@ -3340,18 +3338,14 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                        Push `obj` back to the stack. */
                     PUSH(obj);
 
-                    if (PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG)) {
-                        if (opt != NULL && !opt->optimized) {
-                            _PyOpCodeOpt_LoadMethod *lm = &opt->u.lm;
-
-                            opt->optimized = 1;
-                            lm->type = type;
-                            lm->tp_version_tag = type->tp_version_tag;
-                            lm->meth = meth; /* borrowed */
-#ifdef Py_DEBUG
-                            opt->opcode = LOAD_METHOD;
-#endif
-                        }
+                    if (co_opt != NULL &&
+                        PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG))
+                    {
+                        _PyOpCodeOpt_LoadMethod *lm = &co_opt->u.lm;
+                        co_opt->optimized = 1;
+                        lm->type = type;
+                        lm->tp_version_tag = type->tp_version_tag;
+                        lm->meth = meth; /* borrowed */
                     }
                 } else {
                     /* Not a method (but a regular attr, or something
