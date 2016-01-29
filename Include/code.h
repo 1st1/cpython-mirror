@@ -60,6 +60,7 @@ typedef struct {
     /* Opcodes just-in-time cache */
     unsigned char *co_opt_opcodemap;
     _PyOpCodeOpt *co_opt;
+    PY_UINT64_T co_opt_flag;
 #ifdef Py_DEBUG
     unsigned char co_opt_size;
 #endif
@@ -155,6 +156,10 @@ PyAPI_FUNC(PyObject*) _PyCode_ConstantKey(PyObject *obj);
 
 PyAPI_FUNC(PyObject*) PyCode_Optimize(PyObject *code, PyObject* consts,
                                       PyObject *names, PyObject *lnotab);
+
+/* Private API */
+int _PyCode_InitOptCache(PyCodeObject *co);
+
 
 #ifdef __cplusplus
 }

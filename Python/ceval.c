@@ -96,6 +96,17 @@ void dump_tsc(int opcode, int ticked, uint64 inst0, uint64 inst1,
 
 #endif
 
+
+#define OPCODE_CACHE_STATS 1
+
+#if OPCODE_CACHE_STATS
+static size_t opcode_cache_method_hits = 0;
+static size_t opcode_cache_method_misses = 0;
+static size_t opcode_cache_global_hits = 0;
+static size_t opcode_cache_global_misses = 0;
+#endif
+
+
 /* Turn this on if your compiler chokes on the big switch: */
 /* #define CASE_TOO_BIG 1 */
 
@@ -324,6 +335,32 @@ _PyEval_FiniThreads(void)
         return;
     destroy_gil();
     assert(!gil_created());
+}
+
+void
+_PyEval_Fini(void)
+{
+#if OPCODE_CACHE_STATS
+    fprintf(stderr, "-- Opcode cache LOAD_METHOD hits   = %zd (%d%%)\n",
+            opcode_cache_method_hits,
+            (int) (100.0 * opcode_cache_method_hits /
+                (opcode_cache_method_hits + opcode_cache_method_misses)));
+
+    fprintf(stderr, "-- Opcode cache LOAD_METHOD misses = %zd (%d%%)\n",
+            opcode_cache_method_misses,
+            (int) (100.0 * opcode_cache_method_misses /
+                (opcode_cache_method_hits + opcode_cache_method_misses)));
+
+    fprintf(stderr, "-- Opcode cache LOAD_GLOBAL hits   = %zd (%d%%)\n",
+            opcode_cache_global_hits,
+            (int) (100.0 * opcode_cache_global_hits /
+                (opcode_cache_global_hits + opcode_cache_global_misses)));
+
+    fprintf(stderr, "-- Opcode cache LOAD_GLOBAL misses = %zd (%d%%)\n",
+            opcode_cache_global_misses,
+            (int) (100.0 * opcode_cache_global_misses /
+                (opcode_cache_global_hits + opcode_cache_global_misses)));
+#endif
 }
 
 void
@@ -1123,6 +1160,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 #define OPCODE_CACHE_CHECK() \
     do { \
+        co_opt = NULL; \
         if (co->co_opt != NULL) { \
             co_opt_offset = co->co_opt_opcodemap[INSTR_OFFSET()]; \
             if (co_opt_offset > 0) { \
@@ -1132,11 +1170,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 if (co_opt->optimized < 0) { \
                     co_opt = NULL; \
                 } \
-            } else { \
-                co_opt = NULL; \
             } \
-        } else { \
-            co_opt = NULL; \
         } \
     } while (0)
 
@@ -1147,6 +1181,39 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         co->co_opt_opcodemap[INSTR_OFFSET()] = 0; \
         co_opt = NULL; \
     } while (0)
+
+#if OPCODE_CACHE_STATS
+
+#define OPCODE_CACHE_METHOD_HIT() \
+    do { \
+        if (co->co_opt != NULL) opcode_cache_method_hits++; \
+    } while (0)
+
+#define OPCODE_CACHE_METHOD_MISS() \
+    do { \
+        if (co->co_opt != NULL) opcode_cache_method_misses++; \
+    } while (0)
+
+#define OPCODE_CACHE_GLOBAL_HIT() \
+    do { \
+        if (co->co_opt != NULL) opcode_cache_global_hits++; \
+    } while (0)
+
+#define OPCODE_CACHE_GLOBAL_MISS() \
+    do { \
+        if (co->co_opt != NULL) opcode_cache_global_misses++; \
+    } while (0)
+
+#else
+
+#define OPCODE_CACHE_METHOD_HIT()
+#define OPCODE_CACHE_METHOD_MISS()
+
+#define OPCODE_CACHE_GLOBAL_HIT()
+#define OPCODE_CACHE_GLOBAL_MISS()
+
+#endif
+
 
 /* Start of code */
 
@@ -1220,6 +1287,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     assert(stack_pointer != NULL);
     f->f_stacktop = NULL;       /* remains NULL unless yield suspends frame */
     f->f_executing = 1;
+
+    if (co->co_opt_flag < 1024) {
+        co->co_opt_flag++;
+        if (co->co_opt_flag == 1024) {
+            if (_PyCode_InitOptCache(co) < 0) {
+                return NULL;
+            }
+        }
+    }
 
     if (co->co_flags & (CO_GENERATOR | CO_COROUTINE)) {
         if (!throwflag && f->f_exc_type != NULL && f->f_exc_type != Py_None) {
@@ -2404,12 +2480,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                            ((PyDictObject *)f->f_builtins)->ma_version)
                     {
                         PyObject *ptr = lg->ptr;
+                        OPCODE_CACHE_GLOBAL_HIT();
                         assert(ptr != NULL);
                         Py_INCREF(ptr);
                         PUSH(ptr);
                         DISPATCH();
                     }
                 }
+
+                OPCODE_CACHE_GLOBAL_MISS();
 
                 name = GETITEM(names, oparg);
                 v = _PyDict_LoadGlobal((PyDictObject *)f->f_globals,
@@ -3300,6 +3379,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                             Py_INCREF(dict);
                             meth = PyDict_GetItem(dict, name);
                             if (meth != NULL) {
+                                OPCODE_CACHE_METHOD_MISS();
                                 OPCODE_CACHE_DEOPT();
 
                                 Py_INCREF(meth);
@@ -3313,6 +3393,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                         }
                     }
 
+                    OPCODE_CACHE_METHOD_HIT();
                     meth = lm->meth;
                     Py_INCREF(meth);
                     SET_TOP(meth);
@@ -3322,6 +3403,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     OPCODE_CACHE_DEOPT();
                 }
             }
+
+            OPCODE_CACHE_METHOD_MISS();
 
             if (type->tp_getattro == PyObject_GenericGetAttr) {
                 int meth_found = __PyObject_GetMethod(obj, name, &meth);
