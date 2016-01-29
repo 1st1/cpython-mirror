@@ -11,22 +11,20 @@ extern "C" {
 
 typedef struct {
     PyTypeObject *type;
-    PyObject *descr;
+    Py_ssize_t hint;
     unsigned int tp_version_tag;
-    int hint;
-    char descr_type;
 } _PyOpCodeOpt_LoadAttr;
 
 typedef struct {
+    PyObject *ptr;
     PY_UINT64_T globals_ver;
     PY_UINT64_T builtins_ver;
-    PyObject *ptr;
 } _PyOpCodeOpt_LoadGlobal;
 
 typedef struct {
-    unsigned int tp_version_tag;
     PyTypeObject *type;
     PyObject *meth;
+    unsigned int tp_version_tag;
 } _PyOpCodeOpt_LoadMethod;
 
 typedef struct {
