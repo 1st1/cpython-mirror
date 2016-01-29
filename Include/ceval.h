@@ -215,6 +215,10 @@ PyAPI_FUNC(void) _PyEval_SignalAsyncExc(void);
 #define FVS_MASK      0x4
 #define FVS_HAVE_SPEC 0x4
 
+/* Private function */
+void _PyEval_Fini(void);
+
+
 #ifdef __cplusplus
 }
 #endif
