@@ -1297,7 +1297,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             if (_PyCode_InitOptCache(co) < 0) {
                 return NULL;
             }
+#if OPCODE_CACHE_STATS
             opcode_cache_code_objects++;
+#endif
         }
     }
 
