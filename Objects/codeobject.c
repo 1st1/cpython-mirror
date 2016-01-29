@@ -175,16 +175,26 @@ _PyCode_InitOptCache(PyCodeObject *co)
     if (co->co_opt_opcodemap == NULL) {
         return -1;
     }
+
     opts = 0;
     opcodes = (unsigned char*) PyBytes_AS_STRING(co->co_code);
-    for (i = 0; i < co_size; i++) {
-        if (opcodes[i] == LOAD_METHOD || opcodes[i] == LOAD_GLOBAL) {
+    for (i = 0; i < co_size;) {
+        unsigned char opcode = opcodes[i];
+
+        i++;
+        if (HAS_ARG(opcode)) {
+            i += 2;
+        }
+
+        if (opcode == LOAD_METHOD || opcode == LOAD_GLOBAL) {
+            /* 'i' is now aligned to ceval/INSTR_OFFSET() */
             co->co_opt_opcodemap[i] = ++opts;
             if (opts > 250) {
                 break;
             }
         }
     }
+
     if (opts) {
         co->co_opt = (_PyOpCodeOpt *)PyMem_Calloc(opts, sizeof(_PyOpCodeOpt));
         if (co->co_opt == NULL) {
@@ -195,9 +205,11 @@ _PyCode_InitOptCache(PyCodeObject *co)
         co->co_opt_opcodemap = NULL;
         co->co_opt = NULL;
     }
+
 #ifdef Py_DEBUG
     co->co_opt_size = opts;
 #endif
+
     return 0;
 }
 

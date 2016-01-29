@@ -7,6 +7,7 @@
 extern "C" {
 #endif
 
+#define OPCODE_CACHE_MIN_RUNS 1024
 
 typedef struct {
     PY_UINT64_T globals_ver;
