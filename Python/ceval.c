@@ -2907,8 +2907,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                             Py_ssize_t hint = la->hint;
                             PyDictObject *mp = (PyDictObject *)dict;
 
+                            assert(hint >= 0);
                             Py_INCREF(dict);
-                            if (hint >= 0 && hint < mp->ma_keys->dk_size) {
+                            if (hint < mp->ma_keys->dk_size) {
                                 PyDictKeyEntry *ep0, *ep;
                                 ep0 = &mp->ma_keys->dk_entries[0];
                                 ep = &ep0[(size_t)hint];
@@ -2943,9 +2944,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     PyObject *descr;
                     Py_ssize_t ret;
 
-                    if (type->tp_dictoffset > 0) {
-                        co_opt->optimized = 0;
+                    co_opt->optimized = 0;
 
+                    if (type->tp_dictoffset > 0) {
                         if (type->tp_dict == NULL) {
                             if (PyType_Ready(type) < 0) {
                                 Py_DECREF(owner);
