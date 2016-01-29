@@ -97,9 +97,10 @@ void dump_tsc(int opcode, int ticked, uint64 inst0, uint64 inst1,
 #endif
 
 
-#define OPCODE_CACHE_STATS 1
+#define OPCODE_CACHE_STATS 0
 
 #if OPCODE_CACHE_STATS
+static size_t opcode_cache_code_objects = 0;
 static size_t opcode_cache_method_hits = 0;
 static size_t opcode_cache_method_misses = 0;
 static size_t opcode_cache_global_hits = 0;
@@ -341,6 +342,8 @@ void
 _PyEval_Fini(void)
 {
 #if OPCODE_CACHE_STATS
+    fprintf(stderr, "-- Opcode cache number of objects  = %zd\n",
+            opcode_cache_code_objects);
     fprintf(stderr, "-- Opcode cache LOAD_METHOD hits   = %zd (%d%%)\n",
             opcode_cache_method_hits,
             (int) (100.0 * opcode_cache_method_hits /
@@ -1288,12 +1291,13 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     f->f_stacktop = NULL;       /* remains NULL unless yield suspends frame */
     f->f_executing = 1;
 
-    if (co->co_opt_flag < 1024) {
+    if (co->co_opt_flag < OPCODE_CACHE_MIN_RUNS) {
         co->co_opt_flag++;
-        if (co->co_opt_flag == 1024) {
+        if (co->co_opt_flag == OPCODE_CACHE_MIN_RUNS) {
             if (_PyCode_InitOptCache(co) < 0) {
                 return NULL;
             }
+            opcode_cache_code_objects++;
         }
     }
 
@@ -2488,8 +2492,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     }
                 }
 
-                OPCODE_CACHE_GLOBAL_MISS();
-
                 name = GETITEM(names, oparg);
                 v = _PyDict_LoadGlobal((PyDictObject *)f->f_globals,
                                        (PyDictObject *)f->f_builtins,
@@ -2515,6 +2517,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     lg->ptr = v; /* borrowed */
                 }
 
+                OPCODE_CACHE_GLOBAL_MISS();
                 Py_INCREF(v);
             }
             else {
@@ -3339,7 +3342,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
         TARGET(LOAD_METHOD) {
             /* Designed to work in tamdem with CALL_METHOD. */
-            PyObject *name = GETITEM(names, oparg);
+            PyObject *name;
             PyObject *obj = TOP();
             PyTypeObject *type = Py_TYPE(obj);
             PyObject *meth = NULL;
@@ -3377,6 +3380,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                         dict = *dictptr;
                         if (dict != NULL) {
                             Py_INCREF(dict);
+                            name = GETITEM(names, oparg);
                             meth = PyDict_GetItem(dict, name);
                             if (meth != NULL) {
                                 OPCODE_CACHE_METHOD_MISS();
@@ -3399,12 +3403,11 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     SET_TOP(meth);
                     PUSH(obj);
                     DISPATCH();
-                } else {
-                    OPCODE_CACHE_DEOPT();
                 }
             }
 
             OPCODE_CACHE_METHOD_MISS();
+            name = GETITEM(names, oparg);
 
             if (type->tp_getattro == PyObject_GenericGetAttr) {
                 int meth_found = __PyObject_GetMethod(obj, name, &meth);
