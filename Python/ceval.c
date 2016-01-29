@@ -101,6 +101,8 @@ void dump_tsc(int opcode, int ticked, uint64 inst0, uint64 inst1,
 
 #if OPCODE_CACHE_STATS
 static size_t opcode_cache_code_objects = 0;
+static size_t opcode_cache_attr_hits = 0;
+static size_t opcode_cache_attr_misses = 0;
 static size_t opcode_cache_method_hits = 0;
 static size_t opcode_cache_method_misses = 0;
 static size_t opcode_cache_global_hits = 0;
@@ -344,6 +346,7 @@ _PyEval_Fini(void)
 #if OPCODE_CACHE_STATS
     fprintf(stderr, "-- Opcode cache number of objects  = %zd\n",
             opcode_cache_code_objects);
+
     fprintf(stderr, "-- Opcode cache LOAD_METHOD hits   = %zd (%d%%)\n",
             opcode_cache_method_hits,
             (int) (100.0 * opcode_cache_method_hits /
@@ -363,6 +366,16 @@ _PyEval_Fini(void)
             opcode_cache_global_misses,
             (int) (100.0 * opcode_cache_global_misses /
                 (opcode_cache_global_hits + opcode_cache_global_misses)));
+
+    fprintf(stderr, "-- Opcode cache LOAD_ATTR hits     = %zd (%d%%)\n",
+            opcode_cache_attr_hits,
+            (int) (100.0 * opcode_cache_attr_hits /
+                (opcode_cache_attr_hits + opcode_cache_attr_misses)));
+
+    fprintf(stderr, "-- Opcode cache LOAD_ATTR misses   = %zd (%d%%)\n",
+            opcode_cache_attr_misses,
+            (int) (100.0 * opcode_cache_attr_misses /
+                (opcode_cache_attr_hits + opcode_cache_attr_misses)));
 #endif
 }
 
@@ -1207,6 +1220,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         if (co->co_opt != NULL) opcode_cache_global_misses++; \
     } while (0)
 
+#define OPCODE_CACHE_ATTR_HIT() \
+    do { \
+        if (co->co_opt != NULL) opcode_cache_attr_hits++; \
+    } while (0)
+
+#define OPCODE_CACHE_ATTR_MISS() \
+    do { \
+        if (co->co_opt != NULL) opcode_cache_attr_misses++; \
+    } while (0)
+
 #else
 
 #define OPCODE_CACHE_METHOD_HIT()
@@ -1214,6 +1237,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 #define OPCODE_CACHE_GLOBAL_HIT()
 #define OPCODE_CACHE_GLOBAL_MISS()
+
+#define OPCODE_CACHE_ATTR_HIT()
+#define OPCODE_CACHE_ATTR_MISS()
 
 #endif
 
@@ -2856,7 +2882,45 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(LOAD_ATTR) {
             PyObject *name = GETITEM(names, oparg);
             PyObject *owner = TOP();
-            PyObject *res = PyObject_GetAttr(owner, name);
+            PyTypeObject *type = Py_TYPE(owner);
+            PyObject *res;
+            Py_ssize_t ret;
+
+            if (type->tp_getattro == PyObject_GenericGetAttr) {
+                OPCODE_CACHE_CHECK();
+                if (co_opt != NULL) {
+                    _PyOpCodeOpt_LoadAttr *la = &co_opt->u.la;
+
+                    res = NULL;
+                    ret = __PyObject_GenericGetAttrWithDictHint(
+                        owner,
+                        name,
+                        NULL,
+                        la->hint,
+                        &res);
+
+                    if (ret >= 0 && ret != __DICTHINTMISS) {
+                        if (la->hint == ret && ret != __DICTHINTMISS) {
+                            OPCODE_CACHE_ATTR_HIT();
+                        } else {
+                            OPCODE_CACHE_ATTR_MISS();
+                        }
+
+                        la->hint = ret;
+                    } else {
+                        OPCODE_CACHE_ATTR_MISS();
+                        la->hint = -1;
+                    }
+
+                    Py_DECREF(owner);
+                    SET_TOP(res);
+                    if (res == NULL)
+                        goto error;
+                    DISPATCH();
+                }
+            }
+
+            res = PyObject_GetAttr(owner, name);
             Py_DECREF(owner);
             SET_TOP(res);
             if (res == NULL)

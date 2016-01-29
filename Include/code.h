@@ -10,6 +10,10 @@ extern "C" {
 #define OPCODE_CACHE_MIN_RUNS 1024
 
 typedef struct {
+    Py_ssize_t hint;
+} _PyOpCodeOpt_LoadAttr;
+
+typedef struct {
     PY_UINT64_T globals_ver;
     PY_UINT64_T builtins_ver;
     PyObject *ptr;
@@ -26,6 +30,7 @@ typedef struct {
     union {
         _PyOpCodeOpt_LoadGlobal lg;
         _PyOpCodeOpt_LoadMethod lm;
+        _PyOpCodeOpt_LoadAttr la;
     } u;
 } _PyOpCodeOpt;
 

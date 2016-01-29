@@ -1064,6 +1064,11 @@ PyAPI_FUNC(void)
 _PyObject_DebugTypeStats(FILE *out);
 #endif /* ifndef Py_LIMITED_API */
 
+Py_ssize_t
+__PyObject_GenericGetAttrWithDictHint(PyObject *, PyObject *, PyObject *,
+                                      Py_ssize_t, PyObject **);
+
+
 #ifdef __cplusplus
 }
 #endif

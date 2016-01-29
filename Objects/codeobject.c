@@ -186,7 +186,9 @@ _PyCode_InitOptCache(PyCodeObject *co)
             i += 2;
         }
 
-        if (opcode == LOAD_METHOD || opcode == LOAD_GLOBAL) {
+        if (opcode == LOAD_METHOD || opcode == LOAD_GLOBAL ||
+            opcode == LOAD_ATTR)
+        {
             /* 'i' is now aligned to ceval/INSTR_OFFSET() */
             co->co_opt_opcodemap[i] = ++opts;
             if (opts > 250) {

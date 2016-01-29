@@ -1099,6 +1099,71 @@ PyDict_GetItem(PyObject *op, PyObject *key)
     return *value_addr;
 }
 
+Py_ssize_t
+__PyDict_GetItemHint(PyObject *op, PyObject *key, Py_ssize_t hint, PyObject **value)
+{
+    Py_hash_t hash;
+    PyDictObject *mp = (PyDictObject *)op;
+    PyDictKeyEntry *ep;
+    PyThreadState *tstate;
+    PyObject **value_addr;
+
+    assert(*value == NULL);
+
+    if (!PyDict_Check(op))
+        return -1;
+
+    if (hint >= 0 && hint < mp->ma_keys->dk_size) {
+        PyDictKeyEntry *ep0, *ep;
+        assert(key != NULL);
+        ep0 = &mp->ma_keys->dk_entries[0];
+        ep = &ep0[(size_t)hint];
+        if (ep->me_key == key) {
+            *value = ep->me_value;
+            if (*value != NULL) {
+                return hint;
+            }
+        }
+    }
+
+    if (!PyUnicode_CheckExact(key) ||
+        (hash = ((PyASCIIObject *) key)->hash) == -1)
+    {
+        hash = PyObject_Hash(key);
+        if (hash == -1) {
+            PyErr_Clear();
+            return -1;
+        }
+    }
+
+    /* We can arrive here with a NULL tstate during initialization: try
+       running "python -Wi" for an example related to string interning.
+       Let's just hope that no exception occurs then...  This must be
+       _PyThreadState_Current and not PyThreadState_GET() because in debug
+       mode, the latter complains if tstate is NULL. */
+    tstate = _PyThreadState_UncheckedGet();
+    if (tstate != NULL && tstate->curexc_type != NULL) {
+        /* preserve the existing exception */
+        PyObject *err_type, *err_value, *err_tb;
+        PyErr_Fetch(&err_type, &err_value, &err_tb);
+        ep = (mp->ma_keys->dk_lookup)(mp, key, hash, &value_addr);
+        /* ignore errors */
+        PyErr_Restore(err_type, err_value, err_tb);
+        if (ep == NULL)
+            return -1;
+    }
+    else {
+        ep = (mp->ma_keys->dk_lookup)(mp, key, hash, &value_addr);
+        if (ep == NULL) {
+            PyErr_Clear();
+            return -1;
+        }
+    }
+
+    *value = *value_addr;
+    return (Py_ssize_t)(ep - mp->ma_keys->dk_entries);
+}
+
 PyObject *
 _PyDict_GetItem_KnownHash(PyObject *op, PyObject *key, Py_hash_t hash)
 {

@@ -1111,8 +1111,9 @@ __PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method)
 
 /* Generic GetAttr functions - put these in your tp_[gs]etattro slot. */
 
-PyObject *
-_PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name, PyObject *dict)
+Py_ssize_t
+__PyObject_GenericGetAttrWithDictHint(PyObject *obj, PyObject *name, PyObject *dict,
+                                      Py_ssize_t hint, PyObject **value)
 {
     /* Make sure the logic of __PyObject_GetMethod is in sync with
        this method.
@@ -1124,18 +1125,23 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name, PyObject *dict)
     descrgetfunc f;
     Py_ssize_t dictoffset;
     PyObject **dictptr;
+    Py_ssize_t ret = __DICTHINTMISS;
+
+    assert(*value == NULL);
 
     if (!PyUnicode_Check(name)){
         PyErr_Format(PyExc_TypeError,
                      "attribute name must be string, not '%.200s'",
                      name->ob_type->tp_name);
-        return NULL;
+        return -1;
     }
     Py_INCREF(name);
 
     if (tp->tp_dict == NULL) {
-        if (PyType_Ready(tp) < 0)
+        if (PyType_Ready(tp) < 0) {
+            ret = -1;
             goto done;
+        }
     }
 
     descr = _PyType_Lookup(tp, name);
@@ -1174,12 +1180,13 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name, PyObject *dict)
     }
     if (dict != NULL) {
         Py_INCREF(dict);
-        res = PyDict_GetItem(dict, name);
-        if (res != NULL) {
+        ret = __PyDict_GetItemHint(dict, name, hint, &res);
+        if (ret >= 0 && res != NULL) {
             Py_INCREF(res);
             Py_DECREF(dict);
             goto done;
         }
+        ret = __DICTHINTMISS;
         Py_DECREF(dict);
     }
 
@@ -1194,19 +1201,37 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name, PyObject *dict)
         goto done;
     }
 
+    ret = -1;
     PyErr_Format(PyExc_AttributeError,
                  "'%.50s' object has no attribute '%U'",
                  tp->tp_name, name);
   done:
     Py_XDECREF(descr);
     Py_DECREF(name);
-    return res;
+    *value = res;
+    return ret;
+}
+
+PyObject *
+_PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name, PyObject *dict)
+{
+    PyObject *value = NULL;
+    Py_ssize_t ret =  __PyObject_GenericGetAttrWithDictHint(obj, name, dict, -1, &value);
+    if (ret < 0) {
+        return NULL;
+    }
+    return value;
 }
 
 PyObject *
 PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 {
-    return _PyObject_GenericGetAttrWithDict(obj, name, NULL);
+    PyObject *value = NULL;
+    Py_ssize_t ret =  __PyObject_GenericGetAttrWithDictHint(obj, name, NULL, -1, &value);
+    if (ret < 0) {
+        return NULL;
+    }
+    return value;
 }
 
 int
