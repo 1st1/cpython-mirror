@@ -146,10 +146,6 @@ int _PyObjectDict_SetItem(PyTypeObject *tp, PyObject **dictptr, PyObject *name, 
 PyObject *_PyDict_LoadGlobal(PyDictObject *, PyDictObject *, PyObject *);
 #endif
 
-#define __DICTHINTMISS 1000000
-Py_ssize_t
-__PyDict_GetItemHint(PyObject *, PyObject *, Py_ssize_t, PyObject **);
-
 #ifdef __cplusplus
 }
 #endif

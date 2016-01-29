@@ -1099,6 +1099,12 @@ PyDict_GetItem(PyObject *op, PyObject *key)
     return *value_addr;
 }
 
+int
+__PyDict_IsSplit(PyObject *op)
+{
+    return ((PyDictObject *)op)->ma_keys->dk_lookup == lookdict_split;
+}
+
 Py_ssize_t
 __PyDict_GetItemHint(PyObject *op, PyObject *key, Py_ssize_t hint, PyObject **value)
 {
@@ -1113,19 +1119,6 @@ __PyDict_GetItemHint(PyObject *op, PyObject *key, Py_ssize_t hint, PyObject **va
 
     if (!PyDict_Check(op))
         return -1;
-
-    if (hint >= 0 && hint < mp->ma_keys->dk_size) {
-        PyDictKeyEntry *ep0, *ep;
-        assert(key != NULL);
-        ep0 = &mp->ma_keys->dk_entries[0];
-        ep = &ep0[(size_t)hint];
-        if (ep->me_key == key) {
-            *value = ep->me_value;
-            if (*value != NULL) {
-                return hint;
-            }
-        }
-    }
 
     if (!PyUnicode_CheckExact(key) ||
         (hash = ((PyASCIIObject *) key)->hash) == -1)

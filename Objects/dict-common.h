@@ -19,4 +19,12 @@ struct _dictkeysobject {
     PyDictKeyEntry dk_entries[1];
 };
 
+#define __DICTHINTMISS 1000000
+
+Py_ssize_t
+__PyDict_GetItemHint(PyObject *, PyObject *, Py_ssize_t, PyObject **);
+
+int
+__PyDict_IsSplit(PyObject *);
+
 #endif
