@@ -2886,39 +2886,203 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *res;
             Py_ssize_t ret;
 
-            if (type->tp_getattro == PyObject_GenericGetAttr) {
+            if (type->tp_getattro == PyObject_GenericGetAttr &&
+                type->tp_dictoffset >= 0 &&
+                PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG))
+            {
                 OPCODE_CACHE_CHECK();
                 if (co_opt != NULL) {
+                    PyObject *descr;
+                    descrgetfunc df;
+                    PyObject **dictptr;
+                    PyObject *dict;
                     _PyOpCodeOpt_LoadAttr *la = &co_opt->u.la;
 
-                    res = NULL;
-                    ret = __PyObject_GenericGetAttrWithDictHint(
-                        owner,
-                        name,
-                        NULL,
-                        la->hint,
-                        &res);
+                    if (co_opt->optimized > 0 &&
+                        la->type == type &&
+                        la->tp_version_tag == type->tp_version_tag)
+                    {
+                        descr = la->descr;
 
-                    if (ret >= 0 && ret != __DICTHINTMISS) {
-                        if (la->hint == ret && ret != __DICTHINTMISS) {
+                        if (la->descr_type == 1) {
+                            assert(descr != NULL);
+                            assert(PyDescr_IsData(descr));
+                            df = descr->ob_type->tp_descr_get;
+                            assert(df != NULL);
+
+                            Py_INCREF(descr);
+                            res = df(descr, owner, (PyObject *)type);
+                            Py_DECREF(descr);
+
+                            Py_DECREF(owner);
+                            SET_TOP(res);
+                            if (res == NULL)
+                                goto error;
+
                             OPCODE_CACHE_ATTR_HIT();
-                        } else {
-                            OPCODE_CACHE_ATTR_MISS();
+                            DISPATCH();
                         }
 
-                        la->hint = ret;
-                    } else {
+                        if (type->tp_dictoffset > 0) {
+                            dictptr = (PyObject **) ((char *)owner +
+                                            type->tp_dictoffset);
+                            dict = *dictptr;
+
+                            if (dict != NULL) {
+                                Py_INCREF(dict);
+                                res = NULL;
+                                ret = __PyDict_GetItemHint(
+                                    dict, name, la->hint, &res);
+
+                                if (res != NULL) {
+                                    if (ret >= 0 && ret < 16000) { /* XXX */
+                                        if (la->hint == ret) {
+                                            OPCODE_CACHE_ATTR_HIT();
+                                        } else {
+                                            OPCODE_CACHE_ATTR_MISS();
+                                        }
+
+                                        la->hint = (int)ret;
+                                    } else {
+                                        OPCODE_CACHE_ATTR_MISS();
+                                        la->hint = -1;
+                                    }
+
+                                    Py_INCREF(res);
+                                    SET_TOP(res);
+
+                                    Py_DECREF(dict);
+                                    Py_DECREF(owner);
+
+                                    DISPATCH();
+                                }
+                                Py_DECREF(dict);
+                            }
+                        }
+
+                        if (descr != NULL) {
+                            df = descr->ob_type->tp_descr_get;
+                            if (df != NULL) {
+                                Py_INCREF(descr);
+                                res = df(descr, owner, (PyObject *)type);
+                                Py_DECREF(descr);
+
+                                Py_DECREF(owner);
+                                SET_TOP(res);
+                                if (res == NULL)
+                                    goto error;
+
+                                DISPATCH();
+                            }
+
+                            Py_INCREF(descr);
+                            Py_DECREF(owner);
+                            SET_TOP(descr);
+
+                            DISPATCH();
+                        }
+
                         OPCODE_CACHE_ATTR_MISS();
-                        la->hint = -1;
+
+                        Py_DECREF(owner);
+                        SET_TOP(NULL);
+
+                        PyErr_Format(PyExc_AttributeError,
+                                     "'%.50s' object has no attribute '%U'",
+                                     type->tp_name, name);
+
+                        goto error;
+                    }
+
+                    OPCODE_CACHE_ATTR_MISS();
+
+                    co_opt->optimized = 1;
+                    la->type = type;
+                    la->tp_version_tag = type->tp_version_tag;
+                    la->descr_type = 0;
+
+                    la->descr = descr = _PyType_Lookup(type, name);
+
+                    df = NULL;
+                    if (descr != NULL) {
+                        df = descr->ob_type->tp_descr_get;
+                        if (df != NULL && PyDescr_IsData(descr)) {
+                            Py_INCREF(descr);
+                            res = df(descr, owner, (PyObject *)type);
+                            Py_DECREF(descr);
+
+                            Py_DECREF(owner);
+                            SET_TOP(res);
+
+                            if (res == NULL) {
+                                goto error;
+                            } else {
+                                la->descr_type = 1;
+                            }
+
+                            DISPATCH();
+                        }
+                    }
+
+                    if (type->tp_dictoffset > 0) {
+                        dictptr = (PyObject **) ((char *)owner +
+                                                    type->tp_dictoffset);
+                        dict = *dictptr;
+
+                        if (dict != NULL) {
+                            Py_INCREF(dict);
+                            res = NULL;
+                            la->hint = ret = __PyDict_GetItemHint(
+                                dict, name, -1, &res);
+                            if (ret >= 0 && res != NULL) {
+                                Py_INCREF(res);
+                                Py_DECREF(dict);
+
+                                Py_DECREF(owner);
+                                SET_TOP(res);
+                                if (res == NULL)
+                                    goto error;
+                                DISPATCH();
+                            }
+                            Py_DECREF(dict);
+                        }
+                    }
+
+                    if (descr != NULL) {
+                        df = descr->ob_type->tp_descr_get;
+                        if (df != NULL) {
+                            Py_INCREF(descr);
+                            res = df(descr, owner, (PyObject *)type);
+                            Py_DECREF(descr);
+
+                            Py_DECREF(owner);
+                            SET_TOP(res);
+
+                            if (res == NULL)
+                                goto error;
+
+                            DISPATCH();
+                        }
+
+                        Py_DECREF(owner);
+                        Py_INCREF(descr);
+                        SET_TOP(descr);
+
+                        DISPATCH();
                     }
 
                     Py_DECREF(owner);
-                    SET_TOP(res);
-                    if (res == NULL)
-                        goto error;
-                    DISPATCH();
+                    SET_TOP(NULL);
+
+                    PyErr_Format(PyExc_AttributeError,
+                                 "'%.50s' object has no attribute '%U'",
+                                 type->tp_name, name);
+
+                    goto error;
                 }
             }
+
+            /* slow path */
 
             res = PyObject_GetAttr(owner, name);
             Py_DECREF(owner);

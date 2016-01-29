@@ -1107,6 +1107,7 @@ __PyDict_GetItemHint(PyObject *op, PyObject *key, Py_ssize_t hint, PyObject **va
     PyDictKeyEntry *ep;
     PyThreadState *tstate;
     PyObject **value_addr;
+    Py_ssize_t ret;
 
     assert(*value == NULL);
 
@@ -1161,7 +1162,9 @@ __PyDict_GetItemHint(PyObject *op, PyObject *key, Py_ssize_t hint, PyObject **va
     }
 
     *value = *value_addr;
-    return (Py_ssize_t)(ep - mp->ma_keys->dk_entries);
+    ret = (Py_ssize_t)(ep - mp->ma_keys->dk_entries);
+    assert(ret >= 0);
+    return ret;
 }
 
 PyObject *
