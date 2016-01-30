@@ -8,6 +8,7 @@ extern "C" {
 #endif
 
 #define OPCODE_CACHE_MIN_RUNS 1024
+#define OPCODE_CACHE_MAX_TRIES 20
 
 typedef struct {
     PyTypeObject *type;
