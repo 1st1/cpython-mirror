@@ -1099,29 +1099,41 @@ PyDict_GetItem(PyObject *op, PyObject *key)
     return *value_addr;
 }
 
-int
-__PyDict_IsSplit(PyObject *op)
-{
-    return ((PyDictObject *)op)->ma_keys->dk_lookup == lookdict_split;
-}
-
 Py_ssize_t
-__PyDict_GetItemHint(PyObject *op, PyObject *key, Py_ssize_t hint, PyObject **value)
+__PyDict_GetItemHint(PyDictObject *mp, PyObject *key,
+                     Py_ssize_t hint, PyObject **value)
 {
     Py_hash_t hash;
-    PyDictObject *mp = (PyDictObject *)op;
     PyDictKeyEntry *ep;
     PyThreadState *tstate;
     PyObject **value_addr;
     Py_ssize_t ret;
 
     assert(*value == NULL);
+    assert(PyDict_CheckExact((PyObject*)mp));
+    assert(PyUnicode_CheckExact(key));
 
-    if (!PyDict_Check(op))
-        return -1;
+    if (hint >= 0 && hint < mp->ma_keys->dk_size) {
+        PyDictKeyEntry *ep0, *ep;
+        PyObject *res;
 
-    if (!PyUnicode_CheckExact(key) ||
-        (hash = ((PyASCIIObject *) key)->hash) == -1)
+        ep0 = &mp->ma_keys->dk_entries[0];
+        ep = &ep0[(size_t)hint];
+        if (ep->me_key == key) {
+            if (mp->ma_keys->dk_lookup == lookdict_split) {
+                assert(mp->ma_values != NULL);
+                res = mp->ma_values[(size_t)hint];
+            } else {
+                res = ep->me_value;
+            }
+            if (res != NULL) {
+                *value = res;
+                return hint;
+            }
+        }
+    }
+
+    if ((hash = ((PyASCIIObject *) key)->hash) == -1)
     {
         hash = PyObject_Hash(key);
         if (hash == -1) {

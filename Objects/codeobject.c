@@ -191,7 +191,7 @@ _PyCode_InitOptCache(PyCodeObject *co)
         {
             /* 'i' is now aligned to ceval/INSTR_OFFSET() */
             co->co_opt_opcodemap[i] = ++opts;
-            if (opts > 250) {
+            if (opts > 254) {
                 break;
             }
         }
