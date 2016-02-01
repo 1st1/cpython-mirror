@@ -3042,7 +3042,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                                 (PyDictObject*)dict, name, hint, &res);
 
                             if (res != NULL) {
-                                if (la->hint == hint && hint >= 0) {
+                                if (la->hint == hint && la->hint >= 0) {
                                     /* Our hint has helped -- cache hit. */
                                     OPCODE_CACHE_STAT_ATTR_HIT();
                                 } else {
@@ -3062,6 +3062,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                                    this lookup. */
                                 OPCODE_CACHE_DEOPT_LOAD_ATTR();
                             }
+                            Py_DECREF(dict);
                         } else {
                             /* no dict, or __dict__ doesn't satisfy
                                PyDict_CheckExact */
@@ -3082,8 +3083,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 {
                     PyObject *descr;
                     Py_ssize_t ret;
-
-                    co_opt->optimized = 0;
 
                     if (type->tp_dictoffset > 0) {
                         if (type->tp_dict == NULL) {
@@ -3108,16 +3107,21 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                                 res = NULL;
                                 ret = __PyDict_GetItemHint(
                                     (PyDictObject*)dict, name, -1, &res);
-                                if (ret >= 0 && res != NULL) {
+                                if (res != NULL) {
                                     Py_INCREF(res);
                                     Py_DECREF(dict);
 
                                     Py_DECREF(owner);
                                     SET_TOP(res);
 
-                                    OPCODE_CACHE_STAT_ATTR_OPT();
+                                    if (co_opt->optimized == 0) {
+                                        /* First time we optimize this
+                                           opcode. */
+                                        OPCODE_CACHE_STAT_ATTR_OPT();
+                                        co_opt->optimized =
+                                            OPCODE_CACHE_MAX_TRIES;
+                                    }
 
-                                    co_opt->optimized = OPCODE_CACHE_MAX_TRIES;
                                     la = &co_opt->u.la;
                                     la->type = type;
                                     la->tp_version_tag = type->tp_version_tag;
@@ -3126,13 +3130,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                                     DISPATCH();
                                 }
                                 Py_DECREF(dict);
+                            } else {
+                                OPCODE_CACHE_DEOPT_LOAD_ATTR();
                             }
+                        } else {
+                            OPCODE_CACHE_DEOPT_LOAD_ATTR();
                         }
+                    } else {
+                        OPCODE_CACHE_DEOPT_LOAD_ATTR();
                     }
                 }
-
-                /* We can't really optimize this opcode. */
-                OPCODE_CACHE_DEOPT_LOAD_ATTR();
             }
 
             /* slow path */
