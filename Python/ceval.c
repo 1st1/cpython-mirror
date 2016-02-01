@@ -3728,13 +3728,13 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     if (co_opt != NULL &&
                         PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG))
                     {
-                        OPCODE_CACHE_STAT_METHOD_OPT();
-
                         _PyOpCodeOpt_LoadMethod *lm = &co_opt->u.lm;
                         co_opt->optimized = OPCODE_CACHE_MAX_TRIES;
                         lm->type = type;
                         lm->tp_version_tag = type->tp_version_tag;
                         lm->meth = meth; /* borrowed */
+
+                        OPCODE_CACHE_STAT_METHOD_OPT();
                     }
                 } else {
                     /* Not a method (but a regular attr, or something
