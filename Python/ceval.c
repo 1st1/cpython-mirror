@@ -140,9 +140,9 @@ typedef PyObject *(*callproc)(PyObject *, PyObject *, PyObject *);
 
 /* Forward declarations */
 #ifdef WITH_TSC
-static PyObject * call_function(PyObject ***, int, uint64*, uint64*);
+static PyObject * call_function(PyObject ***, int, int, uint64*, uint64*);
 #else
-static PyObject * call_function(PyObject ***, int);
+static PyObject * call_function(PyObject ***, int, int);
 #endif
 static PyObject * fast_function(PyObject *, PyObject ***, int, int, int);
 static PyObject * do_call(PyObject *, PyObject ***, int, int);
@@ -3786,21 +3786,21 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
                    after the next line it will be:
 
-                       ... | NULL | method | arg1 | ... | argN
+                       ... | method | method | arg1 | ... | argN
                                                            ^- TOP()
                                               ^- (-oparg)
                                        ^- (-oparg-1)
                               ^- (-oparg-2)
 
-                   `method` will be POPed by call_funtion, NULL
+                   The first `method` will be POPed by call_funtion, the latter
                    will be POPed manually later.
                 */
                 SET_VALUE(oparg + 1, PEEK(oparg + 2));
 
 #ifdef WITH_TSC
-                res = call_function(&sp, oparg, &intr0, &intr1);
+                res = call_function(&sp, oparg, 0, &intr0, &intr1);
 #else
-                res = call_function(&sp, oparg);
+                res = call_function(&sp, oparg, 0);
 #endif
                 stack_pointer = sp;
                 POP(); /* POP the NULL. */
@@ -3817,9 +3817,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                   make it accept the `obj` as a first argument.
                 */
 #ifdef WITH_TSC
-                res = call_function(&sp, oparg + 1, &intr0, &intr1);
+                res = call_function(&sp, oparg + 1, 1, &intr0, &intr1);
 #else
-                res = call_function(&sp, oparg + 1);
+                res = call_function(&sp, oparg + 1, 1);
 #endif
                 stack_pointer = sp;
             }
@@ -3835,9 +3835,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PCALL(PCALL_ALL);
             sp = stack_pointer;
 #ifdef WITH_TSC
-            res = call_function(&sp, oparg, &intr0, &intr1);
+            res = call_function(&sp, oparg, 0, &intr0, &intr1);
 #else
-            res = call_function(&sp, oparg);
+            res = call_function(&sp, oparg, 0);
 #endif
             stack_pointer = sp;
             PUSH(res);
@@ -5316,7 +5316,7 @@ if (tstate->use_tracing && tstate->c_profilefunc) { \
     }
 
 static PyObject *
-call_function(PyObject ***pp_stack, int oparg
+call_function(PyObject ***pp_stack, int oparg, int is_meth
 #ifdef WITH_TSC
                 , uint64* pintr0, uint64* pintr1
 #endif
@@ -5371,10 +5371,12 @@ call_function(PyObject ***pp_stack, int oparg
             }
         }
     }
-    else if (Py_TYPE(func) == &PyMethodDescr_Type && nk == 0) {
+    else if (is_meth && Py_TYPE(func) == &PyMethodDescr_Type) {
         PyMethodDef *md = ((PyMethodDescrObject*)func)->d_method;
         int flags = md->ml_flags;
         PyThreadState *tstate = PyThreadState_GET();
+
+        assert(nk == 0);
 
         if (flags & (METH_NOARGS | METH_O)) {
             PyCFunction meth = md->ml_meth;
