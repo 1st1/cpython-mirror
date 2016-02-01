@@ -3035,15 +3035,13 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                         dict = *dictptr;
                         if (dict != NULL && PyDict_CheckExact(dict)) {
                             Py_ssize_t hint = la->hint;
-                            assert(hint >= 0);
-
                             Py_INCREF(dict);
                             res = NULL;
                             la->hint = __PyDict_GetItemHint(
                                 (PyDictObject*)dict, name, hint, &res);
 
                             if (res != NULL) {
-                                if (la->hint == hint && la->hint >= 0) {
+                                if (la->hint == hint && hint >= 0) {
                                     /* Our hint has helped -- cache hit. */
                                     OPCODE_CACHE_STAT_ATTR_HIT();
                                 } else {
@@ -3062,8 +3060,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                                    sometimes -- we don't want to optimize
                                    this lookup. */
                                 OPCODE_CACHE_DEOPT_LOAD_ATTR();
+                                Py_DECREF(dict);
                             }
-                            Py_DECREF(dict);
                         } else {
                             /* no dict, or __dict__ doesn't satisfy
                                PyDict_CheckExact */
