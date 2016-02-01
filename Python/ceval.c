@@ -3138,6 +3138,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     } else {
                         OPCODE_CACHE_DEOPT_LOAD_ATTR();
                     }
+                } else if (type->tp_getattro != PyObject_GenericGetAttr) {
+                    OPCODE_CACHE_DEOPT_LOAD_ATTR();
                 }
             }
 
