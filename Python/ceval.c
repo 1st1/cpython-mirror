@@ -97,7 +97,8 @@ void dump_tsc(int opcode, int ticked, uint64 inst0, uint64 inst1,
 
 #endif
 
-
+#define OPCODE_CACHE_MIN_RUNS 1024
+#define OPCODE_CACHE_MAX_TRIES 20
 #define OPCODE_CACHE_STATS 0
 
 #if OPCODE_CACHE_STATS
