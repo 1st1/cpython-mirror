@@ -147,6 +147,10 @@ static PyObject * unicode_concatenate(PyObject *, PyObject *,
                                       PyFrameObject *, unsigned char *);
 static PyObject * special_lookup(PyObject *, _Py_Identifier *);
 
+Py_LOCAL_INLINE(PyObject *) pylong_add(PyObject *, PyObject *);
+Py_LOCAL_INLINE(PyObject *) pylong_sub(PyObject *, PyObject *);
+Py_LOCAL_INLINE(PyObject *) pylong_mul(PyObject *, PyObject *);
+
 #define NAME_ERROR_MSG \
     "name '%.200s' is not defined"
 #define UNBOUNDLOCAL_ERROR_MSG \
@@ -1497,12 +1501,23 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(BINARY_MULTIPLY) {
             PyObject *right = POP();
             PyObject *left = TOP();
-            PyObject *res = PyNumber_Multiply(left, right);
-            Py_DECREF(left);
-            Py_DECREF(right);
+            PyObject *res;
+            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
+                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
+            ) {
+                /* Fast path for small ints; refs to 'left' and 'right'
+                   will be managed by pylong_mul. */
+                res = pylong_mul(left, right);
+            } else {
+                res = PyNumber_Multiply(left, right);
+                Py_DECREF(left);
+                Py_DECREF(right);
+            }
+
             SET_TOP(res);
-            if (res == NULL)
+            if (res == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
@@ -1563,33 +1578,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
                 PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
             ) {
-                /* Fast path for small ints */
-                if (Py_SIZE(left) != 0) {
-                    if (Py_SIZE(right) != 0) {
-                        long a, b;
-
-                        a = ((PyLongObject*)left)->ob_digit[0];
-                        a *= Py_SIZE(left);
-
-                        b = ((PyLongObject*)right)->ob_digit[0];
-                        b *= Py_SIZE(right);
-
-                        /* `a + b` will never overflow, as digits in
-                           PyLong are 30 bits max */
-                        sum = PyLong_FromLong(a + b);
-
-                        Py_DECREF(left);
-                        Py_DECREF(right);
-                    }
-                    else {
-                        sum = left;
-                        Py_DECREF(right);
-                    }
-                }
-                else {
-                    sum = right;
-                    Py_DECREF(left);
-                }
+                /* Fast path for small ints; refs to 'left' and 'right'
+                   will be managed by pylong_add. */
+                sum = pylong_add(left, right);
             }
             else if (PyUnicode_CheckExact(left) &&
                      PyUnicode_CheckExact(right)
@@ -1614,12 +1605,22 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(BINARY_SUBTRACT) {
             PyObject *right = POP();
             PyObject *left = TOP();
-            PyObject *diff = PyNumber_Subtract(left, right);
-            Py_DECREF(right);
-            Py_DECREF(left);
+            PyObject *diff;
+            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
+                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
+            ) {
+                /* Fast path for small ints; refs to 'left' and 'right'
+                   will be managed by pylong_sub. */
+                diff = pylong_sub(left, right);
+            } else {
+                diff = PyNumber_Subtract(left, right);
+                Py_DECREF(right);
+                Py_DECREF(left);
+            }
             SET_TOP(diff);
-            if (diff == NULL)
+            if (diff == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
@@ -1734,12 +1735,22 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(INPLACE_MULTIPLY) {
             PyObject *right = POP();
             PyObject *left = TOP();
-            PyObject *res = PyNumber_InPlaceMultiply(left, right);
-            Py_DECREF(left);
-            Py_DECREF(right);
+            PyObject *res;
+            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
+                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
+            ) {
+                /* Fast path for small ints; refs to 'left' and 'right'
+                   will be managed by pylong_mul. */
+                res = pylong_mul(left, right);
+            } else {
+                res = PyNumber_InPlaceMultiply(left, right);
+                Py_DECREF(left);
+                Py_DECREF(right);
+            }
             SET_TOP(res);
-            if (res == NULL)
+            if (res == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
@@ -1795,30 +1806,49 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *sum;
-            if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
+            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
+                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
+            ) {
+                /* Fast path for small ints; refs to 'left' and 'right'
+                   will be managed by pylong_add. */
+                sum = pylong_add(left, right);
+            }
+            else if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
                 sum = unicode_concatenate(left, right, f, next_instr);
-                /* unicode_concatenate consumed the ref to v */
+                /* unicode_concatenate consumed the ref to 'left' */
+                Py_DECREF(right);
             }
             else {
                 sum = PyNumber_InPlaceAdd(left, right);
                 Py_DECREF(left);
+                Py_DECREF(right);
             }
-            Py_DECREF(right);
             SET_TOP(sum);
-            if (sum == NULL)
+            if (sum == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
         TARGET(INPLACE_SUBTRACT) {
             PyObject *right = POP();
             PyObject *left = TOP();
-            PyObject *diff = PyNumber_InPlaceSubtract(left, right);
-            Py_DECREF(left);
-            Py_DECREF(right);
+            PyObject *diff;
+            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
+                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
+            ) {
+                /* Fast path for small ints; refs to 'left' and 'right'
+                   will be managed by pylong_sub. */
+                diff = pylong_sub(left, right);
+            } else {
+                diff = PyNumber_InPlaceSubtract(left, right);
+                Py_DECREF(left);
+                Py_DECREF(right);
+            }
             SET_TOP(diff);
-            if (diff == NULL)
+            if (diff == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
@@ -5351,6 +5381,164 @@ unicode_concatenate(PyObject *v, PyObject *w,
     res = v;
     PyUnicode_Append(&res, w);
     return res;
+}
+
+Py_LOCAL_INLINE(PyObject *)
+pylong_add(PyObject *left, PyObject *right) {
+    long a, b;
+    PyObject *sum;
+
+    assert(PyLong_CheckExact(left));
+    assert(Py_ABS(Py_SIZE(left)) <= 1);
+    assert(PyLong_CheckExact(right));
+    assert(Py_ABS(Py_SIZE(right)) <= 1);
+
+    if (Py_SIZE(left) != 0) {
+        if (Py_SIZE(right) != 0) {
+            a = ((PyLongObject*)left)->ob_digit[0];
+            a *= Py_SIZE(left);
+
+            b = ((PyLongObject*)right)->ob_digit[0];
+            b *= Py_SIZE(right);
+
+            /* `a + b` will never overflow, as digits in
+               PyLong are 30 bits max */
+            sum = PyLong_FromLong(a + b);
+
+            Py_DECREF(left);
+            Py_DECREF(right);
+
+            return sum;
+        }
+        else {
+            /* right == 0 */
+            Py_DECREF(right);
+            return left;
+        }
+    }
+    else {
+        /* left == 0 */
+        Py_DECREF(left);
+        return right;
+    }
+    /* event horizon */
+    assert(0);
+}
+
+Py_LOCAL_INLINE(PyObject *)
+pylong_sub(PyObject *left, PyObject *right) {
+    long a, b;
+    PyObject *sum;
+
+    assert(PyLong_CheckExact(left));
+    assert(Py_ABS(Py_SIZE(left)) <= 1);
+    assert(PyLong_CheckExact(right));
+    assert(Py_ABS(Py_SIZE(right)) <= 1);
+
+    if (Py_SIZE(left) != 0) {
+        if (Py_SIZE(right) != 0) {
+            a = ((PyLongObject*)left)->ob_digit[0];
+            a *= Py_SIZE(left);
+
+            b = ((PyLongObject*)right)->ob_digit[0];
+            b *= Py_SIZE(right);
+
+            /* `a - b` will never overflow, as digits in
+               PyLong are 30 bits max */
+            sum = PyLong_FromLong(a - b);
+
+            Py_DECREF(left);
+            Py_DECREF(right);
+
+            return sum;
+        }
+        else {
+            /* left != 0 && right == 0:
+                return left
+            */
+            Py_DECREF(right);
+            return left;
+        }
+    }
+    else {
+        if (Py_SIZE(right) != 0) {
+            /* left == 0 && right != 0:
+                  return 0 - right
+            */
+            b = ((PyLongObject*)right)->ob_digit[0];
+            b *= Py_SIZE(right);
+
+            sum = PyLong_FromLong(-b);
+
+            Py_DECREF(left);
+            Py_DECREF(right);
+
+            return sum;
+        } else {
+            /* left == 0 && right == 0:
+                   return left
+            */
+            Py_DECREF(right);
+            return left;
+        }
+    }
+    /* event horizon */
+    assert(0);
+}
+
+Py_LOCAL_INLINE(PyObject *)
+pylong_mul(PyObject *left, PyObject *right) {
+    PyObject *res;
+    long a, b;
+
+    assert(PyLong_CheckExact(left));
+    assert(Py_ABS(Py_SIZE(left)) <= 1);
+    assert(PyLong_CheckExact(right));
+    assert(Py_ABS(Py_SIZE(right)) <= 1);
+
+    if (Py_SIZE(left) != 0) {
+        if (Py_SIZE(right) != 0) {
+
+#ifdef HAVE_LONG_LONG
+            long long mul;
+
+            a = ((PyLongObject*)left)->ob_digit[0];
+            a *= Py_SIZE(left);
+
+            b = ((PyLongObject*)right)->ob_digit[0];
+            b *= Py_SIZE(right);
+
+            /* `a * b` will never overflow, as digits in
+               PyLong are 30 bits max, and 'mul' is 64 bits */
+
+            mul = (long long)a * b;
+            res = PyLong_FromLongLong(mul);
+#else
+            res = PyNumber_Multiply(left, right);
+#endif
+
+            Py_DECREF(left);
+            Py_DECREF(right);
+
+            return res;
+        }
+        else {
+            /* left != 0 && right == 0:
+                return right
+            */
+            Py_DECREF(left);
+            return right;
+        }
+    }
+    else {
+        /* left == 0 && right == something:
+            return left
+        */
+        Py_DECREF(right);
+        return left;
+    }
+    /* event horizon */
+    assert(0);
 }
 
 #ifdef DYNAMIC_EXECUTION_PROFILE
