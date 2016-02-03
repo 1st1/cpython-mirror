@@ -1560,19 +1560,54 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *sum;
-            if (PyUnicode_CheckExact(left) &&
-                     PyUnicode_CheckExact(right)) {
+            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
+                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
+            ) {
+                /* Fast path for small ints */
+                if (Py_SIZE(left) != 0) {
+                    if (Py_SIZE(right) != 0) {
+                        long a, b;
+
+                        a = ((PyLongObject*)left)->ob_digit[0];
+                        a *= Py_SIZE(left);
+
+                        b = ((PyLongObject*)right)->ob_digit[0];
+                        b *= Py_SIZE(right);
+
+                        /* `a + b` will never overflow, as digits in
+                           PyLong are 30 bits max */
+                        sum = PyLong_FromLong(a + b);
+
+                        Py_DECREF(left);
+                        Py_DECREF(right);
+                    }
+                    else {
+                        sum = left;
+                        Py_DECREF(right);
+                    }
+                }
+                else {
+                    sum = right;
+                    Py_DECREF(left);
+                }
+            }
+            else if (PyUnicode_CheckExact(left) &&
+                     PyUnicode_CheckExact(right)
+            ) {
+                /* fast path for string concatenation */
                 sum = unicode_concatenate(left, right, f, next_instr);
-                /* unicode_concatenate consumed the ref to v */
+                /* unicode_concatenate consumed the ref to left */
+                Py_DECREF(right);
             }
             else {
                 sum = PyNumber_Add(left, right);
                 Py_DECREF(left);
+                Py_DECREF(right);
             }
-            Py_DECREF(right);
             SET_TOP(sum);
-            if (sum == NULL)
+            if (sum == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
