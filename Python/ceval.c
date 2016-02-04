@@ -5438,6 +5438,7 @@ static int
 fast_add(PyObject *left, PyObject *right, PyObject **result)
 {
     PyObject *sum;
+    double left_d, right_d;
     int l_float, r_float;
     int l_long = PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1;
     int r_long = PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1;
@@ -5474,45 +5475,43 @@ fast_add(PyObject *left, PyObject *right, PyObject **result)
 
     r_float = PyFloat_CheckExact(right);
     if (l_long && r_float) {
-        double res = PyFloat_AS_DOUBLE(right) + SINGLE_DIGIT_LONG_AS_LONG(left);
-        sum = PyFloat_FromDouble(res);
-        Py_DECREF(left);
-        Py_DECREF(right);
-
-        *result = sum;
-        return sum == NULL;
+        left_d = (double)SINGLE_DIGIT_LONG_AS_LONG(left);
+        right_d = PyFloat_AS_DOUBLE(right);
+        goto calc_float;
     }
 
     l_float = PyFloat_CheckExact(left);
     if (l_float && r_long) {
-        double res = PyFloat_AS_DOUBLE(left) + SINGLE_DIGIT_LONG_AS_LONG(right);
-        sum = PyFloat_FromDouble(res);
-        Py_DECREF(left);
-        Py_DECREF(right);
-
-        *result = sum;
-        return sum == NULL;
+        left_d = PyFloat_AS_DOUBLE(left);
+        right_d = (double)SINGLE_DIGIT_LONG_AS_LONG(right);
+        goto calc_float;
     }
 
     if (l_float && r_float) {
-        double res = PyFloat_AS_DOUBLE(left) + PyFloat_AS_DOUBLE(right);
-
-        sum = PyFloat_FromDouble(res);
-        Py_DECREF(left);
-        Py_DECREF(right);
-
-        *result = sum;
-        return sum == NULL;
+        left_d = PyFloat_AS_DOUBLE(left);
+        right_d = PyFloat_AS_DOUBLE(right);
+        goto calc_float;
     }
 
     *result = NULL;
     return 0;
+
+  calc_float:
+    Py_DECREF(left);
+    Py_DECREF(right);
+
+    PyFPE_START_PROTECT("add", return -1)
+    left_d = left_d + right_d;
+    PyFPE_END_PROTECT(left_d)
+    *result = PyFloat_FromDouble(left_d);
+    return *result == NULL;
 }
 
 static int
 fast_sub(PyObject *left, PyObject *right, PyObject **result)
 {
     PyObject *sub;
+    double left_d, right_d;
     int l_float, r_float;
     int l_long = PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1;
     int r_long = PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1;
@@ -5553,49 +5552,43 @@ fast_sub(PyObject *left, PyObject *right, PyObject **result)
 
     r_float = PyFloat_CheckExact(right);
     if (l_long && r_float) {
-        double res = (double)SINGLE_DIGIT_LONG_AS_LONG(left) -
-                        PyFloat_AS_DOUBLE(right);
-
-        sub = PyFloat_FromDouble(res);
-        Py_DECREF(left);
-        Py_DECREF(right);
-
-        *result = sub;
-        return sub == NULL;
+        left_d = (double)SINGLE_DIGIT_LONG_AS_LONG(left);
+        right_d = PyFloat_AS_DOUBLE(right);
+        goto calc_float;
     }
 
     l_float = PyFloat_CheckExact(left);
     if (l_float && r_long) {
-        double res = PyFloat_AS_DOUBLE(left) -
-                        (double)SINGLE_DIGIT_LONG_AS_LONG(right);
-
-        sub = PyFloat_FromDouble(res);
-        Py_DECREF(left);
-        Py_DECREF(right);
-
-        *result = sub;
-        return sub == NULL;
+        left_d = PyFloat_AS_DOUBLE(left);
+        right_d = (double)SINGLE_DIGIT_LONG_AS_LONG(right);
+        goto calc_float;
     }
 
     if (l_float && r_float) {
-        double res = PyFloat_AS_DOUBLE(left) - PyFloat_AS_DOUBLE(right);
-
-        sub = PyFloat_FromDouble(res);
-        Py_DECREF(left);
-        Py_DECREF(right);
-
-        *result = sub;
-        return sub == NULL;
+        left_d = PyFloat_AS_DOUBLE(left);
+        right_d = PyFloat_AS_DOUBLE(right);
+        goto calc_float;
     }
 
     *result = NULL;
     return 0;
+
+  calc_float:
+    Py_DECREF(left);
+    Py_DECREF(right);
+
+    PyFPE_START_PROTECT("subtract", return -1)
+    left_d = left_d - right_d;
+    PyFPE_END_PROTECT(left_d)
+    *result = PyFloat_FromDouble(left_d);
+    return *result == NULL;
 }
 
 static int
 fast_mul(PyObject *left, PyObject *right, PyObject **result)
 {
     PyObject *mul;
+    double left_d, right_d;
     int l_float, r_float;
     int l_long = PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1;
     int r_long = PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1;
@@ -5639,43 +5632,36 @@ fast_mul(PyObject *left, PyObject *right, PyObject **result)
 
     r_float = PyFloat_CheckExact(right);
     if (l_long && r_float) {
-        double res = (double)SINGLE_DIGIT_LONG_AS_LONG(left) *
-                        PyFloat_AS_DOUBLE(right);
-
-        mul = PyFloat_FromDouble(res);
-        Py_DECREF(left);
-        Py_DECREF(right);
-
-        *result = mul;
-        return mul == NULL;
+        left_d = (double)SINGLE_DIGIT_LONG_AS_LONG(left);
+        right_d = PyFloat_AS_DOUBLE(right);
+        goto calc_float;
     }
 
     l_float = PyFloat_CheckExact(left);
     if (l_float && r_long) {
-        double res = PyFloat_AS_DOUBLE(left) *
-                        (double)SINGLE_DIGIT_LONG_AS_LONG(right);
-
-        mul = PyFloat_FromDouble(res);
-        Py_DECREF(left);
-        Py_DECREF(right);
-
-        *result = mul;
-        return mul == NULL;
+        left_d = PyFloat_AS_DOUBLE(left);
+        right_d = (double)SINGLE_DIGIT_LONG_AS_LONG(right);
+        goto calc_float;
     }
 
     if (l_float && r_float) {
-        double res = PyFloat_AS_DOUBLE(left) * PyFloat_AS_DOUBLE(right);
-
-        mul = PyFloat_FromDouble(res);
-        Py_DECREF(left);
-        Py_DECREF(right);
-
-        *result = mul;
-        return mul == NULL;
+        left_d = PyFloat_AS_DOUBLE(left);
+        right_d = PyFloat_AS_DOUBLE(right);
+        goto calc_float;
     }
 
     *result = NULL;
     return 0;
+
+  calc_float:
+    Py_DECREF(left);
+    Py_DECREF(right);
+
+    PyFPE_START_PROTECT("multiply", return -1)
+    left_d = left_d * right_d;
+    PyFPE_END_PROTECT(left_d)
+    *result = PyFloat_FromDouble(left_d);
+    return *result == NULL;
 }
 
 static int
@@ -5761,36 +5747,44 @@ fast_true_div(PyObject *left, PyObject *right, PyObject **result)
 
         left_d = (double)SINGLE_DIGIT_LONG_AS_LONG(left);
         right_d = (double)SINGLE_DIGIT_LONG_AS_LONG(right);
-        goto calc;
+        goto calc_float;
     }
 
     r_float = PyFloat_CheckExact(right);
     if (l_long && r_float) {
         left_d = (double)SINGLE_DIGIT_LONG_AS_LONG(left);
         right_d = PyFloat_AS_DOUBLE(right);
-        goto calc;
+        goto calc_float;
     }
 
     l_float = PyFloat_CheckExact(left);
     if (l_float && r_long) {
         left_d = PyFloat_AS_DOUBLE(left);
         right_d = (double)SINGLE_DIGIT_LONG_AS_LONG(right);
-        goto calc;
+        goto calc_float;
     }
 
     if (l_float && r_float) {
         left_d = PyFloat_AS_DOUBLE(left);
         right_d = PyFloat_AS_DOUBLE(right);
-        goto calc;
+        goto calc_float;
     }
 
     *result = NULL;
     return 0;
 
-  calc:
+  calc_float:
     Py_DECREF(left);
     Py_DECREF(right);
-    *result = _PyFloat_DivDouble(left_d, right_d);
+    if (right_d == 0.0) {
+        PyErr_SetString(PyExc_ZeroDivisionError,
+                        "float division by zero");
+        return -1;
+    }
+    PyFPE_START_PROTECT("divide", return -1)
+    left_d = left_d / right_d;
+    PyFPE_END_PROTECT(left_d)
+    *result = PyFloat_FromDouble(left_d);
     return *result == NULL;
 }
 
