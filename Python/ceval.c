@@ -5458,19 +5458,19 @@ fast_add(PyObject *left, PyObject *right,
          PyFrameObject *f, unsigned char *next_instr,
          PyObject **result)
 {
-    if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
-        /* fast path for string concatenation */
-        *result = unicode_concatenate(left, right, f, next_instr);
-        /* unicode_concatenate consumed the ref to left */
-        Py_DECREF(right);
-        return *result == NULL;
-    }
-
     if (Py_TYPE(left) == Py_TYPE(right)) {
         if (PyLong_CheckExact(left)) {
             *result = _PyLong_Add((PyLongObject*)left, (PyLongObject*)right);
             goto ret;
-        } else if (PyFloat_CheckExact(left)) {
+        }
+        else if (PyUnicode_CheckExact(left)) {
+            /* fast path for string concatenation */
+            *result = unicode_concatenate(left, right, f, next_instr);
+            /* unicode_concatenate consumed the ref to left */
+            Py_DECREF(right);
+            return *result == NULL;
+        }
+        else if (PyFloat_CheckExact(left)) {
             *result = _PyFloat_Add(left, right);
             goto ret;
         }

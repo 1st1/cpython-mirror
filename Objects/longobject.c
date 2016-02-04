@@ -2765,6 +2765,10 @@ PyLong_AsDouble(PyObject *v)
         PyErr_BadInternalCall();
         return -1.0;
     }
+    if (PyLong_CheckExact(v) && Py_ABS(Py_SIZE(v)) <= 1) {
+        /* fast path; single digit will always fit decimal */
+        return (double)MEDIUM_VALUE((PyLongObject *)v);
+    }
     if (!PyLong_Check(v)) {
         PyErr_SetString(PyExc_TypeError, "an integer is required");
         return -1.0;
