@@ -636,8 +636,8 @@ float_divmod(PyObject *v, PyObject *w)
     return Py_BuildValue("(dd)", floordiv, mod);
 }
 
-static PyObject *
-float_floor_div(PyObject *v, PyObject *w)
+PyObject *
+_PyFloat_FloorDiv(PyObject *v, PyObject *w)
 {
     PyObject *t, *r;
 
@@ -1826,7 +1826,7 @@ static PyNumberMethods float_as_number = {
     0,                  /* nb_inplace_and */
     0,                  /* nb_inplace_xor */
     0,                  /* nb_inplace_or */
-    float_floor_div, /* nb_floor_divide */
+    _PyFloat_FloorDiv,  /* nb_floor_divide */
     _PyFloat_Div,       /* nb_true_divide */
     0,                  /* nb_inplace_floor_divide */
     0,                  /* nb_inplace_true_divide */

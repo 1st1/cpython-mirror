@@ -5458,29 +5458,31 @@ fast_add(PyObject *left, PyObject *right,
          PyFrameObject *f, unsigned char *next_instr,
          PyObject **result)
 {
-    if (Py_TYPE(left) == Py_TYPE(right)) {
-        if (PyLong_CheckExact(left)) {
+    if (PyLong_CheckExact(left)) {
+        if (PyLong_CheckExact(right)) {
             *result = _PyLong_Add((PyLongObject*)left, (PyLongObject*)right);
             goto ret;
         }
-        else if (PyUnicode_CheckExact(left)) {
-            /* fast path for string concatenation */
-            *result = unicode_concatenate(left, right, f, next_instr);
-            /* unicode_concatenate consumed the ref to left */
-            Py_DECREF(right);
-            return *result == NULL;
-        }
-        else if (PyFloat_CheckExact(left)) {
+
+        if (PyFloat_CheckExact(right)) {
             *result = _PyFloat_Add(left, right);
             goto ret;
         }
-    } else {
-        if ((PyLong_CheckExact(left) && PyFloat_CheckExact(right)) ||
-            (PyLong_CheckExact(right) && PyFloat_CheckExact(left))
-        ) {
-            *result = _PyFloat_Add(left, right);
-            goto ret;
-        }
+    }
+
+    if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
+        /* fast path for string concatenation */
+        *result = unicode_concatenate(left, right, f, next_instr);
+        /* unicode_concatenate consumed the ref to left */
+        Py_DECREF(right);
+        return *result == NULL;
+    }
+
+    if (PyFloat_CheckExact(left) &&
+        (PyFloat_CheckExact(right) || PyLong_CheckExact(right))
+    ) {
+        *result = _PyFloat_Add(left, right);
+        goto ret;
     }
 
     *result = NULL;
@@ -5495,21 +5497,23 @@ fast_add(PyObject *left, PyObject *right,
 static int
 fast_sub(PyObject *left, PyObject *right, PyObject **result)
 {
-    if (Py_TYPE(left) == Py_TYPE(right)) {
-        if (PyLong_CheckExact(left)) {
+    if (PyLong_CheckExact(left)) {
+        if (PyLong_CheckExact(right)) {
             *result = _PyLong_Sub((PyLongObject*)left, (PyLongObject*)right);
             goto ret;
-        } else if (PyFloat_CheckExact(left)) {
+        }
+
+        if (PyFloat_CheckExact(right)) {
             *result = _PyFloat_Sub(left, right);
             goto ret;
         }
-    } else {
-        if ((PyLong_CheckExact(left) && PyFloat_CheckExact(right)) ||
-            (PyLong_CheckExact(right) && PyFloat_CheckExact(left))
-        ) {
-            *result = _PyFloat_Sub(left, right);
-            goto ret;
-        }
+    }
+
+    if (PyFloat_CheckExact(left) &&
+        (PyFloat_CheckExact(right) || PyLong_CheckExact(right))
+    ) {
+        *result = _PyFloat_Sub(left, right);
+        goto ret;
     }
 
     *result = NULL;
@@ -5524,21 +5528,23 @@ fast_sub(PyObject *left, PyObject *right, PyObject **result)
 static int
 fast_mul(PyObject *left, PyObject *right, PyObject **result)
 {
-    if (Py_TYPE(left) == Py_TYPE(right)) {
-        if (PyLong_CheckExact(left)) {
+    if (PyLong_CheckExact(left)) {
+        if (PyLong_CheckExact(right)) {
             *result = _PyLong_Mul((PyLongObject*)left, (PyLongObject*)right);
             goto ret;
-        } else if (PyFloat_CheckExact(left)) {
+        }
+
+        if (PyFloat_CheckExact(right)) {
             *result = _PyFloat_Mul(left, right);
             goto ret;
         }
-    } else {
-        if ((PyLong_CheckExact(left) && PyFloat_CheckExact(right)) ||
-            (PyLong_CheckExact(right) && PyFloat_CheckExact(left))
-        ) {
-            *result = _PyFloat_Mul(left, right);
-            goto ret;
-        }
+    }
+
+    if (PyFloat_CheckExact(left) &&
+        (PyFloat_CheckExact(right) || PyLong_CheckExact(right))
+    ) {
+        *result = _PyFloat_Mul(left, right);
+        goto ret;
     }
 
     *result = NULL;
@@ -5553,84 +5559,54 @@ fast_mul(PyObject *left, PyObject *right, PyObject **result)
 static int
 fast_floor_div(PyObject *left, PyObject *right, PyObject **result)
 {
-    PyObject *res;
-    int l_long = PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1;
-    int r_long = PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1;
-
-    if (l_long && r_long) {
-        if (Py_SIZE(left) != 0) {
-            if (Py_SIZE(right) != 0) {
-                long a, b, adivb;
-
-                a = ((PyLongObject*)left)->ob_digit[0];
-                b = ((PyLongObject*)right)->ob_digit[0];
-
-                if (Py_SIZE(left) != Py_SIZE(right)) {
-                    a *= Py_SIZE(left);
-                    b *= Py_SIZE(right);
-
-                    adivb = a / b;
-                    if (a - adivb * b) {
-                        /* we want floor */
-                        --adivb;
-                    }
-
-                    res = PyLong_FromLong(adivb);
-                } else {
-                    res = PyLong_FromLong(a / b);
-                }
-
-                Py_DECREF(left);
-                Py_DECREF(right);
-
-                *result = res;
-                return res == NULL;
-            }
-            else {
-                /* left != 0 && right == 0:
-                    raise ZeroDivisionError
-                */
-                Py_DECREF(left);
-                Py_DECREF(right);
-
-                PyErr_SetString(PyExc_ZeroDivisionError,
-                                "integer division or modulo by zero");
-                *result = NULL;
-                return -1;
-            }
+    if (PyLong_CheckExact(left)) {
+        if (PyLong_CheckExact(right)) {
+            *result = _PyLong_FloorDiv(left, right);
+            goto ret;
         }
-        else {
-            /* left == 0 && right == something:
-                return left
-            */
-            Py_DECREF(right);
-            *result = left;
-            return 0;
+
+        if (PyFloat_CheckExact(right)) {
+            *result = _PyFloat_FloorDiv(left, right);
+            goto ret;
         }
+    }
+
+    if (PyFloat_CheckExact(left) &&
+        (PyFloat_CheckExact(right) || PyLong_CheckExact(right))
+    ) {
+        *result = _PyFloat_FloorDiv(left, right);
+        goto ret;
     }
 
     *result = NULL;
     return 0;
+
+  ret:
+    Py_DECREF(left);
+    Py_DECREF(right);
+    return *result == NULL;
 }
 
 static int
 fast_true_div(PyObject *left, PyObject *right, PyObject **result)
 {
-    if (Py_TYPE(left) == Py_TYPE(right)) {
-        if (PyLong_CheckExact(left)) {
+    if (PyLong_CheckExact(left)) {
+        if (PyLong_CheckExact(right)) {
             *result = _PyLong_Div(left, right);
             goto ret;
-        } else if (PyFloat_CheckExact(left)) {
+        }
+
+        if (PyFloat_CheckExact(right)) {
             *result = _PyFloat_Div(left, right);
             goto ret;
         }
-    } else {
-        if ((PyLong_CheckExact(left) && PyFloat_CheckExact(right)) ||
-            (PyLong_CheckExact(right) && PyFloat_CheckExact(left))
-        ) {
-            *result = _PyFloat_Div(left, right);
-            goto ret;
-        }
+    }
+
+    if (PyFloat_CheckExact(left) &&
+        (PyFloat_CheckExact(right) || PyLong_CheckExact(right))
+    ) {
+        *result = _PyFloat_Div(left, right);
+        goto ret;
     }
 
     *result = NULL;

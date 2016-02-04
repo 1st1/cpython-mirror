@@ -3564,12 +3564,34 @@ l_divmod(PyLongObject *v, PyLongObject *w,
     return 0;
 }
 
-static PyObject *
-long_floor_div(PyObject *a, PyObject *b)
+PyObject *
+_PyLong_FloorDiv(PyObject *a, PyObject *b)
 {
     PyLongObject *div;
 
-    CHECK_BINOP(a, b);
+    if (PyLong_CheckExact(a) && PyLong_CheckExact(b)) {
+        if (Py_ABS(Py_SIZE(a)) == 1 && Py_ABS(Py_SIZE(b)) == 1) {
+            sdigit left = ((PyLongObject*)a)->ob_digit[0];
+            sdigit right = ((PyLongObject*)b)->ob_digit[0];
+            sdigit div;
+
+            if (Py_SIZE(a) != Py_SIZE(b)) {
+                left = -left;
+                div = left / right;
+                if (left - div * right) {
+                    /* we want floor */
+                    --div;
+                }
+
+                return PyLong_FromLong(div);
+            } else {
+                return PyLong_FromLong(left / right);
+            }
+        }
+    } else {
+        CHECK_BINOP(a, b);
+    }
+
     if (l_divmod((PyLongObject*)a, (PyLongObject*)b, &div, NULL) < 0)
         div = NULL;
     return (PyObject *)div;
@@ -5254,7 +5276,7 @@ static PyNumberMethods long_as_number = {
     0,                          /* nb_inplace_and */
     0,                          /* nb_inplace_xor */
     0,                          /* nb_inplace_or */
-    long_floor_div,             /* nb_floor_divide */
+    _PyLong_FloorDiv,           /* nb_floor_divide */
     _PyLong_Div,                /* nb_true_divide */
     0,                          /* nb_inplace_floor_divide */
     0,                          /* nb_inplace_true_divide */
