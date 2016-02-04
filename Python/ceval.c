@@ -1129,6 +1129,32 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         Py_XDECREF(traceback); \
     }
 
+#define FAST_NUM_OP(OP, left, right)                                    \
+    do {                                                                \
+        PyObject *result;                                               \
+        int check = 0;                                                  \
+        if (PyLong_CheckExact(left)) {                                  \
+            if (PyLong_CheckExact(right)) {                             \
+                result = _PyLong_##OP(left, right);                     \
+                check = 1;                                              \
+            }                                                           \
+            if (PyFloat_CheckExact(right)) {                            \
+                result = _PyFloat_##OP(left, right);                    \
+                check = 1;                                              \
+            }                                                           \
+        }                                                               \
+        else if (PyFloat_CheckExact(left) &&                            \
+            (PyFloat_CheckExact(right) || PyLong_CheckExact(right))) {  \
+            result = _PyFloat_##OP(left, right);                        \
+            check = 1;                                                  \
+        }                                                               \
+        if (check) {                                                    \
+            SET_TOP(result);                                            \
+            if (result == NULL) goto error;                             \
+            DISPATCH();                                                 \
+        }                                                               \
+    } while (0)
+
 /* Start of code */
 
     /* push frame */
@@ -1573,24 +1599,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            if (fast_floor_div(dividend, divisor, &quotient)) {
-                SET_TOP(NULL);
+            FAST_NUM_OP(FloorDiv, dividend, divisor);
+
+            quotient = PyNumber_FloorDivide(dividend, divisor);
+            Py_DECREF(dividend);
+            Py_DECREF(divisor);
+
+            SET_TOP(quotient);
+            if (quotient == NULL) {
                 goto error;
             }
-
-            if (quotient == NULL) {
-                quotient = PyNumber_FloorDivide(dividend, divisor);
-                Py_DECREF(dividend);
-                Py_DECREF(divisor);
-
-                SET_TOP(quotient);
-                if (quotient == NULL) {
-                    goto error;
-                }
-            } else {
-                SET_TOP(quotient);
-            }
-
             DISPATCH();
         }
 
@@ -1837,24 +1855,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            if (fast_floor_div(dividend, divisor, &quotient)) {
-                SET_TOP(NULL);
+            FAST_NUM_OP(FloorDiv, dividend, divisor);
+
+            quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
+            Py_DECREF(dividend);
+            Py_DECREF(divisor);
+
+            SET_TOP(quotient);
+            if (quotient == NULL) {
                 goto error;
             }
-
-            if (quotient == NULL) {
-                quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
-                Py_DECREF(dividend);
-                Py_DECREF(divisor);
-
-                SET_TOP(quotient);
-                if (quotient == NULL) {
-                    goto error;
-                }
-            } else {
-                SET_TOP(quotient);
-            }
-
             DISPATCH();
         }
 
