@@ -1509,6 +1509,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *res;
 
             if (fast_mul(left, right, &res)) {
+                SET_TOP(NULL);
                 goto error;
             }
 
@@ -1543,6 +1544,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *quotient;
 
             if (fast_true_div(dividend, divisor, &quotient)) {
+                SET_TOP(NULL);
                 goto error;
             }
 
@@ -1565,6 +1567,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *quotient;
 
             if (fast_floor_div(dividend, divisor, &quotient)) {
+                SET_TOP(NULL);
                 goto error;
             }
 
@@ -1601,6 +1604,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *sum;
 
             if (fast_add(left, right, &sum)) {
+                SET_TOP(NULL);
                 goto error;
             }
 
@@ -1631,6 +1635,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *diff;
 
             if (fast_sub(left, right, &diff)) {
+                SET_TOP(NULL);
                 goto error;
             }
 
@@ -1761,6 +1766,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *res;
 
             if (fast_mul(left, right, &res)) {
+                SET_TOP(NULL);
                 goto error;
             }
 
@@ -1795,6 +1801,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *quotient;
 
             if (fast_true_div(dividend, divisor, &quotient)) {
+                SET_TOP(NULL);
                 goto error;
             }
 
@@ -1816,6 +1823,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *quotient;
 
             if (fast_floor_div(dividend, divisor, &quotient)) {
+                SET_TOP(NULL);
                 goto error;
             }
 
@@ -1849,6 +1857,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *sum;
 
             if (fast_add(left, right, &sum)) {
+                SET_TOP(NULL);
                 goto error;
             }
 
@@ -1877,6 +1886,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *diff;
 
             if (fast_sub(left, right, &diff)) {
+                SET_TOP(NULL);
                 goto error;
             }
 
