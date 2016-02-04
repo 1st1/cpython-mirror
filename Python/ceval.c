@@ -149,7 +149,7 @@ static PyObject * special_lookup(PyObject *, _Py_Identifier *);
 
 static int fast_add(PyObject *, PyObject *, PyObject **);
 static int fast_sub(PyObject *, PyObject *, PyObject **);
-static PyObject * pylong_mul(PyObject *, PyObject *);
+static int fast_mul(PyObject *, PyObject *, PyObject **);
 static PyObject * pylong_floor_div(PyObject *, PyObject *);
 
 #define SINGLE_DIGIT_LONG_AS_LONG(op) \
@@ -1506,13 +1506,12 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *res;
-            if (PyLong_CheckExact(left) && PyLong_CheckExact(right) &&
-                Py_ABS(Py_SIZE(left)) <= 1 && Py_ABS(Py_SIZE(right)) <= 1
-            ) {
-                /* Fast path for small ints; refs to 'left' and 'right'
-                   will be managed by pylong_mul. */
-                res = pylong_mul(left, right);
-            } else {
+
+            if (fast_mul(left, right, &res)) {
+                goto error;
+            }
+
+            if (res == NULL) {
                 res = PyNumber_Multiply(left, right);
                 Py_DECREF(left);
                 Py_DECREF(right);
@@ -1747,17 +1746,17 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *res;
-            if (PyLong_CheckExact(left) && PyLong_CheckExact(right) &&
-                Py_ABS(Py_SIZE(left)) <= 1 && Py_ABS(Py_SIZE(right)) <= 1
-            ) {
-                /* Fast path for small ints; refs to 'left' and 'right'
-                   will be managed by pylong_mul. */
-                res = pylong_mul(left, right);
-            } else {
+
+            if (fast_mul(left, right, &res)) {
+                goto error;
+            }
+
+            if (res == NULL) {
                 res = PyNumber_InPlaceMultiply(left, right);
                 Py_DECREF(left);
                 Py_DECREF(right);
             }
+
             SET_TOP(res);
             if (res == NULL) {
                 goto error;
@@ -5479,7 +5478,7 @@ fast_add(PyObject *left, PyObject *right, PyObject **result)
 static int
 fast_sub(PyObject *left, PyObject *right, PyObject **result)
 {
-    PyObject *sum;
+    PyObject *sub;
     int l_float, r_float;
     int l_long = PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1;
     int r_long = PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1;
@@ -5489,15 +5488,15 @@ fast_sub(PyObject *left, PyObject *right, PyObject **result)
             if (Py_SIZE(right) != 0) {
                 /* This will never overflow, as digits in
                    PyLong are 30 bits max */
-                sum = PyLong_FromLong(
+                sub = PyLong_FromLong(
                     SINGLE_DIGIT_LONG_AS_LONG(left) -
                     SINGLE_DIGIT_LONG_AS_LONG(right));
 
                 Py_DECREF(left);
                 Py_DECREF(right);
 
-                *result = sum;
-                return sum == NULL;
+                *result = sub;
+                return sub == NULL;
             }
             else {
                 /* left != 0 && right == 0:
@@ -5523,12 +5522,12 @@ fast_sub(PyObject *left, PyObject *right, PyObject **result)
         double res = (double)SINGLE_DIGIT_LONG_AS_LONG(left) -
                         PyFloat_AS_DOUBLE(right);
 
-        sum = PyFloat_FromDouble(res);
+        sub = PyFloat_FromDouble(res);
         Py_DECREF(left);
         Py_DECREF(right);
 
-        *result = sum;
-        return sum == NULL;
+        *result = sub;
+        return sub == NULL;
     }
 
     l_float = PyFloat_CheckExact(left);
@@ -5536,81 +5535,113 @@ fast_sub(PyObject *left, PyObject *right, PyObject **result)
         double res = PyFloat_AS_DOUBLE(left) -
                         (double)SINGLE_DIGIT_LONG_AS_LONG(right);
 
-        sum = PyFloat_FromDouble(res);
+        sub = PyFloat_FromDouble(res);
         Py_DECREF(left);
         Py_DECREF(right);
 
-        *result = sum;
-        return sum == NULL;
+        *result = sub;
+        return sub == NULL;
     }
 
     if (l_float && r_float) {
         double res = PyFloat_AS_DOUBLE(left) - PyFloat_AS_DOUBLE(right);
 
-        sum = PyFloat_FromDouble(res);
+        sub = PyFloat_FromDouble(res);
         Py_DECREF(left);
         Py_DECREF(right);
 
-        *result = sum;
-        return sum == NULL;
+        *result = sub;
+        return sub == NULL;
     }
 
     *result = NULL;
     return 0;
 }
 
-static PyObject *
-pylong_mul(PyObject *left, PyObject *right)
+static int
+fast_mul(PyObject *left, PyObject *right, PyObject **result)
 {
-    PyObject *res;
-    long a, b;
+    PyObject *mul;
+    int l_float, r_float;
+    int l_long = PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1;
+    int r_long = PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1;
 
-    assert(PyLong_CheckExact(left));
-    assert(Py_ABS(Py_SIZE(left)) <= 1);
-    assert(PyLong_CheckExact(right));
-    assert(Py_ABS(Py_SIZE(right)) <= 1);
-
-    if (Py_SIZE(left) != 0) {
-        if (Py_SIZE(right) != 0) {
+    if (l_long && r_long) {
+        if (Py_SIZE(left) != 0) {
+            if (Py_SIZE(right) != 0) {
 
 #ifdef HAVE_LONG_LONG
-            long long mul;
-
-            a = ((PyLongObject*)left)->ob_digit[0];
-            a *= Py_SIZE(left);
-
-            b = ((PyLongObject*)right)->ob_digit[0];
-            b *= Py_SIZE(right);
-
-            /* `a * b` will never overflow, as digits in
-               PyLong are 30 bits max, and 'mul' is 64 bits */
-
-            mul = (long long)a * b;
-            res = PyLong_FromLongLong(mul);
+                mul = PyLong_FromLongLong(
+                        (long long)SINGLE_DIGIT_LONG_AS_LONG(left) *
+                            SINGLE_DIGIT_LONG_AS_LONG(right));
 #else
-            res = PyNumber_Multiply(left, right);
+                mul = PyNumber_Multiply(left, right);
 #endif
 
-            Py_DECREF(left);
-            Py_DECREF(right);
+                Py_DECREF(left);
+                Py_DECREF(right);
 
-            return res;
+                *result = mul;
+                return mul == NULL;
+            }
+            else {
+                /* left != 0 && right == 0:
+                    return right
+                */
+                Py_DECREF(left);
+                *result = right;
+                return 0;
+            }
         }
         else {
-            /* left != 0 && right == 0:
-                return right
+            /* left == 0 && right == something:
+                return left
             */
-            Py_DECREF(left);
-            return right;
+            Py_DECREF(right);
+            *result = left;
+            return 0;
         }
     }
-    else {
-        /* left == 0 && right == something:
-            return left
-        */
+
+    r_float = PyFloat_CheckExact(right);
+    if (l_long && r_float) {
+        double res = (double)SINGLE_DIGIT_LONG_AS_LONG(left) *
+                        PyFloat_AS_DOUBLE(right);
+
+        mul = PyFloat_FromDouble(res);
+        Py_DECREF(left);
         Py_DECREF(right);
-        return left;
+
+        *result = mul;
+        return mul == NULL;
     }
+
+    l_float = PyFloat_CheckExact(left);
+    if (l_float && r_long) {
+        double res = PyFloat_AS_DOUBLE(left) *
+                        (double)SINGLE_DIGIT_LONG_AS_LONG(right);
+
+        mul = PyFloat_FromDouble(res);
+        Py_DECREF(left);
+        Py_DECREF(right);
+
+        *result = mul;
+        return mul == NULL;
+    }
+
+    if (l_float && r_float) {
+        double res = PyFloat_AS_DOUBLE(left) * PyFloat_AS_DOUBLE(right);
+
+        mul = PyFloat_FromDouble(res);
+        Py_DECREF(left);
+        Py_DECREF(right);
+
+        *result = mul;
+        return mul == NULL;
+    }
+
+    *result = NULL;
+    return 0;
 }
 
 static PyObject *
