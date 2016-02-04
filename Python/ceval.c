@@ -5792,6 +5792,8 @@ fast_true_div(PyObject *left, PyObject *right, PyObject **result)
     return res == NULL;
 
   zero_error:
+    Py_DECREF(left);
+    Py_DECREF(right);
     PyErr_SetString(PyExc_ZeroDivisionError,
                     "division by zero");
     *result = NULL;
