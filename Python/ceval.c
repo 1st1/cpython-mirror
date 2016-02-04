@@ -150,7 +150,7 @@ static PyObject * special_lookup(PyObject *, _Py_Identifier *);
 static int fast_add(PyObject *, PyObject *, PyObject **);
 static int fast_sub(PyObject *, PyObject *, PyObject **);
 static int fast_mul(PyObject *, PyObject *, PyObject **);
-static PyObject * pylong_floor_div(PyObject *, PyObject *);
+static int fast_floor_div(PyObject *, PyObject *, PyObject **);
 
 #define SINGLE_DIGIT_LONG_AS_LONG(op) \
     ((((PyLongObject*)(op))->ob_digit[0]) * Py_SIZE(op))
@@ -1553,18 +1553,20 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            if (PyLong_CheckExact(divisor) && PyLong_CheckExact(dividend) &&
-                Py_ABS(Py_SIZE(divisor)) <= 1 && Py_ABS(Py_SIZE(dividend)) <= 1
-            ) {
-                quotient = pylong_floor_div(dividend, divisor);
-            } else {
+            if (fast_floor_div(dividend, divisor, &quotient)) {
+                goto error;
+            }
+
+            if (quotient == NULL) {
                 quotient = PyNumber_FloorDivide(dividend, divisor);
                 Py_DECREF(dividend);
                 Py_DECREF(divisor);
             }
+
             SET_TOP(quotient);
-            if (quotient == NULL)
+            if (quotient == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
@@ -1792,15 +1794,17 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
             PyObject *quotient;
-            if (PyLong_CheckExact(divisor) && PyLong_CheckExact(dividend) &&
-                Py_ABS(Py_SIZE(divisor)) <= 1 && Py_ABS(Py_SIZE(dividend)) <= 1
-            ) {
-                quotient = pylong_floor_div(dividend, divisor);
-            } else {
+
+            if (fast_floor_div(dividend, divisor, &quotient)) {
+                goto error;
+            }
+
+            if (quotient == NULL) {
                 quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
                 Py_DECREF(dividend);
                 Py_DECREF(divisor);
             }
+
             SET_TOP(quotient);
             if (quotient == NULL)
                 goto error;
@@ -5644,61 +5648,67 @@ fast_mul(PyObject *left, PyObject *right, PyObject **result)
     return 0;
 }
 
-static PyObject *
-pylong_floor_div(PyObject *left, PyObject *right)
+static int
+fast_floor_div(PyObject *left, PyObject *right, PyObject **result)
 {
     PyObject *res;
-    long a, b, adivb;
+    int l_long = PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1;
+    int r_long = PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1;
 
-    assert(PyLong_CheckExact(left));
-    assert(Py_ABS(Py_SIZE(left)) <= 1);
-    assert(PyLong_CheckExact(right));
-    assert(Py_ABS(Py_SIZE(right)) <= 1);
+    if (l_long && r_long) {
+        if (Py_SIZE(left) != 0) {
+            if (Py_SIZE(right) != 0) {
+                long a, b, adivb;
 
-    if (Py_SIZE(left) != 0) {
-        if (Py_SIZE(right) != 0) {
-            a = ((PyLongObject*)left)->ob_digit[0];
-            b = ((PyLongObject*)right)->ob_digit[0];
+                a = ((PyLongObject*)left)->ob_digit[0];
+                b = ((PyLongObject*)right)->ob_digit[0];
 
-            if (Py_SIZE(left) != Py_SIZE(right)) {
-                a *= Py_SIZE(left);
-                b *= Py_SIZE(right);
+                if (Py_SIZE(left) != Py_SIZE(right)) {
+                    a *= Py_SIZE(left);
+                    b *= Py_SIZE(right);
 
-                adivb = a / b;
-                if (a - adivb * b) {
-                    /* we want floor */
-                    --adivb;
+                    adivb = a / b;
+                    if (a - adivb * b) {
+                        /* we want floor */
+                        --adivb;
+                    }
+
+                    res = PyLong_FromLong(adivb);
+                } else {
+                    res = PyLong_FromLong(a / b);
                 }
 
-                res = PyLong_FromLong(adivb);
-            } else {
-                res = PyLong_FromLong(a / b);
+                Py_DECREF(left);
+                Py_DECREF(right);
+
+                *result = res;
+                return res == NULL;
             }
+            else {
+                /* left != 0 && right == 0:
+                    raise ZeroDivisionError
+                */
+                Py_DECREF(left);
+                Py_DECREF(right);
 
-            Py_DECREF(left);
-            Py_DECREF(right);
-
-            return res;
+                PyErr_SetString(PyExc_ZeroDivisionError,
+                                "integer division or modulo by zero");
+                *result = NULL;
+                return -1;
+            }
         }
         else {
-            /* left != 0 && right == 0:
-                raise ZeroDivisionError
+            /* left == 0 && right == something:
+                return left
             */
-            Py_DECREF(left);
             Py_DECREF(right);
-
-            PyErr_SetString(PyExc_ZeroDivisionError,
-                            "integer division or modulo by zero");
-            return NULL;
+            *result = left;
+            return 0;
         }
     }
-    else {
-        /* left == 0 && right == something:
-            return left
-        */
-        Py_DECREF(right);
-        return left;
-    }
+
+    *result = NULL;
+    return 0;
 }
 
 #ifdef DYNAMIC_EXECUTION_PROFILE
