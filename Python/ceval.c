@@ -151,6 +151,7 @@ static int fast_add(PyObject *, PyObject *, PyObject **);
 static int fast_sub(PyObject *, PyObject *, PyObject **);
 static int fast_mul(PyObject *, PyObject *, PyObject **);
 static int fast_floor_div(PyObject *, PyObject *, PyObject **);
+static int fast_true_div(PyObject *, PyObject *, PyObject **);
 
 #define SINGLE_DIGIT_LONG_AS_LONG(op) \
     ((((PyLongObject*)(op))->ob_digit[0]) * Py_SIZE(op))
@@ -1539,12 +1540,22 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(BINARY_TRUE_DIVIDE) {
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
-            PyObject *quotient = PyNumber_TrueDivide(dividend, divisor);
-            Py_DECREF(dividend);
-            Py_DECREF(divisor);
-            SET_TOP(quotient);
-            if (quotient == NULL)
+            PyObject *quotient;
+
+            if (fast_true_div(dividend, divisor, &quotient)) {
                 goto error;
+            }
+
+            if (quotient == NULL) {
+                quotient = PyNumber_TrueDivide(dividend, divisor);
+                Py_DECREF(dividend);
+                Py_DECREF(divisor);
+            }
+
+            SET_TOP(quotient);
+            if (quotient == NULL) {
+                goto error;
+            }
             DISPATCH();
         }
 
@@ -1781,9 +1792,18 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(INPLACE_TRUE_DIVIDE) {
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
-            PyObject *quotient = PyNumber_InPlaceTrueDivide(dividend, divisor);
-            Py_DECREF(dividend);
-            Py_DECREF(divisor);
+            PyObject *quotient;
+
+            if (fast_true_div(dividend, divisor, &quotient)) {
+                goto error;
+            }
+
+            if (quotient == NULL) {
+                quotient = PyNumber_InPlaceTrueDivide(dividend, divisor);
+                Py_DECREF(dividend);
+                Py_DECREF(divisor);
+            }
+
             SET_TOP(quotient);
             if (quotient == NULL)
                 goto error;
@@ -5709,6 +5729,73 @@ fast_floor_div(PyObject *left, PyObject *right, PyObject **result)
 
     *result = NULL;
     return 0;
+}
+
+static int
+fast_true_div(PyObject *left, PyObject *right, PyObject **result)
+{
+    PyObject *res;
+    int l_float, r_float;
+    int l_long = PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1;
+    int r_long = PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1;
+    double divisor;
+
+    if (l_long && r_long) {
+        if (!Py_SIZE(right)) {
+            goto zero_error;
+        }
+        res = PyFloat_FromDouble(
+                    (double)SINGLE_DIGIT_LONG_AS_LONG(left) /
+                        SINGLE_DIGIT_LONG_AS_LONG(right));
+        goto have_result;
+    }
+
+    r_float = PyFloat_CheckExact(right);
+    if (l_long && r_float) {
+        divisor = PyFloat_AS_DOUBLE(right);
+        if (divisor == 0.0) {
+            goto zero_error;
+        }
+        res = PyFloat_FromDouble(
+                    (double)SINGLE_DIGIT_LONG_AS_LONG(left) / divisor);
+        goto have_result;
+    }
+
+    l_float = PyFloat_CheckExact(left);
+    if (l_float && r_long) {
+        if (!Py_SIZE(right)) {
+            goto zero_error;
+        }
+        res = PyFloat_FromDouble(
+                    PyFloat_AS_DOUBLE(left) /
+                        (double)SINGLE_DIGIT_LONG_AS_LONG(right));
+        goto have_result;
+    }
+
+    if (l_float && r_float) {
+        divisor = PyFloat_AS_DOUBLE(right);
+        if (divisor == 0.0) {
+            goto zero_error;
+        }
+        res = PyFloat_FromDouble(
+                (double)PyFloat_AS_DOUBLE(left) / divisor);
+        goto have_result;
+    }
+
+    *result = NULL;
+    return 0;
+
+  have_result:
+    Py_DECREF(left);
+    Py_DECREF(right);
+    *result = res;
+    return res == NULL;
+
+  zero_error:
+    PyErr_SetString(PyExc_ZeroDivisionError,
+                    "division by zero");
+    *result = NULL;
+    return -1;
 }
 
 #ifdef DYNAMIC_EXECUTION_PROFILE
