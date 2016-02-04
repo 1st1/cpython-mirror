@@ -147,9 +147,9 @@ static PyObject * unicode_concatenate(PyObject *, PyObject *,
                                       PyFrameObject *, unsigned char *);
 static PyObject * special_lookup(PyObject *, _Py_Identifier *);
 
-Py_LOCAL_INLINE(PyObject *) pylong_add(PyObject *, PyObject *);
-Py_LOCAL_INLINE(PyObject *) pylong_sub(PyObject *, PyObject *);
-Py_LOCAL_INLINE(PyObject *) pylong_mul(PyObject *, PyObject *);
+static PyObject * pylong_add(PyObject *, PyObject *);
+static PyObject * pylong_sub(PyObject *, PyObject *);
+static PyObject * pylong_mul(PyObject *, PyObject *);
 
 #define NAME_ERROR_MSG \
     "name '%.200s' is not defined"
@@ -1502,8 +1502,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *res;
-            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
-                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
+            if (PyLong_CheckExact(left) && PyLong_CheckExact(right) &&
+                Py_ABS(Py_SIZE(left)) <= 1 && Py_ABS(Py_SIZE(right)) <= 1
             ) {
                 /* Fast path for small ints; refs to 'left' and 'right'
                    will be managed by pylong_mul. */
@@ -1575,8 +1575,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *sum;
-            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
-                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
+            if (PyLong_CheckExact(left) && PyLong_CheckExact(right) &&
+                Py_ABS(Py_SIZE(left)) <= 1 && Py_ABS(Py_SIZE(right)) <= 1
             ) {
                 /* Fast path for small ints; refs to 'left' and 'right'
                    will be managed by pylong_add. */
@@ -1606,8 +1606,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *diff;
-            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
-                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
+            if (PyLong_CheckExact(left) && PyLong_CheckExact(right) &&
+                Py_ABS(Py_SIZE(left)) <= 1 && Py_ABS(Py_SIZE(right)) <= 1
             ) {
                 /* Fast path for small ints; refs to 'left' and 'right'
                    will be managed by pylong_sub. */
@@ -1736,8 +1736,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *res;
-            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
-                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
+            if (PyLong_CheckExact(left) && PyLong_CheckExact(right) &&
+                Py_ABS(Py_SIZE(left)) <= 1 && Py_ABS(Py_SIZE(right)) <= 1
             ) {
                 /* Fast path for small ints; refs to 'left' and 'right'
                    will be managed by pylong_mul. */
@@ -1806,8 +1806,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *sum;
-            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
-                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
+            if (PyLong_CheckExact(left) && PyLong_CheckExact(right) &&
+                Py_ABS(Py_SIZE(left)) <= 1 && Py_ABS(Py_SIZE(right)) <= 1
             ) {
                 /* Fast path for small ints; refs to 'left' and 'right'
                    will be managed by pylong_add. */
@@ -1834,8 +1834,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *diff;
-            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
-                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
+            if (PyLong_CheckExact(left) && PyLong_CheckExact(right) &&
+                Py_ABS(Py_SIZE(left)) <= 1 && Py_ABS(Py_SIZE(right)) <= 1
             ) {
                 /* Fast path for small ints; refs to 'left' and 'right'
                    will be managed by pylong_sub. */
@@ -5383,7 +5383,7 @@ unicode_concatenate(PyObject *v, PyObject *w,
     return res;
 }
 
-Py_LOCAL_INLINE(PyObject *)
+static PyObject *
 pylong_add(PyObject *left, PyObject *right) {
     long a, b;
     PyObject *sum;
@@ -5421,11 +5421,9 @@ pylong_add(PyObject *left, PyObject *right) {
         Py_DECREF(left);
         return right;
     }
-    /* event horizon */
-    assert(0);
 }
 
-Py_LOCAL_INLINE(PyObject *)
+static PyObject *
 pylong_sub(PyObject *left, PyObject *right) {
     long a, b;
     PyObject *sum;
@@ -5482,11 +5480,9 @@ pylong_sub(PyObject *left, PyObject *right) {
             return left;
         }
     }
-    /* event horizon */
-    assert(0);
 }
 
-Py_LOCAL_INLINE(PyObject *)
+static PyObject *
 pylong_mul(PyObject *left, PyObject *right) {
     PyObject *res;
     long a, b;
@@ -5537,8 +5533,6 @@ pylong_mul(PyObject *left, PyObject *right) {
         Py_DECREF(right);
         return left;
     }
-    /* event horizon */
-    assert(0);
 }
 
 #ifdef DYNAMIC_EXECUTION_PROFILE
