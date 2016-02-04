@@ -147,7 +147,9 @@ static PyObject * unicode_concatenate(PyObject *, PyObject *,
                                       PyFrameObject *, unsigned char *);
 static PyObject * special_lookup(PyObject *, _Py_Identifier *);
 
-static int fast_add(PyObject *, PyObject *, PyObject **);
+static int fast_add(PyObject *, PyObject *,
+                    PyFrameObject *, unsigned char *,
+                    PyObject **);
 static int fast_sub(PyObject *, PyObject *, PyObject **);
 static int fast_mul(PyObject *, PyObject *, PyObject **);
 static int fast_floor_div(PyObject *, PyObject *, PyObject **);
@@ -1611,23 +1613,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *sum;
 
-            if (fast_add(left, right, &sum)) {
+            if (fast_add(left, right, f, next_instr, &sum)) {
                 SET_TOP(NULL);
                 goto error;
             }
 
             if (sum == NULL) {
-                if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
-                    /* fast path for string concatenation */
-                    sum = unicode_concatenate(left, right, f, next_instr);
-                    /* unicode_concatenate consumed the ref to left */
-                    Py_DECREF(right);
-                }
-                else {
-                    sum = PyNumber_Add(left, right);
-                    Py_DECREF(left);
-                    Py_DECREF(right);
-                }
+                sum = PyNumber_Add(left, right);
+                Py_DECREF(left);
+                Py_DECREF(right);
 
                 SET_TOP(sum);
                 if (sum == NULL) {
@@ -1881,22 +1875,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *sum;
 
-            if (fast_add(left, right, &sum)) {
+            if (fast_add(left, right, f, next_instr, &sum)) {
                 SET_TOP(NULL);
                 goto error;
             }
 
             if (sum == NULL) {
-                if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
-                    sum = unicode_concatenate(left, right, f, next_instr);
-                    /* unicode_concatenate consumed the ref to 'left' */
-                    Py_DECREF(right);
-                }
-                else {
-                    sum = PyNumber_InPlaceAdd(left, right);
-                    Py_DECREF(left);
-                    Py_DECREF(right);
-                }
+                sum = PyNumber_InPlaceAdd(left, right);
+                Py_DECREF(left);
+                Py_DECREF(right);
 
                 SET_TOP(sum);
                 if (sum == NULL) {
@@ -5467,13 +5454,25 @@ unicode_concatenate(PyObject *v, PyObject *w,
 }
 
 static int
-fast_add(PyObject *left, PyObject *right, PyObject **result)
+fast_add(PyObject *left, PyObject *right,
+         PyFrameObject *f, unsigned char *next_instr,
+         PyObject **result)
 {
     PyObject *sum;
     double left_d, right_d;
-    int l_float, r_float;
-    int l_long = PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1;
-    int r_long = PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1;
+    int l_float, r_float, l_long, r_long;
+
+    if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
+        /* fast path for string concatenation */
+        sum = unicode_concatenate(left, right, f, next_instr);
+        /* unicode_concatenate consumed the ref to left */
+        Py_DECREF(right);
+        *result = sum;
+        return sum == NULL;
+    }
+
+    l_long = PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1;
+    r_long = PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1;
 
     if (l_long && r_long) {
         if (Py_SIZE(left) != 0) {
@@ -5532,7 +5531,7 @@ fast_add(PyObject *left, PyObject *right, PyObject **result)
     Py_DECREF(left);
     Py_DECREF(right);
 
-    PyFPE_START_PROTECT("add", return -1)
+    PyFPE_START_PROTECT("add", return 1)
     left_d = left_d + right_d;
     PyFPE_END_PROTECT(left_d)
     *result = PyFloat_FromDouble(left_d);
@@ -5609,7 +5608,7 @@ fast_sub(PyObject *left, PyObject *right, PyObject **result)
     Py_DECREF(left);
     Py_DECREF(right);
 
-    PyFPE_START_PROTECT("subtract", return -1)
+    PyFPE_START_PROTECT("subtract", return 1)
     left_d = left_d - right_d;
     PyFPE_END_PROTECT(left_d)
     *result = PyFloat_FromDouble(left_d);
@@ -5689,7 +5688,7 @@ fast_mul(PyObject *left, PyObject *right, PyObject **result)
     Py_DECREF(left);
     Py_DECREF(right);
 
-    PyFPE_START_PROTECT("multiply", return -1)
+    PyFPE_START_PROTECT("multiply", return 1)
     left_d = left_d * right_d;
     PyFPE_END_PROTECT(left_d)
     *result = PyFloat_FromDouble(left_d);
@@ -5742,7 +5741,7 @@ fast_floor_div(PyObject *left, PyObject *right, PyObject **result)
                 PyErr_SetString(PyExc_ZeroDivisionError,
                                 "integer division or modulo by zero");
                 *result = NULL;
-                return -1;
+                return 1;
             }
         }
         else {
@@ -5774,7 +5773,7 @@ fast_true_div(PyObject *left, PyObject *right, PyObject **result)
             PyErr_SetString(PyExc_ZeroDivisionError,
                             "division by zero");
             *result = NULL;
-            return -1;
+            return 1;
         }
 
         left_d = (double)SINGLE_DIGIT_LONG_AS_LONG(left);
@@ -5811,9 +5810,9 @@ fast_true_div(PyObject *left, PyObject *right, PyObject **result)
     if (right_d == 0.0) {
         PyErr_SetString(PyExc_ZeroDivisionError,
                         "float division by zero");
-        return -1;
+        return 1;
     }
-    PyFPE_START_PROTECT("divide", return -1)
+    PyFPE_START_PROTECT("divide", return 1)
     left_d = left_d / right_d;
     PyFPE_END_PROTECT(left_d)
     *result = PyFloat_FromDouble(left_d);
