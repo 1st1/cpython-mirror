@@ -1138,7 +1138,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 result = _PyLong_##OP(left, right);                     \
                 check = 1;                                              \
             }                                                           \
-            if (PyFloat_CheckExact(right)) {                            \
+            else if (PyFloat_CheckExact(right)) {                       \
                 result = _PyFloat_##OP(left, right);                    \
                 check = 1;                                              \
             }                                                           \
@@ -1536,23 +1536,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *res;
 
-            if (fast_mul(left, right, &res)) {
-                SET_TOP(NULL);
+            FAST_NUM_OP(Mul, left, right);
+
+            res = PyNumber_Multiply(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            SET_TOP(res);
+            if (res == NULL) {
                 goto error;
             }
-
-            if (res == NULL) {
-                res = PyNumber_Multiply(left, right);
-                Py_DECREF(left);
-                Py_DECREF(right);
-                SET_TOP(res);
-                if (res == NULL) {
-                    goto error;
-                }
-            } else {
-                SET_TOP(res);
-            }
-
             DISPATCH();
         }
 
@@ -1573,24 +1565,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            if (fast_true_div(dividend, divisor, &quotient)) {
-                SET_TOP(NULL);
+            FAST_NUM_OP(Div, dividend, divisor);
+
+            quotient = PyNumber_TrueDivide(dividend, divisor);
+            Py_DECREF(dividend);
+            Py_DECREF(divisor);
+
+            SET_TOP(quotient);
+            if (quotient == NULL) {
                 goto error;
             }
-
-            if (quotient == NULL) {
-                quotient = PyNumber_TrueDivide(dividend, divisor);
-                Py_DECREF(dividend);
-                Py_DECREF(divisor);
-
-                SET_TOP(quotient);
-                if (quotient == NULL) {
-                    goto error;
-                }
-            } else {
-                SET_TOP(quotient);
-            }
-
             DISPATCH();
         }
 
@@ -1631,24 +1615,27 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *sum;
 
-            if (fast_add(left, right, f, next_instr, &sum)) {
-                SET_TOP(NULL);
-                goto error;
-            }
-
-            if (sum == NULL) {
-                sum = PyNumber_Add(left, right);
-                Py_DECREF(left);
-                Py_DECREF(right);
-
+            if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
+                /* fast path for string concatenation */
+                sum = unicode_concatenate(left, right, f, next_instr);
+                /* unicode_concatenate consumed the ref to left */
                 SET_TOP(sum);
                 if (sum == NULL) {
                     goto error;
                 }
-            } else {
-                SET_TOP(sum);
+                DISPATCH();
             }
 
+            FAST_NUM_OP(Add, left, right);
+
+            sum = PyNumber_Add(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+
+            SET_TOP(sum);
+            if (sum == NULL) {
+                goto error;
+            }
             DISPATCH();
         }
 
@@ -1657,24 +1644,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *diff;
 
-            if (fast_sub(left, right, &diff)) {
-                SET_TOP(NULL);
+            FAST_NUM_OP(Sub, left, right);
+
+            diff = PyNumber_Subtract(left, right);
+            Py_DECREF(right);
+            Py_DECREF(left);
+
+            SET_TOP(diff);
+            if (diff == NULL) {
                 goto error;
             }
-
-            if (diff == NULL) {
-                diff = PyNumber_Subtract(left, right);
-                Py_DECREF(right);
-                Py_DECREF(left);
-
-                SET_TOP(diff);
-                if (diff == NULL) {
-                    goto error;
-                }
-            } else {
-                SET_TOP(diff);
-            }
-
             DISPATCH();
         }
 
@@ -1791,24 +1770,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *res;
 
-            if (fast_mul(left, right, &res)) {
-                SET_TOP(NULL);
+            FAST_NUM_OP(Mul, left, right);
+
+            res = PyNumber_InPlaceMultiply(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+
+            SET_TOP(res);
+            if (res == NULL) {
                 goto error;
             }
-
-            if (res == NULL) {
-                res = PyNumber_InPlaceMultiply(left, right);
-                Py_DECREF(left);
-                Py_DECREF(right);
-
-                SET_TOP(res);
-                if (res == NULL) {
-                    goto error;
-                }
-            } else {
-                SET_TOP(res);
-            }
-
             DISPATCH();
         }
 
@@ -1829,24 +1800,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            if (fast_true_div(dividend, divisor, &quotient)) {
-                SET_TOP(NULL);
+            FAST_NUM_OP(Div, dividend, divisor);
+
+            quotient = PyNumber_InPlaceTrueDivide(dividend, divisor);
+            Py_DECREF(dividend);
+            Py_DECREF(divisor);
+
+            SET_TOP(quotient);
+            if (quotient == NULL) {
                 goto error;
             }
-
-            if (quotient == NULL) {
-                quotient = PyNumber_InPlaceTrueDivide(dividend, divisor);
-                Py_DECREF(dividend);
-                Py_DECREF(divisor);
-
-                SET_TOP(quotient);
-                if (quotient == NULL) {
-                    goto error;
-                }
-            } else {
-                SET_TOP(quotient);
-            }
-
             DISPATCH();
         }
 
@@ -1885,24 +1848,27 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *sum;
 
-            if (fast_add(left, right, f, next_instr, &sum)) {
-                SET_TOP(NULL);
-                goto error;
-            }
-
-            if (sum == NULL) {
-                sum = PyNumber_InPlaceAdd(left, right);
-                Py_DECREF(left);
-                Py_DECREF(right);
-
+            if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
+                /* fast path for string concatenation */
+                sum = unicode_concatenate(left, right, f, next_instr);
+                /* unicode_concatenate consumed the ref to left */
                 SET_TOP(sum);
                 if (sum == NULL) {
                     goto error;
                 }
-            } else {
-                SET_TOP(sum);
+                DISPATCH();
             }
 
+            FAST_NUM_OP(Add, left, right);
+
+            sum = PyNumber_InPlaceAdd(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+
+            SET_TOP(sum);
+            if (sum == NULL) {
+                goto error;
+            }
             DISPATCH();
         }
 
@@ -1911,24 +1877,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *diff;
 
-            if (fast_sub(left, right, &diff)) {
-                SET_TOP(NULL);
+            FAST_NUM_OP(Sub, left, right);
+
+            diff = PyNumber_InPlaceSubtract(left, right);
+            Py_DECREF(left);
+            Py_DECREF(right);
+
+            SET_TOP(diff);
+            if (diff == NULL) {
                 goto error;
             }
-
-            if (diff == NULL) {
-                diff = PyNumber_InPlaceSubtract(left, right);
-                Py_DECREF(left);
-                Py_DECREF(right);
-
-                SET_TOP(diff);
-                if (diff == NULL) {
-                    goto error;
-                }
-            } else {
-                SET_TOP(diff);
-            }
-
             DISPATCH();
         }
 
