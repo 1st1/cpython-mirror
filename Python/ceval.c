@@ -147,10 +147,13 @@ static PyObject * unicode_concatenate(PyObject *, PyObject *,
                                       PyFrameObject *, unsigned char *);
 static PyObject * special_lookup(PyObject *, _Py_Identifier *);
 
-static PyObject * pylong_add(PyObject *, PyObject *);
+static int fast_add(PyObject *, PyObject *, PyObject **);
 static PyObject * pylong_sub(PyObject *, PyObject *);
 static PyObject * pylong_mul(PyObject *, PyObject *);
 static PyObject * pylong_floor_div(PyObject *, PyObject *);
+
+#define SINGLE_DIGIT_LONG_AS_LONG(op) \
+    ((((PyLongObject*)(op))->ob_digit[0]) * Py_SIZE(op))
 
 #define NAME_ERROR_MSG \
     "name '%.200s' is not defined"
@@ -1584,26 +1587,25 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *sum;
-            if (PyLong_CheckExact(left) && PyLong_CheckExact(right) &&
-                Py_ABS(Py_SIZE(left)) <= 1 && Py_ABS(Py_SIZE(right)) <= 1
-            ) {
-                /* Fast path for small ints; refs to 'left' and 'right'
-                   will be managed by pylong_add. */
-                sum = pylong_add(left, right);
+
+            if (fast_add(left, right, &sum)) {
+                goto error;
             }
-            else if (PyUnicode_CheckExact(left) &&
-                     PyUnicode_CheckExact(right)
-            ) {
-                /* fast path for string concatenation */
-                sum = unicode_concatenate(left, right, f, next_instr);
-                /* unicode_concatenate consumed the ref to left */
-                Py_DECREF(right);
+
+            if (sum == NULL) {
+                if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
+                    /* fast path for string concatenation */
+                    sum = unicode_concatenate(left, right, f, next_instr);
+                    /* unicode_concatenate consumed the ref to left */
+                    Py_DECREF(right);
+                }
+                else {
+                    sum = PyNumber_Add(left, right);
+                    Py_DECREF(left);
+                    Py_DECREF(right);
+                }
             }
-            else {
-                sum = PyNumber_Add(left, right);
-                Py_DECREF(left);
-                Py_DECREF(right);
-            }
+
             SET_TOP(sum);
             if (sum == NULL) {
                 goto error;
@@ -1822,22 +1824,22 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *sum;
-            if (PyLong_CheckExact(left) && PyLong_CheckExact(right) &&
-                Py_ABS(Py_SIZE(left)) <= 1 && Py_ABS(Py_SIZE(right)) <= 1
-            ) {
-                /* Fast path for small ints; refs to 'left' and 'right'
-                   will be managed by pylong_add. */
-                sum = pylong_add(left, right);
+
+            if (fast_add(left, right, &sum)) {
+                goto error;
             }
-            else if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
-                sum = unicode_concatenate(left, right, f, next_instr);
-                /* unicode_concatenate consumed the ref to 'left' */
-                Py_DECREF(right);
-            }
-            else {
-                sum = PyNumber_InPlaceAdd(left, right);
-                Py_DECREF(left);
-                Py_DECREF(right);
+
+            if (sum == NULL) {
+                if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
+                    sum = unicode_concatenate(left, right, f, next_instr);
+                    /* unicode_concatenate consumed the ref to 'left' */
+                    Py_DECREF(right);
+                }
+                else {
+                    sum = PyNumber_InPlaceAdd(left, right);
+                    Py_DECREF(left);
+                    Py_DECREF(right);
+                }
             }
             SET_TOP(sum);
             if (sum == NULL) {
@@ -5399,44 +5401,80 @@ unicode_concatenate(PyObject *v, PyObject *w,
     return res;
 }
 
-static PyObject *
-pylong_add(PyObject *left, PyObject *right) {
-    long a, b;
+static int
+fast_add(PyObject *left, PyObject *right, PyObject **result) {
     PyObject *sum;
+    int l_float, r_float;
+    int l_long = PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1;
+    int r_long = PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1;
 
-    assert(PyLong_CheckExact(left));
-    assert(Py_ABS(Py_SIZE(left)) <= 1);
-    assert(PyLong_CheckExact(right));
-    assert(Py_ABS(Py_SIZE(right)) <= 1);
+    if (l_long && r_long) {
+        if (Py_SIZE(left) != 0) {
+            if (Py_SIZE(right) != 0) {
+                /* This will never overflow, as digits in
+                   PyLong are 30 bits max */
+                sum = PyLong_FromLong(
+                    SINGLE_DIGIT_LONG_AS_LONG(left) +
+                    SINGLE_DIGIT_LONG_AS_LONG(right));
 
-    if (Py_SIZE(left) != 0) {
-        if (Py_SIZE(right) != 0) {
-            a = ((PyLongObject*)left)->ob_digit[0];
-            a *= Py_SIZE(left);
+                Py_DECREF(left);
+                Py_DECREF(right);
 
-            b = ((PyLongObject*)right)->ob_digit[0];
-            b *= Py_SIZE(right);
-
-            /* `a + b` will never overflow, as digits in
-               PyLong are 30 bits max */
-            sum = PyLong_FromLong(a + b);
-
-            Py_DECREF(left);
-            Py_DECREF(right);
-
-            return sum;
+                *result = sum;
+                return sum == NULL;
+            }
+            else {
+                /* right == 0 */
+                Py_DECREF(right);
+                *result = left;
+                return 0;
+            }
         }
         else {
-            /* right == 0 */
-            Py_DECREF(right);
-            return left;
+            /* left == 0 */
+            Py_DECREF(left);
+            *result = right;
+            return 0;
         }
     }
-    else {
-        /* left == 0 */
+
+    r_float = PyFloat_CheckExact(right);
+    if (l_long && r_float) {
+        double res = PyFloat_AS_DOUBLE(right) +
+                            SINGLE_DIGIT_LONG_AS_LONG(left);
+        sum = PyFloat_FromDouble(res);
         Py_DECREF(left);
-        return right;
+        Py_DECREF(right);
+
+        *result = sum;
+        return sum == NULL;
     }
+
+    l_float = PyFloat_CheckExact(left);
+    if (r_long && l_float) {
+        double res = PyFloat_AS_DOUBLE(left) +
+                            SINGLE_DIGIT_LONG_AS_LONG(right);
+        sum = PyFloat_FromDouble(res);
+        Py_DECREF(left);
+        Py_DECREF(right);
+
+        *result = sum;
+        return sum == NULL;
+    }
+
+    if (l_float && r_float) {
+        double res = PyFloat_AS_DOUBLE(left) + PyFloat_AS_DOUBLE(right);
+
+        sum = PyFloat_FromDouble(res);
+        Py_DECREF(left);
+        Py_DECREF(right);
+
+        *result = sum;
+        return sum == NULL;
+    }
+
+    *result = NULL;
+    return 0;
 }
 
 static PyObject *
