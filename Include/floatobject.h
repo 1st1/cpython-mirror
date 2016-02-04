@@ -122,6 +122,10 @@ PyAPI_FUNC(int) _PyFloat_FormatAdvancedWriter(
     Py_ssize_t end);
 #endif /* Py_LIMITED_API */
 
+PyObject * _PyFloat_Add(PyObject *, PyObject *);
+PyObject * _PyFloat_Sub(PyObject *, PyObject *);
+PyObject * _PyFloat_Mul(PyObject *, PyObject *);
+
 #ifdef __cplusplus
 }
 #endif

@@ -506,8 +506,8 @@ float_hash(PyFloatObject *v)
     return _Py_HashDouble(v->ob_fval);
 }
 
-static PyObject *
-float_add(PyObject *v, PyObject *w)
+PyObject *
+_PyFloat_Add(PyObject *v, PyObject *w)
 {
     double a,b;
     CONVERT_TO_DOUBLE(v, a);
@@ -518,8 +518,8 @@ float_add(PyObject *v, PyObject *w)
     return PyFloat_FromDouble(a);
 }
 
-static PyObject *
-float_sub(PyObject *v, PyObject *w)
+PyObject *
+_PyFloat_Sub(PyObject *v, PyObject *w)
 {
     double a,b;
     CONVERT_TO_DOUBLE(v, a);
@@ -530,8 +530,8 @@ float_sub(PyObject *v, PyObject *w)
     return PyFloat_FromDouble(a);
 }
 
-static PyObject *
-float_mul(PyObject *v, PyObject *w)
+PyObject *
+_PyFloat_Mul(PyObject *v, PyObject *w)
 {
     double a,b;
     CONVERT_TO_DOUBLE(v, a);
@@ -1797,9 +1797,9 @@ Convert a string or number to a floating point number, if possible.");
 
 
 static PyNumberMethods float_as_number = {
-    float_add,          /*nb_add*/
-    float_sub,          /*nb_subtract*/
-    float_mul,          /*nb_multiply*/
+    _PyFloat_Add,       /*nb_add*/
+    _PyFloat_Sub,       /*nb_subtract*/
+    _PyFloat_Mul,       /*nb_multiply*/
     float_rem,          /*nb_remainder*/
     float_divmod,       /*nb_divmod*/
     float_pow,          /*nb_power*/
