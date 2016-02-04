@@ -3560,8 +3560,8 @@ l_divmod(PyLongObject *v, PyLongObject *w,
     return 0;
 }
 
-PyObject *
-_PyLong_Div(PyObject *a, PyObject *b)
+static PyObject *
+long_floor_div(PyObject *a, PyObject *b)
 {
     PyLongObject *div;
 
@@ -3576,8 +3576,8 @@ _PyLong_Div(PyObject *a, PyObject *b)
 #define MANT_DIG_DIGITS (DBL_MANT_DIG / PyLong_SHIFT)
 #define MANT_DIG_BITS (DBL_MANT_DIG % PyLong_SHIFT)
 
-static PyObject *
-long_true_divide(PyObject *v, PyObject *w)
+PyObject *
+_PyLong_Div(PyObject *v, PyObject *w)
 {
     PyLongObject *a, *b, *x;
     Py_ssize_t a_size, b_size, shift, extra_bits, diff, x_size, x_bits;
@@ -5250,8 +5250,8 @@ static PyNumberMethods long_as_number = {
     0,                          /* nb_inplace_and */
     0,                          /* nb_inplace_xor */
     0,                          /* nb_inplace_or */
-    _PyLong_Div,                /* nb_floor_divide */
-    long_true_divide,           /* nb_true_divide */
+    long_floor_div,             /* nb_floor_divide */
+    _PyLong_Div,                /* nb_true_divide */
     0,                          /* nb_inplace_floor_divide */
     0,                          /* nb_inplace_true_divide */
     long_long,                  /* nb_index */
