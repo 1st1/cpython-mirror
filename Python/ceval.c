@@ -147,9 +147,9 @@ static PyObject * unicode_concatenate(PyObject *, PyObject *,
                                       PyFrameObject *, unsigned char *);
 static PyObject * special_lookup(PyObject *, _Py_Identifier *);
 
-Py_LOCAL_INLINE(PyObject *) pylong_add(PyObject *, PyObject *);
-Py_LOCAL_INLINE(PyObject *) pylong_sub(PyObject *, PyObject *);
-Py_LOCAL_INLINE(PyObject *) pylong_mul(PyObject *, PyObject *);
+static PyObject * pylong_add(PyObject *, PyObject *);
+static PyObject * pylong_sub(PyObject *, PyObject *);
+static PyObject * pylong_mul(PyObject *, PyObject *);
 
 #define NAME_ERROR_MSG \
     "name '%.200s' is not defined"
@@ -1575,9 +1575,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *sum;
-            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
-                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
-            ) {
+            if (PyLong_CheckExact(left) && PyLong_CheckExact(right)) {
                 /* Fast path for small ints; refs to 'left' and 'right'
                    will be managed by pylong_add. */
                 sum = pylong_add(left, right);
@@ -1806,9 +1804,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *sum;
-            if (PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1 &&
-                PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1
-            ) {
+            if (PyLong_CheckExact(left) && PyLong_CheckExact(right)) {
                 /* Fast path for small ints; refs to 'left' and 'right'
                    will be managed by pylong_add. */
                 sum = pylong_add(left, right);
@@ -5383,49 +5379,87 @@ unicode_concatenate(PyObject *v, PyObject *w,
     return res;
 }
 
-Py_LOCAL_INLINE(PyObject *)
+static PyObject *
 pylong_add(PyObject *left, PyObject *right) {
     long a, b;
     PyObject *sum;
 
     assert(PyLong_CheckExact(left));
-    assert(Py_ABS(Py_SIZE(left)) <= 1);
     assert(PyLong_CheckExact(right));
-    assert(Py_ABS(Py_SIZE(right)) <= 1);
 
-    if (Py_SIZE(left) != 0) {
-        if (Py_SIZE(right) != 0) {
-            a = ((PyLongObject*)left)->ob_digit[0];
-            a *= Py_SIZE(left);
+    switch (Py_SIZE(left)) {
+    case 0:
+        /* left == 0 && right == something:
+            return right
+        */
+        Py_DECREF(left);
+        return right;
 
-            b = ((PyLongObject*)right)->ob_digit[0];
-            b *= Py_SIZE(right);
-
-            /* `a + b` will never overflow, as digits in
-               PyLong are 30 bits max */
-            sum = PyLong_FromLong(a + b);
-
-            Py_DECREF(left);
-            Py_DECREF(right);
-
-            return sum;
-        }
-        else {
+    case 1:
+        /* left > 0 */
+        switch (Py_SIZE(right)) {
+        case 0:
             /* right == 0 */
             Py_DECREF(right);
             return left;
+        case 1:
+            /* left > 0 && right > 0:
+                    return left + right
+            */
+            sum = PyLong_FromLong(
+                ((PyLongObject*)left)->ob_digit[0] +
+                ((PyLongObject*)right)->ob_digit[0]);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            return sum;
+        case -1:
+            /* left > 0 && right < 0:
+                    return left - right
+            */
+            sum = PyLong_FromLong(
+                ((PyLongObject*)left)->ob_digit[0] -
+                ((PyLongObject*)right)->ob_digit[0]);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            return sum;
+        }
+    case -1:
+        /* left < 0 */
+        switch (Py_SIZE(right)) {
+        case 0:
+            /* right == 0 */
+            Py_DECREF(right);
+            return left;
+        case 1:
+            /* left < 0 && right > 0:
+                    return right - left
+            */
+            sum = PyLong_FromLong(
+                ((PyLongObject*)right)->ob_digit[0] -
+                ((PyLongObject*)left)->ob_digit[0]);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            return sum;
+        case -1:
+            /* left < 0 && right < 0:
+                    return -left - right
+            */
+            sum = PyLong_FromLong(
+                -((PyLongObject*)left)->ob_digit[0] -
+                ((PyLongObject*)right)->ob_digit[0]);
+            Py_DECREF(left);
+            Py_DECREF(right);
+            return sum;
         }
     }
-    else {
-        /* left == 0 */
-        Py_DECREF(left);
-        return right;
-    }
-    /* event horizon */
-    assert(0);
+
+    sum = PyNumber_Add(left, right);
+    Py_DECREF(left);
+    Py_DECREF(right);
+    return sum;
 }
 
-Py_LOCAL_INLINE(PyObject *)
+static PyObject *
 pylong_sub(PyObject *left, PyObject *right) {
     long a, b;
     PyObject *sum;
@@ -5486,7 +5520,7 @@ pylong_sub(PyObject *left, PyObject *right) {
     assert(0);
 }
 
-Py_LOCAL_INLINE(PyObject *)
+static PyObject *
 pylong_mul(PyObject *left, PyObject *right) {
     PyObject *res;
     long a, b;
