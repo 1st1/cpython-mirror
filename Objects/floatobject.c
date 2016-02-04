@@ -2370,3 +2370,18 @@ _PyFloat_Unpack8(const unsigned char *p, int le)
         return x;
     }
 }
+
+PyObject *
+_PyFloat_DivDouble(double left, double right)
+{
+    double result;
+    if (right == 0.0) {
+        PyErr_SetString(PyExc_ZeroDivisionError,
+                        "float division by zero");
+        return NULL;
+    }
+    PyFPE_START_PROTECT("divide", return 0)
+    result = left / right;
+    PyFPE_END_PROTECT(result)
+    return PyFloat_FromDouble(result);
+}

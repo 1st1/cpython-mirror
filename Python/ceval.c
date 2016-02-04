@@ -5744,70 +5744,54 @@ fast_floor_div(PyObject *left, PyObject *right, PyObject **result)
 static int
 fast_true_div(PyObject *left, PyObject *right, PyObject **result)
 {
-    PyObject *res;
+    double left_d, right_d;
     int l_float, r_float;
     int l_long = PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1;
     int r_long = PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1;
-    double divisor;
 
     if (l_long && r_long) {
         if (!Py_SIZE(right)) {
-            goto zero_error;
+            Py_DECREF(left);
+            Py_DECREF(right);
+            PyErr_SetString(PyExc_ZeroDivisionError,
+                            "division by zero");
+            *result = NULL;
+            return -1;
         }
-        res = PyFloat_FromDouble(
-                    (double)SINGLE_DIGIT_LONG_AS_LONG(left) /
-                        SINGLE_DIGIT_LONG_AS_LONG(right));
-        goto have_result;
+
+        left_d = (double)SINGLE_DIGIT_LONG_AS_LONG(left);
+        right_d = (double)SINGLE_DIGIT_LONG_AS_LONG(right);
+        goto calc;
     }
 
     r_float = PyFloat_CheckExact(right);
     if (l_long && r_float) {
-        divisor = PyFloat_AS_DOUBLE(right);
-        if (divisor == 0.0) {
-            goto zero_error;
-        }
-        res = PyFloat_FromDouble(
-                    (double)SINGLE_DIGIT_LONG_AS_LONG(left) / divisor);
-        goto have_result;
+        left_d = (double)SINGLE_DIGIT_LONG_AS_LONG(left);
+        right_d = PyFloat_AS_DOUBLE(right);
+        goto calc;
     }
 
     l_float = PyFloat_CheckExact(left);
     if (l_float && r_long) {
-        if (!Py_SIZE(right)) {
-            goto zero_error;
-        }
-        res = PyFloat_FromDouble(
-                    PyFloat_AS_DOUBLE(left) /
-                        (double)SINGLE_DIGIT_LONG_AS_LONG(right));
-        goto have_result;
+        left_d = PyFloat_AS_DOUBLE(left);
+        right_d = (double)SINGLE_DIGIT_LONG_AS_LONG(right);
+        goto calc;
     }
 
     if (l_float && r_float) {
-        divisor = PyFloat_AS_DOUBLE(right);
-        if (divisor == 0.0) {
-            goto zero_error;
-        }
-        res = PyFloat_FromDouble(
-                (double)PyFloat_AS_DOUBLE(left) / divisor);
-        goto have_result;
+        left_d = PyFloat_AS_DOUBLE(left);
+        right_d = PyFloat_AS_DOUBLE(right);
+        goto calc;
     }
 
     *result = NULL;
     return 0;
 
-  have_result:
+  calc:
     Py_DECREF(left);
     Py_DECREF(right);
-    *result = res;
-    return res == NULL;
-
-  zero_error:
-    Py_DECREF(left);
-    Py_DECREF(right);
-    PyErr_SetString(PyExc_ZeroDivisionError,
-                    "division by zero");
-    *result = NULL;
-    return -1;
+    *result = _PyFloat_DivDouble(left_d, right_d);
+    return *result == NULL;
 }
 
 #ifdef DYNAMIC_EXECUTION_PROFILE

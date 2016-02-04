@@ -120,6 +120,10 @@ PyAPI_FUNC(int) _PyFloat_FormatAdvancedWriter(
     PyObject *format_spec,
     Py_ssize_t start,
     Py_ssize_t end);
+
+
+PyAPI_FUNC(PyObject *) _PyFloat_DivDouble(double left, double right);
+
 #endif /* Py_LIMITED_API */
 
 #ifdef __cplusplus
