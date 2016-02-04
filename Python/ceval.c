@@ -150,6 +150,7 @@ static PyObject * special_lookup(PyObject *, _Py_Identifier *);
 static PyObject * pylong_add(PyObject *, PyObject *);
 static PyObject * pylong_sub(PyObject *, PyObject *);
 static PyObject * pylong_mul(PyObject *, PyObject *);
+static PyObject * pylong_floor_div(PyObject *, PyObject *);
 
 #define NAME_ERROR_MSG \
     "name '%.200s' is not defined"
@@ -1548,9 +1549,17 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(BINARY_FLOOR_DIVIDE) {
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
-            PyObject *quotient = PyNumber_FloorDivide(dividend, divisor);
-            Py_DECREF(dividend);
-            Py_DECREF(divisor);
+            PyObject *quotient;
+
+            if (PyLong_CheckExact(divisor) && PyLong_CheckExact(dividend) &&
+                Py_ABS(Py_SIZE(divisor)) <= 1 && Py_ABS(Py_SIZE(dividend)) <= 1
+            ) {
+                quotient = pylong_floor_div(dividend, divisor);
+            } else {
+                quotient = PyNumber_FloorDivide(dividend, divisor);
+                Py_DECREF(dividend);
+                Py_DECREF(divisor);
+            }
             SET_TOP(quotient);
             if (quotient == NULL)
                 goto error;
@@ -1781,9 +1790,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(INPLACE_FLOOR_DIVIDE) {
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
-            PyObject *quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
-            Py_DECREF(dividend);
-            Py_DECREF(divisor);
+            PyObject *quotient;
+            if (PyLong_CheckExact(divisor) && PyLong_CheckExact(dividend) &&
+                Py_ABS(Py_SIZE(divisor)) <= 1 && Py_ABS(Py_SIZE(dividend)) <= 1
+            ) {
+                quotient = pylong_floor_div(dividend, divisor);
+            } else {
+                quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
+                Py_DECREF(dividend);
+                Py_DECREF(divisor);
+            }
             SET_TOP(quotient);
             if (quotient == NULL)
                 goto error;
@@ -5524,6 +5540,62 @@ pylong_mul(PyObject *left, PyObject *right) {
             */
             Py_DECREF(left);
             return right;
+        }
+    }
+    else {
+        /* left == 0 && right == something:
+            return left
+        */
+        Py_DECREF(right);
+        return left;
+    }
+}
+
+static PyObject *
+pylong_floor_div(PyObject *left, PyObject *right) {
+    PyObject *res;
+    long a, b, adivb;
+
+    assert(PyLong_CheckExact(left));
+    assert(Py_ABS(Py_SIZE(left)) <= 1);
+    assert(PyLong_CheckExact(right));
+    assert(Py_ABS(Py_SIZE(right)) <= 1);
+
+    if (Py_SIZE(left) != 0) {
+        if (Py_SIZE(right) != 0) {
+            a = ((PyLongObject*)left)->ob_digit[0];
+            b = ((PyLongObject*)right)->ob_digit[0];
+
+            if (Py_SIZE(left) != Py_SIZE(right)) {
+                a *= Py_SIZE(left);
+                b *= Py_SIZE(right);
+
+                adivb = a / b;
+                if (a - adivb * b) {
+                    /* we want floor */
+                    --adivb;
+                }
+
+                res = PyLong_FromLong(adivb);
+            } else {
+                res = PyLong_FromLong(a / b);
+            }
+
+            Py_DECREF(left);
+            Py_DECREF(right);
+
+            return res;
+        }
+        else {
+            /* left != 0 && right == 0:
+                raise ZeroDivisionError
+            */
+            Py_DECREF(left);
+            Py_DECREF(right);
+
+            PyErr_SetString(PyExc_ZeroDivisionError,
+                            "integer division or modulo by zero");
+            return NULL;
         }
     }
     else {
