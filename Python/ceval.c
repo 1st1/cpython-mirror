@@ -155,9 +155,6 @@ static int fast_mul(PyObject *, PyObject *, PyObject **);
 static int fast_floor_div(PyObject *, PyObject *, PyObject **);
 static int fast_true_div(PyObject *, PyObject *, PyObject **);
 
-#define SINGLE_DIGIT_LONG_AS_LONG(op) \
-    ((((PyLongObject*)(op))->ob_digit[0]) * Py_SIZE(op))
-
 #define NAME_ERROR_MSG \
     "name '%.200s' is not defined"
 #define UNBOUNDLOCAL_ERROR_MSG \
