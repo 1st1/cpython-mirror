@@ -3005,8 +3005,10 @@ x_sub(PyLongObject *a, PyLongObject *b)
 }
 
 PyObject *
-_PyLong_Add(PyLongObject *a, PyLongObject *b)
+_PyLong_Add(PyObject *left, PyObject *right)
 {
+    PyLongObject *a = (PyLongObject*) left;
+    PyLongObject *b = (PyLongObject*) right;
     PyLongObject *z;
 
     CHECK_BINOP(a, b);
@@ -3035,8 +3037,10 @@ _PyLong_Add(PyLongObject *a, PyLongObject *b)
 }
 
 PyObject *
-_PyLong_Sub(PyLongObject *a, PyLongObject *b)
+_PyLong_Sub(PyObject *left, PyObject *right)
 {
+    PyLongObject *a = (PyLongObject*) left;
+    PyLongObject *b = (PyLongObject*) right;
     PyLongObject *z;
 
     CHECK_BINOP(a, b);
@@ -3467,8 +3471,10 @@ k_lopsided_mul(PyLongObject *a, PyLongObject *b)
 }
 
 PyObject *
-_PyLong_Mul(PyLongObject *a, PyLongObject *b)
+_PyLong_Mul(PyObject *left, PyObject *right)
 {
+    PyLongObject *a = (PyLongObject*) left;
+    PyLongObject *b = (PyLongObject*) right;
     PyLongObject *z;
 
     CHECK_BINOP(a, b);
@@ -3532,7 +3538,7 @@ l_divmod(PyLongObject *v, PyLongObject *w,
         (Py_SIZE(mod) > 0 && Py_SIZE(w) < 0)) {
         PyLongObject *temp;
         PyLongObject *one;
-        temp = (PyLongObject *) _PyLong_Add(mod, w);
+        temp = (PyLongObject *) _PyLong_Add((PyObject*)mod, (PyObject*)w);
         Py_DECREF(mod);
         mod = temp;
         if (mod == NULL) {
@@ -3541,7 +3547,8 @@ l_divmod(PyLongObject *v, PyLongObject *w,
         }
         one = (PyLongObject *) PyLong_FromLong(1L);
         if (one == NULL ||
-            (temp = (PyLongObject *) _PyLong_Sub(div, one)) == NULL) {
+            (temp = (PyLongObject *) _PyLong_Sub(
+                (PyObject*)div, (PyObject*)one)) == NULL) {
             Py_DECREF(mod);
             Py_DECREF(div);
             Py_XDECREF(one);
@@ -4019,7 +4026,7 @@ long_pow(PyObject *v, PyObject *w, PyObject *x)
        result = X*Y % c.  If c is NULL, skip the mod. */
 #define MULT(X, Y, result)                      \
     do {                                        \
-        temp = (PyLongObject *)_PyLong_Mul(X, Y);  \
+        temp = (PyLongObject *)_PyLong_Mul((PyObject*)X, (PyObject*)Y);  \
         if (temp == NULL)                       \
             goto Error;                         \
         Py_XDECREF(result);                     \
@@ -4062,7 +4069,7 @@ long_pow(PyObject *v, PyObject *w, PyObject *x)
     }
 
     if (negativeOutput && (Py_SIZE(z) != 0)) {
-        temp = (PyLongObject *)_PyLong_Sub(z, c);
+        temp = (PyLongObject *)_PyLong_Sub((PyObject*)z, (PyObject*)c);
         if (temp == NULL)
             goto Error;
         Py_DECREF(z);
@@ -4097,7 +4104,7 @@ long_invert(PyLongObject *v)
     w = (PyLongObject *)PyLong_FromLong(1L);
     if (w == NULL)
         return NULL;
-    x = (PyLongObject *) _PyLong_Add(v, w);
+    x = (PyLongObject *) _PyLong_Add((PyObject*)v, (PyObject*)w);
     Py_DECREF(w);
     if (x == NULL)
         return NULL;
@@ -4818,18 +4825,18 @@ _PyLong_DivmodNear(PyObject *a, PyObject *b)
     if ((Py_SIZE(b) < 0 ? cmp < 0 : cmp > 0) || (cmp == 0 && quo_is_odd)) {
         /* fix up quotient */
         if (quo_is_neg)
-            temp = _PyLong_Sub(quo, (PyLongObject *)one);
+            temp = _PyLong_Sub((PyObject*)quo, one);
         else
-            temp = _PyLong_Add(quo, (PyLongObject *)one);
+            temp = _PyLong_Add((PyObject*)quo, one);
         Py_DECREF(quo);
         quo = (PyLongObject *)temp;
         if (quo == NULL)
             goto error;
         /* and remainder */
         if (quo_is_neg)
-            temp = _PyLong_Add(rem, (PyLongObject *)b);
+            temp = _PyLong_Add((PyObject*)rem, b);
         else
-            temp = _PyLong_Sub(rem, (PyLongObject *)b);
+            temp = _PyLong_Sub((PyObject*)rem, b);
         Py_DECREF(rem);
         rem = (PyLongObject *)temp;
         if (rem == NULL)
@@ -4913,8 +4920,7 @@ long_round(PyObject *self, PyObject *args)
     if (result == NULL)
         return NULL;
 
-    temp = _PyLong_Sub((PyLongObject *)self,
-                       (PyLongObject *)PyTuple_GET_ITEM(result, 1));
+    temp = _PyLong_Sub(self, PyTuple_GET_ITEM(result, 1));
     Py_DECREF(result);
     result = temp;
 
@@ -4961,7 +4967,7 @@ long_bit_length(PyLongObject *v)
     x = (PyLongObject *)PyLong_FromLong(PyLong_SHIFT);
     if (x == NULL)
         goto error;
-    y = (PyLongObject *)_PyLong_Mul(result, x);
+    y = (PyLongObject *)_PyLong_Mul((PyObject*)result, (PyObject*)x);
     Py_DECREF(x);
     if (y == NULL)
         goto error;
@@ -4971,7 +4977,7 @@ long_bit_length(PyLongObject *v)
     x = (PyLongObject *)PyLong_FromLong((long)msd_bits);
     if (x == NULL)
         goto error;
-    y = (PyLongObject *)_PyLong_Add(result, x);
+    y = (PyLongObject *)_PyLong_Add((PyObject*)result, (PyObject*)x);
     Py_DECREF(x);
     if (y == NULL)
         goto error;
@@ -5247,9 +5253,9 @@ Base 0 means to interpret the base from the string as an integer literal.\n\
 4");
 
 static PyNumberMethods long_as_number = {
-    (binaryfunc)_PyLong_Add,    /*nb_add*/
-    (binaryfunc)_PyLong_Sub,    /*nb_subtract*/
-    (binaryfunc)_PyLong_Mul,    /*nb_multiply*/
+    _PyLong_Add,                /*nb_add*/
+    _PyLong_Sub,                /*nb_subtract*/
+    _PyLong_Mul,                /*nb_multiply*/
     long_mod,                   /*nb_remainder*/
     long_divmod,                /*nb_divmod*/
     long_pow,                   /*nb_power*/

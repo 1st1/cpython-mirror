@@ -209,9 +209,9 @@ PyAPI_FUNC(long) PyOS_strtol(const char *, char **, int);
 /* For use by the gcd function in mathmodule.c */
 PyAPI_FUNC(PyObject *) _PyLong_GCD(PyObject *, PyObject *);
 
-PyAPI_FUNC(PyObject *) _PyLong_Add(PyLongObject *, PyLongObject *);
-PyAPI_FUNC(PyObject *) _PyLong_Sub(PyLongObject *, PyLongObject *);
-PyAPI_FUNC(PyObject *) _PyLong_Mul(PyLongObject *, PyLongObject *);
+PyAPI_FUNC(PyObject *) _PyLong_Add(PyObject *, PyObject *);
+PyAPI_FUNC(PyObject *) _PyLong_Sub(PyObject *, PyObject *);
+PyAPI_FUNC(PyObject *) _PyLong_Mul(PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) _PyLong_Div(PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) _PyLong_FloorDiv(PyObject *, PyObject *);
 

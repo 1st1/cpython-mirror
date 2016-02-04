@@ -5460,7 +5460,7 @@ fast_add(PyObject *left, PyObject *right,
 {
     if (PyLong_CheckExact(left)) {
         if (PyLong_CheckExact(right)) {
-            *result = _PyLong_Add((PyLongObject*)left, (PyLongObject*)right);
+            *result = _PyLong_Add(left, right);
             goto ret;
         }
 
@@ -5499,7 +5499,7 @@ fast_sub(PyObject *left, PyObject *right, PyObject **result)
 {
     if (PyLong_CheckExact(left)) {
         if (PyLong_CheckExact(right)) {
-            *result = _PyLong_Sub((PyLongObject*)left, (PyLongObject*)right);
+            *result = _PyLong_Sub(left, right);
             goto ret;
         }
 
@@ -5530,7 +5530,7 @@ fast_mul(PyObject *left, PyObject *right, PyObject **result)
 {
     if (PyLong_CheckExact(left)) {
         if (PyLong_CheckExact(right)) {
-            *result = _PyLong_Mul((PyLongObject*)left, (PyLongObject*)right);
+            *result = _PyLong_Mul(left, right);
             goto ret;
         }
 
