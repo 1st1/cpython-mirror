@@ -5616,61 +5616,29 @@ fast_floor_div(PyObject *left, PyObject *right, PyObject **result)
 static int
 fast_true_div(PyObject *left, PyObject *right, PyObject **result)
 {
-    double left_d, right_d;
-    int l_float, r_float;
-    int l_long = PyLong_CheckExact(left) && Py_ABS(Py_SIZE(left)) <= 1;
-    int r_long = PyLong_CheckExact(right) && Py_ABS(Py_SIZE(right)) <= 1;
-
-    if (l_long && r_long) {
-        if (!Py_SIZE(right)) {
-            Py_DECREF(left);
-            Py_DECREF(right);
-            PyErr_SetString(PyExc_ZeroDivisionError,
-                            "division by zero");
-            *result = NULL;
-            return -1;
+    if (Py_TYPE(left) == Py_TYPE(right)) {
+        if (PyLong_CheckExact(left)) {
+            *result = _PyLong_Div(left, right);
+            goto ret;
+        } else if (PyFloat_CheckExact(left)) {
+            *result = _PyFloat_Div(left, right);
+            goto ret;
         }
-
-        left_d = (double)SINGLE_DIGIT_LONG_AS_LONG(left);
-        right_d = (double)SINGLE_DIGIT_LONG_AS_LONG(right);
-        goto calc_float;
-    }
-
-    r_float = PyFloat_CheckExact(right);
-    if (l_long && r_float) {
-        left_d = (double)SINGLE_DIGIT_LONG_AS_LONG(left);
-        right_d = PyFloat_AS_DOUBLE(right);
-        goto calc_float;
-    }
-
-    l_float = PyFloat_CheckExact(left);
-    if (l_float && r_long) {
-        left_d = PyFloat_AS_DOUBLE(left);
-        right_d = (double)SINGLE_DIGIT_LONG_AS_LONG(right);
-        goto calc_float;
-    }
-
-    if (l_float && r_float) {
-        left_d = PyFloat_AS_DOUBLE(left);
-        right_d = PyFloat_AS_DOUBLE(right);
-        goto calc_float;
+    } else {
+        if ((PyLong_CheckExact(left) && PyFloat_CheckExact(right)) ||
+            (PyLong_CheckExact(right) && PyFloat_CheckExact(left))
+        ) {
+            *result = _PyFloat_Div(left, right);
+            goto ret;
+        }
     }
 
     *result = NULL;
     return 0;
 
-  calc_float:
+  ret:
     Py_DECREF(left);
     Py_DECREF(right);
-    if (right_d == 0.0) {
-        PyErr_SetString(PyExc_ZeroDivisionError,
-                        "float division by zero");
-        return -1;
-    }
-    PyFPE_START_PROTECT("divide", return -1)
-    left_d = left_d / right_d;
-    PyFPE_END_PROTECT(left_d)
-    *result = PyFloat_FromDouble(left_d);
     return *result == NULL;
 }
 

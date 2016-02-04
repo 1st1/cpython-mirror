@@ -542,8 +542,8 @@ _PyFloat_Mul(PyObject *v, PyObject *w)
     return PyFloat_FromDouble(a);
 }
 
-static PyObject *
-float_div(PyObject *v, PyObject *w)
+PyObject *
+_PyFloat_Div(PyObject *v, PyObject *w)
 {
     double a,b;
     CONVERT_TO_DOUBLE(v, a);
@@ -1827,7 +1827,7 @@ static PyNumberMethods float_as_number = {
     0,                  /* nb_inplace_xor */
     0,                  /* nb_inplace_or */
     float_floor_div, /* nb_floor_divide */
-    float_div,          /* nb_true_divide */
+    _PyFloat_Div,       /* nb_true_divide */
     0,                  /* nb_inplace_floor_divide */
     0,                  /* nb_inplace_true_divide */
 };

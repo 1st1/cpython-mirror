@@ -212,6 +212,7 @@ PyAPI_FUNC(PyObject *) _PyLong_GCD(PyObject *, PyObject *);
 PyObject * _PyLong_Add(PyLongObject *, PyLongObject *);
 PyObject * _PyLong_Sub(PyLongObject *, PyLongObject *);
 PyObject * _PyLong_Mul(PyLongObject *, PyLongObject *);
+PyObject * _PyLong_Div(PyObject *, PyObject *);
 
 #ifdef __cplusplus
 }
