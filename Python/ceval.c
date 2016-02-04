@@ -1517,12 +1517,14 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 res = PyNumber_Multiply(left, right);
                 Py_DECREF(left);
                 Py_DECREF(right);
+                SET_TOP(res);
+                if (res == NULL) {
+                    goto error;
+                }
+            } else {
+                SET_TOP(res);
             }
 
-            SET_TOP(res);
-            if (res == NULL) {
-                goto error;
-            }
             DISPATCH();
         }
 
@@ -1552,12 +1554,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 quotient = PyNumber_TrueDivide(dividend, divisor);
                 Py_DECREF(dividend);
                 Py_DECREF(divisor);
+
+                SET_TOP(quotient);
+                if (quotient == NULL) {
+                    goto error;
+                }
+            } else {
+                SET_TOP(quotient);
             }
 
-            SET_TOP(quotient);
-            if (quotient == NULL) {
-                goto error;
-            }
             DISPATCH();
         }
 
@@ -1575,12 +1580,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 quotient = PyNumber_FloorDivide(dividend, divisor);
                 Py_DECREF(dividend);
                 Py_DECREF(divisor);
+
+                SET_TOP(quotient);
+                if (quotient == NULL) {
+                    goto error;
+                }
+            } else {
+                SET_TOP(quotient);
             }
 
-            SET_TOP(quotient);
-            if (quotient == NULL) {
-                goto error;
-            }
             DISPATCH();
         }
 
@@ -1620,12 +1628,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     Py_DECREF(left);
                     Py_DECREF(right);
                 }
+
+                SET_TOP(sum);
+                if (sum == NULL) {
+                    goto error;
+                }
+            } else {
+                SET_TOP(sum);
             }
 
-            SET_TOP(sum);
-            if (sum == NULL) {
-                goto error;
-            }
             DISPATCH();
         }
 
@@ -1643,12 +1654,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 diff = PyNumber_Subtract(left, right);
                 Py_DECREF(right);
                 Py_DECREF(left);
+
+                SET_TOP(diff);
+                if (diff == NULL) {
+                    goto error;
+                }
+            } else {
+                SET_TOP(diff);
             }
 
-            SET_TOP(diff);
-            if (diff == NULL) {
-                goto error;
-            }
             DISPATCH();
         }
 
@@ -1774,12 +1788,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 res = PyNumber_InPlaceMultiply(left, right);
                 Py_DECREF(left);
                 Py_DECREF(right);
+
+                SET_TOP(res);
+                if (res == NULL) {
+                    goto error;
+                }
+            } else {
+                SET_TOP(res);
             }
 
-            SET_TOP(res);
-            if (res == NULL) {
-                goto error;
-            }
             DISPATCH();
         }
 
@@ -1809,11 +1826,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 quotient = PyNumber_InPlaceTrueDivide(dividend, divisor);
                 Py_DECREF(dividend);
                 Py_DECREF(divisor);
+
+                SET_TOP(quotient);
+                if (quotient == NULL) {
+                    goto error;
+                }
+            } else {
+                SET_TOP(quotient);
             }
 
-            SET_TOP(quotient);
-            if (quotient == NULL)
-                goto error;
             DISPATCH();
         }
 
@@ -1831,11 +1852,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
                 Py_DECREF(dividend);
                 Py_DECREF(divisor);
+
+                SET_TOP(quotient);
+                if (quotient == NULL) {
+                    goto error;
+                }
+            } else {
+                SET_TOP(quotient);
             }
 
-            SET_TOP(quotient);
-            if (quotient == NULL)
-                goto error;
             DISPATCH();
         }
 
@@ -1872,11 +1897,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     Py_DECREF(left);
                     Py_DECREF(right);
                 }
+
+                SET_TOP(sum);
+                if (sum == NULL) {
+                    goto error;
+                }
+            } else {
+                SET_TOP(sum);
             }
-            SET_TOP(sum);
-            if (sum == NULL) {
-                goto error;
-            }
+
             DISPATCH();
         }
 
@@ -1894,12 +1923,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 diff = PyNumber_InPlaceSubtract(left, right);
                 Py_DECREF(left);
                 Py_DECREF(right);
+
+                SET_TOP(diff);
+                if (diff == NULL) {
+                    goto error;
+                }
+            } else {
+                SET_TOP(diff);
             }
 
-            SET_TOP(diff);
-            if (diff == NULL) {
-                goto error;
-            }
             DISPATCH();
         }
 
