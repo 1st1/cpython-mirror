@@ -147,17 +147,6 @@ static PyObject * unicode_concatenate(PyObject *, PyObject *,
                                       PyFrameObject *, unsigned char *);
 static PyObject * special_lookup(PyObject *, _Py_Identifier *);
 
-static int fast_add(PyObject *, PyObject *,
-                    PyFrameObject *, unsigned char *,
-                    PyObject **);
-static int fast_sub(PyObject *, PyObject *, PyObject **);
-static int fast_mul(PyObject *, PyObject *, PyObject **);
-static int fast_floor_div(PyObject *, PyObject *, PyObject **);
-static int fast_true_div(PyObject *, PyObject *, PyObject **);
-
-#define SINGLE_DIGIT_LONG_AS_LONG(op) \
-    ((((PyLongObject*)(op))->ob_digit[0]) * Py_SIZE(op))
-
 #define NAME_ERROR_MSG \
     "name '%.200s' is not defined"
 #define UNBOUNDLOCAL_ERROR_MSG \
@@ -1129,7 +1118,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         Py_XDECREF(traceback); \
     }
 
-#define FAST_NUM_OP(OP, left, right)                                    \
+#define MAYBE_DISPATCH_FAST_NUM_OP(OP, left, right)                     \
     do {                                                                \
         PyObject *result;                                               \
         int check = 0;                                                  \
@@ -1149,6 +1138,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             check = 1;                                                  \
         }                                                               \
         if (check) {                                                    \
+            Py_DECREF(left);                                            \
+            Py_DECREF(right);                                           \
             SET_TOP(result);                                            \
             if (result == NULL) goto error;                             \
             DISPATCH();                                                 \
@@ -1536,7 +1527,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *res;
 
-            FAST_NUM_OP(Mul, left, right);
+            MAYBE_DISPATCH_FAST_NUM_OP(Mul, left, right);
 
             res = PyNumber_Multiply(left, right);
             Py_DECREF(left);
@@ -1565,7 +1556,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            FAST_NUM_OP(Div, dividend, divisor);
+            MAYBE_DISPATCH_FAST_NUM_OP(Div, dividend, divisor);
 
             quotient = PyNumber_TrueDivide(dividend, divisor);
             Py_DECREF(dividend);
@@ -1583,7 +1574,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            FAST_NUM_OP(FloorDiv, dividend, divisor);
+            MAYBE_DISPATCH_FAST_NUM_OP(FloorDiv, dividend, divisor);
 
             quotient = PyNumber_FloorDivide(dividend, divisor);
             Py_DECREF(dividend);
@@ -1626,7 +1617,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 DISPATCH();
             }
 
-            FAST_NUM_OP(Add, left, right);
+            MAYBE_DISPATCH_FAST_NUM_OP(Add, left, right);
 
             sum = PyNumber_Add(left, right);
             Py_DECREF(left);
@@ -1644,7 +1635,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *diff;
 
-            FAST_NUM_OP(Sub, left, right);
+            MAYBE_DISPATCH_FAST_NUM_OP(Sub, left, right);
 
             diff = PyNumber_Subtract(left, right);
             Py_DECREF(right);
@@ -1770,7 +1761,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *res;
 
-            FAST_NUM_OP(Mul, left, right);
+            MAYBE_DISPATCH_FAST_NUM_OP(Mul, left, right);
 
             res = PyNumber_InPlaceMultiply(left, right);
             Py_DECREF(left);
@@ -1800,7 +1791,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            FAST_NUM_OP(Div, dividend, divisor);
+            MAYBE_DISPATCH_FAST_NUM_OP(Div, dividend, divisor);
 
             quotient = PyNumber_InPlaceTrueDivide(dividend, divisor);
             Py_DECREF(dividend);
@@ -1818,7 +1809,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            FAST_NUM_OP(FloorDiv, dividend, divisor);
+            MAYBE_DISPATCH_FAST_NUM_OP(FloorDiv, dividend, divisor);
 
             quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
             Py_DECREF(dividend);
@@ -1859,7 +1850,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 DISPATCH();
             }
 
-            FAST_NUM_OP(Add, left, right);
+            MAYBE_DISPATCH_FAST_NUM_OP(Add, left, right);
 
             sum = PyNumber_InPlaceAdd(left, right);
             Py_DECREF(left);
@@ -1877,7 +1868,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *diff;
 
-            FAST_NUM_OP(Sub, left, right);
+            MAYBE_DISPATCH_FAST_NUM_OP(Sub, left, right);
 
             diff = PyNumber_InPlaceSubtract(left, right);
             Py_DECREF(left);
@@ -5419,171 +5410,6 @@ unicode_concatenate(PyObject *v, PyObject *w,
     res = v;
     PyUnicode_Append(&res, w);
     return res;
-}
-
-static int
-fast_add(PyObject *left, PyObject *right,
-         PyFrameObject *f, unsigned char *next_instr,
-         PyObject **result)
-{
-    if (PyLong_CheckExact(left)) {
-        if (PyLong_CheckExact(right)) {
-            *result = _PyLong_Add(left, right);
-            goto ret;
-        }
-
-        if (PyFloat_CheckExact(right)) {
-            *result = _PyFloat_Add(left, right);
-            goto ret;
-        }
-    }
-
-    if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
-        /* fast path for string concatenation */
-        *result = unicode_concatenate(left, right, f, next_instr);
-        /* unicode_concatenate consumed the ref to left */
-        Py_DECREF(right);
-        return *result == NULL;
-    }
-
-    if (PyFloat_CheckExact(left) &&
-        (PyFloat_CheckExact(right) || PyLong_CheckExact(right))
-    ) {
-        *result = _PyFloat_Add(left, right);
-        goto ret;
-    }
-
-    *result = NULL;
-    return 0;
-
-  ret:
-    Py_DECREF(left);
-    Py_DECREF(right);
-    return *result == NULL;
-}
-
-static int
-fast_sub(PyObject *left, PyObject *right, PyObject **result)
-{
-    if (PyLong_CheckExact(left)) {
-        if (PyLong_CheckExact(right)) {
-            *result = _PyLong_Sub(left, right);
-            goto ret;
-        }
-
-        if (PyFloat_CheckExact(right)) {
-            *result = _PyFloat_Sub(left, right);
-            goto ret;
-        }
-    }
-
-    if (PyFloat_CheckExact(left) &&
-        (PyFloat_CheckExact(right) || PyLong_CheckExact(right))
-    ) {
-        *result = _PyFloat_Sub(left, right);
-        goto ret;
-    }
-
-    *result = NULL;
-    return 0;
-
-  ret:
-    Py_DECREF(left);
-    Py_DECREF(right);
-    return *result == NULL;
-}
-
-static int
-fast_mul(PyObject *left, PyObject *right, PyObject **result)
-{
-    if (PyLong_CheckExact(left)) {
-        if (PyLong_CheckExact(right)) {
-            *result = _PyLong_Mul(left, right);
-            goto ret;
-        }
-
-        if (PyFloat_CheckExact(right)) {
-            *result = _PyFloat_Mul(left, right);
-            goto ret;
-        }
-    }
-
-    if (PyFloat_CheckExact(left) &&
-        (PyFloat_CheckExact(right) || PyLong_CheckExact(right))
-    ) {
-        *result = _PyFloat_Mul(left, right);
-        goto ret;
-    }
-
-    *result = NULL;
-    return 0;
-
-  ret:
-    Py_DECREF(left);
-    Py_DECREF(right);
-    return *result == NULL;
-}
-
-static int
-fast_floor_div(PyObject *left, PyObject *right, PyObject **result)
-{
-    if (PyLong_CheckExact(left)) {
-        if (PyLong_CheckExact(right)) {
-            *result = _PyLong_FloorDiv(left, right);
-            goto ret;
-        }
-
-        if (PyFloat_CheckExact(right)) {
-            *result = _PyFloat_FloorDiv(left, right);
-            goto ret;
-        }
-    }
-
-    if (PyFloat_CheckExact(left) &&
-        (PyFloat_CheckExact(right) || PyLong_CheckExact(right))
-    ) {
-        *result = _PyFloat_FloorDiv(left, right);
-        goto ret;
-    }
-
-    *result = NULL;
-    return 0;
-
-  ret:
-    Py_DECREF(left);
-    Py_DECREF(right);
-    return *result == NULL;
-}
-
-static int
-fast_true_div(PyObject *left, PyObject *right, PyObject **result)
-{
-    if (PyLong_CheckExact(left)) {
-        if (PyLong_CheckExact(right)) {
-            *result = _PyLong_Div(left, right);
-            goto ret;
-        }
-
-        if (PyFloat_CheckExact(right)) {
-            *result = _PyFloat_Div(left, right);
-            goto ret;
-        }
-    }
-
-    if (PyFloat_CheckExact(left) &&
-        (PyFloat_CheckExact(right) || PyLong_CheckExact(right))
-    ) {
-        *result = _PyFloat_Div(left, right);
-        goto ret;
-    }
-
-    *result = NULL;
-    return 0;
-
-  ret:
-    Py_DECREF(left);
-    Py_DECREF(right);
-    return *result == NULL;
 }
 
 #ifdef DYNAMIC_EXECUTION_PROFILE
