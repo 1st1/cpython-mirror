@@ -1118,7 +1118,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         Py_XDECREF(traceback); \
     }
 
-#define TRY_FAST_NUMOP_DISPATCH(OP, left, right)                        \
+#define TRY_FAST_NUM_BINOP_DISPATCH(OP, left, right)                    \
     {                                                                   \
         PyObject *result;                                               \
         int check = 0;                                                  \
@@ -1527,7 +1527,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *res;
 
-            TRY_FAST_NUMOP_DISPATCH(nb_multiply, left, right);
+            TRY_FAST_NUM_BINOP_DISPATCH(nb_multiply, left, right);
 
             res = PyNumber_Multiply(left, right);
             Py_DECREF(left);
@@ -1556,7 +1556,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            TRY_FAST_NUMOP_DISPATCH(nb_true_divide, dividend, divisor);
+            TRY_FAST_NUM_BINOP_DISPATCH(nb_true_divide, dividend, divisor);
 
             quotient = PyNumber_TrueDivide(dividend, divisor);
             Py_DECREF(dividend);
@@ -1574,7 +1574,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            TRY_FAST_NUMOP_DISPATCH(nb_floor_divide, dividend, divisor);
+            TRY_FAST_NUM_BINOP_DISPATCH(nb_floor_divide, dividend, divisor);
 
             quotient = PyNumber_FloorDivide(dividend, divisor);
             Py_DECREF(dividend);
@@ -1590,9 +1590,15 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(BINARY_MODULO) {
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
-            PyObject *res = PyUnicode_CheckExact(dividend) ?
-                PyUnicode_Format(dividend, divisor) :
-                PyNumber_Remainder(dividend, divisor);
+            PyObject *res;
+
+            if (PyUnicode_CheckExact(dividend)) {
+                res = PyUnicode_Format(dividend, divisor);
+            } else {
+                TRY_FAST_NUM_BINOP_DISPATCH(nb_remainder, dividend, divisor);
+                res = PyNumber_Remainder(dividend, divisor);
+            }
+
             Py_DECREF(divisor);
             Py_DECREF(dividend);
             SET_TOP(res);
@@ -1611,7 +1617,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 sum = unicode_concatenate(left, right, f, next_instr);
                 /* unicode_concatenate consumed the ref to left */
             } else {
-                TRY_FAST_NUMOP_DISPATCH(nb_add, left, right);
+                TRY_FAST_NUM_BINOP_DISPATCH(nb_add, left, right);
 
                 sum = PyNumber_Add(left, right);
                 Py_DECREF(left);
@@ -1630,7 +1636,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *diff;
 
-            TRY_FAST_NUMOP_DISPATCH(nb_subtract, left, right);
+            TRY_FAST_NUM_BINOP_DISPATCH(nb_subtract, left, right);
 
             diff = PyNumber_Subtract(left, right);
             Py_DECREF(right);
@@ -1658,7 +1664,12 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(BINARY_LSHIFT) {
             PyObject *right = POP();
             PyObject *left = TOP();
-            PyObject *res = PyNumber_Lshift(left, right);
+            PyObject *res;
+            if (PyLong_CheckExact(left) && PyLong_CheckExact(right)) {
+                res = PyLong_Type.tp_as_number->nb_lshift(left, right);
+            } else {
+                res = PyNumber_Lshift(left, right);
+            }
             Py_DECREF(left);
             Py_DECREF(right);
             SET_TOP(res);
@@ -1670,7 +1681,12 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(BINARY_RSHIFT) {
             PyObject *right = POP();
             PyObject *left = TOP();
-            PyObject *res = PyNumber_Rshift(left, right);
+            PyObject *res;
+            if (PyLong_CheckExact(left) && PyLong_CheckExact(right)) {
+                res = PyLong_Type.tp_as_number->nb_rshift(left, right);
+            } else {
+                res = PyNumber_Rshift(left, right);
+            }
             Py_DECREF(left);
             Py_DECREF(right);
             SET_TOP(res);
@@ -1756,7 +1772,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *res;
 
-            TRY_FAST_NUMOP_DISPATCH(nb_multiply, left, right);
+            TRY_FAST_NUM_BINOP_DISPATCH(nb_multiply, left, right);
 
             res = PyNumber_InPlaceMultiply(left, right);
             Py_DECREF(left);
@@ -1786,7 +1802,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            TRY_FAST_NUMOP_DISPATCH(nb_true_divide, dividend, divisor);
+            TRY_FAST_NUM_BINOP_DISPATCH(nb_true_divide, dividend, divisor);
 
             quotient = PyNumber_InPlaceTrueDivide(dividend, divisor);
             Py_DECREF(dividend);
@@ -1804,7 +1820,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            TRY_FAST_NUMOP_DISPATCH(nb_floor_divide, dividend, divisor);
+            TRY_FAST_NUM_BINOP_DISPATCH(nb_floor_divide, dividend, divisor);
 
             quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
             Py_DECREF(dividend);
@@ -1820,7 +1836,11 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(INPLACE_MODULO) {
             PyObject *right = POP();
             PyObject *left = TOP();
-            PyObject *mod = PyNumber_InPlaceRemainder(left, right);
+            PyObject *mod;
+
+            TRY_FAST_NUM_BINOP_DISPATCH(nb_remainder, left, right);
+
+            mod = PyNumber_InPlaceRemainder(left, right);
             Py_DECREF(left);
             Py_DECREF(right);
             SET_TOP(mod);
@@ -1839,7 +1859,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 sum = unicode_concatenate(left, right, f, next_instr);
                 /* unicode_concatenate consumed the ref to left */
             } else {
-                TRY_FAST_NUMOP_DISPATCH(nb_add, left, right);
+                TRY_FAST_NUM_BINOP_DISPATCH(nb_add, left, right);
 
                 sum = PyNumber_InPlaceAdd(left, right);
                 Py_DECREF(left);
@@ -1858,7 +1878,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *diff;
 
-            TRY_FAST_NUMOP_DISPATCH(nb_subtract, left, right);
+            TRY_FAST_NUM_BINOP_DISPATCH(nb_subtract, left, right);
 
             diff = PyNumber_InPlaceSubtract(left, right);
             Py_DECREF(left);
