@@ -155,14 +155,6 @@ static PyObject * special_lookup(PyObject *, _Py_Identifier *);
     "free variable '%.200s' referenced before assignment" \
     " in enclosing scope"
 
-#define NB_SLOT(slot) offsetof(PyNumberMethods, slot)
-#define NB_BINOP(nb_methods, slot) \
-    (*(binaryfunc*)(& ((char*)nb_methods)[NB_SLOT(slot)]))
-#define PY_LONG_CALL_BINOP(slot, left, right) \
-    (NB_BINOP(PyLong_Type.tp_as_number, slot))(left, right)
-#define PY_FLOAT_CALL_BINOP(slot, left, right) \
-    (NB_BINOP(PyFloat_Type.tp_as_number, slot))(left, right)
-
 /* Dynamic execution profile */
 #ifdef DYNAMIC_EXECUTION_PROFILE
 #ifdef DXPAIRS
@@ -1126,23 +1118,23 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         Py_XDECREF(traceback); \
     }
 
-#define MAYBE_DISPATCH_FAST_NUM_OP(OP, left, right)                     \
+#define TRY_FAST_NUMOP_DISPATCH(OP, left, right)                        \
     {                                                                   \
         PyObject *result;                                               \
         int check = 0;                                                  \
         if (PyLong_CheckExact(left)) {                                  \
             if (PyLong_CheckExact(right)) {                             \
-                result = PY_LONG_CALL_BINOP(OP, left, right);           \
+                result = PyLong_Type.tp_as_number->OP(left, right);     \
                 check = 1;                                              \
             }                                                           \
             else if (PyFloat_CheckExact(right)) {                       \
-                result = PY_FLOAT_CALL_BINOP(OP, left, right);          \
+                result = PyFloat_Type.tp_as_number->OP(left, right);    \
                 check = 1;                                              \
             }                                                           \
         }                                                               \
         else if (PyFloat_CheckExact(left) &&                            \
             (PyFloat_CheckExact(right) || PyLong_CheckExact(right))) {  \
-            result = PY_FLOAT_CALL_BINOP(OP, left, right);              \
+            result = PyFloat_Type.tp_as_number->OP(left, right);        \
             check = 1;                                                  \
         }                                                               \
         if (check) {                                                    \
@@ -1535,7 +1527,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *res;
 
-            MAYBE_DISPATCH_FAST_NUM_OP(nb_multiply, left, right);
+            TRY_FAST_NUMOP_DISPATCH(nb_multiply, left, right);
 
             res = PyNumber_Multiply(left, right);
             Py_DECREF(left);
@@ -1564,7 +1556,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            MAYBE_DISPATCH_FAST_NUM_OP(nb_true_divide, dividend, divisor);
+            TRY_FAST_NUMOP_DISPATCH(nb_true_divide, dividend, divisor);
 
             quotient = PyNumber_TrueDivide(dividend, divisor);
             Py_DECREF(dividend);
@@ -1582,7 +1574,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            MAYBE_DISPATCH_FAST_NUM_OP(nb_floor_divide, dividend, divisor);
+            TRY_FAST_NUMOP_DISPATCH(nb_floor_divide, dividend, divisor);
 
             quotient = PyNumber_FloorDivide(dividend, divisor);
             Py_DECREF(dividend);
@@ -1619,7 +1611,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 sum = unicode_concatenate(left, right, f, next_instr);
                 /* unicode_concatenate consumed the ref to left */
             } else {
-                MAYBE_DISPATCH_FAST_NUM_OP(nb_add, left, right);
+                TRY_FAST_NUMOP_DISPATCH(nb_add, left, right);
 
                 sum = PyNumber_Add(left, right);
                 Py_DECREF(left);
@@ -1638,7 +1630,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *diff;
 
-            MAYBE_DISPATCH_FAST_NUM_OP(nb_subtract, left, right);
+            TRY_FAST_NUMOP_DISPATCH(nb_subtract, left, right);
 
             diff = PyNumber_Subtract(left, right);
             Py_DECREF(right);
@@ -1764,7 +1756,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *res;
 
-            MAYBE_DISPATCH_FAST_NUM_OP(nb_multiply, left, right);
+            TRY_FAST_NUMOP_DISPATCH(nb_multiply, left, right);
 
             res = PyNumber_InPlaceMultiply(left, right);
             Py_DECREF(left);
@@ -1794,7 +1786,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            MAYBE_DISPATCH_FAST_NUM_OP(nb_true_divide, dividend, divisor);
+            TRY_FAST_NUMOP_DISPATCH(nb_true_divide, dividend, divisor);
 
             quotient = PyNumber_InPlaceTrueDivide(dividend, divisor);
             Py_DECREF(dividend);
@@ -1812,7 +1804,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *dividend = TOP();
             PyObject *quotient;
 
-            MAYBE_DISPATCH_FAST_NUM_OP(nb_floor_divide, dividend, divisor);
+            TRY_FAST_NUMOP_DISPATCH(nb_floor_divide, dividend, divisor);
 
             quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
             Py_DECREF(dividend);
@@ -1847,7 +1839,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 sum = unicode_concatenate(left, right, f, next_instr);
                 /* unicode_concatenate consumed the ref to left */
             } else {
-                MAYBE_DISPATCH_FAST_NUM_OP(nb_add, left, right);
+                TRY_FAST_NUMOP_DISPATCH(nb_add, left, right);
 
                 sum = PyNumber_InPlaceAdd(left, right);
                 Py_DECREF(left);
@@ -1866,7 +1858,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *left = TOP();
             PyObject *diff;
 
-            MAYBE_DISPATCH_FAST_NUM_OP(nb_subtract, left, right);
+            TRY_FAST_NUMOP_DISPATCH(nb_subtract, left, right);
 
             diff = PyNumber_InPlaceSubtract(left, right);
             Py_DECREF(left);
