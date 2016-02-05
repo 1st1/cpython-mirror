@@ -155,6 +155,14 @@ static PyObject * special_lookup(PyObject *, _Py_Identifier *);
     "free variable '%.200s' referenced before assignment" \
     " in enclosing scope"
 
+#define NB_SLOT(slot) offsetof(PyNumberMethods, slot)
+#define NB_BINOP(nb_methods, slot) \
+    (*(binaryfunc*)(& ((char*)nb_methods)[NB_SLOT(slot)]))
+#define PY_LONG_CALL_BINOP(slot, left, right) \
+    (NB_BINOP(PyLong_Type.tp_as_number, slot))(left, right)
+#define PY_FLOAT_CALL_BINOP(slot, left, right) \
+    (NB_BINOP(PyFloat_Type.tp_as_number, slot))(left, right)
+
 /* Dynamic execution profile */
 #ifdef DYNAMIC_EXECUTION_PROFILE
 #ifdef DXPAIRS
@@ -1118,6 +1126,34 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         Py_XDECREF(traceback); \
     }
 
+#define MAYBE_DISPATCH_FAST_NUM_OP(OP, left, right)                     \
+    {                                                                   \
+        PyObject *result;                                               \
+        int check = 0;                                                  \
+        if (PyLong_CheckExact(left)) {                                  \
+            if (PyLong_CheckExact(right)) {                             \
+                result = PY_LONG_CALL_BINOP(OP, left, right);           \
+                check = 1;                                              \
+            }                                                           \
+            else if (PyFloat_CheckExact(right)) {                       \
+                result = PY_FLOAT_CALL_BINOP(OP, left, right);          \
+                check = 1;                                              \
+            }                                                           \
+        }                                                               \
+        else if (PyFloat_CheckExact(left) &&                            \
+            (PyFloat_CheckExact(right) || PyLong_CheckExact(right))) {  \
+            result = PY_FLOAT_CALL_BINOP(OP, left, right);              \
+            check = 1;                                                  \
+        }                                                               \
+        if (check) {                                                    \
+            Py_DECREF(left);                                            \
+            Py_DECREF(right);                                           \
+            SET_TOP(result);                                            \
+            if (result == NULL) goto error;                             \
+            DISPATCH();                                                 \
+        }                                                               \
+    }
+
 /* Start of code */
 
     /* push frame */
@@ -1497,12 +1533,17 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(BINARY_MULTIPLY) {
             PyObject *right = POP();
             PyObject *left = TOP();
-            PyObject *res = PyNumber_Multiply(left, right);
+            PyObject *res;
+
+            MAYBE_DISPATCH_FAST_NUM_OP(nb_multiply, left, right);
+
+            res = PyNumber_Multiply(left, right);
             Py_DECREF(left);
             Py_DECREF(right);
             SET_TOP(res);
-            if (res == NULL)
+            if (res == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
@@ -1521,24 +1562,36 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(BINARY_TRUE_DIVIDE) {
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
-            PyObject *quotient = PyNumber_TrueDivide(dividend, divisor);
+            PyObject *quotient;
+
+            MAYBE_DISPATCH_FAST_NUM_OP(nb_true_divide, dividend, divisor);
+
+            quotient = PyNumber_TrueDivide(dividend, divisor);
             Py_DECREF(dividend);
             Py_DECREF(divisor);
+
             SET_TOP(quotient);
-            if (quotient == NULL)
+            if (quotient == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
         TARGET(BINARY_FLOOR_DIVIDE) {
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
-            PyObject *quotient = PyNumber_FloorDivide(dividend, divisor);
+            PyObject *quotient;
+
+            MAYBE_DISPATCH_FAST_NUM_OP(nb_floor_divide, dividend, divisor);
+
+            quotient = PyNumber_FloorDivide(dividend, divisor);
             Py_DECREF(dividend);
             Py_DECREF(divisor);
+
             SET_TOP(quotient);
-            if (quotient == NULL)
+            if (quotient == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
@@ -1560,31 +1613,41 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *sum;
-            if (PyUnicode_CheckExact(left) &&
-                     PyUnicode_CheckExact(right)) {
+
+            if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
+                /* fast path for string concatenation */
                 sum = unicode_concatenate(left, right, f, next_instr);
-                /* unicode_concatenate consumed the ref to v */
-            }
-            else {
+                /* unicode_concatenate consumed the ref to left */
+            } else {
+                MAYBE_DISPATCH_FAST_NUM_OP(nb_add, left, right);
+
                 sum = PyNumber_Add(left, right);
                 Py_DECREF(left);
             }
+
             Py_DECREF(right);
             SET_TOP(sum);
-            if (sum == NULL)
+            if (sum == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
         TARGET(BINARY_SUBTRACT) {
             PyObject *right = POP();
             PyObject *left = TOP();
-            PyObject *diff = PyNumber_Subtract(left, right);
+            PyObject *diff;
+
+            MAYBE_DISPATCH_FAST_NUM_OP(nb_subtract, left, right);
+
+            diff = PyNumber_Subtract(left, right);
             Py_DECREF(right);
             Py_DECREF(left);
+
             SET_TOP(diff);
-            if (diff == NULL)
+            if (diff == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
@@ -1699,12 +1762,18 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(INPLACE_MULTIPLY) {
             PyObject *right = POP();
             PyObject *left = TOP();
-            PyObject *res = PyNumber_InPlaceMultiply(left, right);
+            PyObject *res;
+
+            MAYBE_DISPATCH_FAST_NUM_OP(nb_multiply, left, right);
+
+            res = PyNumber_InPlaceMultiply(left, right);
             Py_DECREF(left);
             Py_DECREF(right);
+
             SET_TOP(res);
-            if (res == NULL)
+            if (res == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
@@ -1723,24 +1792,36 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         TARGET(INPLACE_TRUE_DIVIDE) {
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
-            PyObject *quotient = PyNumber_InPlaceTrueDivide(dividend, divisor);
+            PyObject *quotient;
+
+            MAYBE_DISPATCH_FAST_NUM_OP(nb_true_divide, dividend, divisor);
+
+            quotient = PyNumber_InPlaceTrueDivide(dividend, divisor);
             Py_DECREF(dividend);
             Py_DECREF(divisor);
+
             SET_TOP(quotient);
-            if (quotient == NULL)
+            if (quotient == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
         TARGET(INPLACE_FLOOR_DIVIDE) {
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
-            PyObject *quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
+            PyObject *quotient;
+
+            MAYBE_DISPATCH_FAST_NUM_OP(nb_floor_divide, dividend, divisor);
+
+            quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
             Py_DECREF(dividend);
             Py_DECREF(divisor);
+
             SET_TOP(quotient);
-            if (quotient == NULL)
+            if (quotient == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
@@ -1760,30 +1841,41 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *sum;
+
             if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
+                /* fast path for string concatenation */
                 sum = unicode_concatenate(left, right, f, next_instr);
-                /* unicode_concatenate consumed the ref to v */
-            }
-            else {
+                /* unicode_concatenate consumed the ref to left */
+            } else {
+                MAYBE_DISPATCH_FAST_NUM_OP(nb_add, left, right);
+
                 sum = PyNumber_InPlaceAdd(left, right);
                 Py_DECREF(left);
             }
+
             Py_DECREF(right);
             SET_TOP(sum);
-            if (sum == NULL)
+            if (sum == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
         TARGET(INPLACE_SUBTRACT) {
             PyObject *right = POP();
             PyObject *left = TOP();
-            PyObject *diff = PyNumber_InPlaceSubtract(left, right);
+            PyObject *diff;
+
+            MAYBE_DISPATCH_FAST_NUM_OP(nb_subtract, left, right);
+
+            diff = PyNumber_InPlaceSubtract(left, right);
             Py_DECREF(left);
             Py_DECREF(right);
+
             SET_TOP(diff);
-            if (diff == NULL)
+            if (diff == NULL) {
                 goto error;
+            }
             DISPATCH();
         }
 
