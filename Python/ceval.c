@@ -1526,9 +1526,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *res;
-
             TRY_FAST_NUM_BINOP_DISPATCH(nb_multiply, left, right);
-
             res = PyNumber_Multiply(left, right);
             Py_DECREF(left);
             Py_DECREF(right);
@@ -1555,9 +1553,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
             PyObject *quotient;
-
             TRY_FAST_NUM_BINOP_DISPATCH(nb_true_divide, dividend, divisor);
-
             quotient = PyNumber_TrueDivide(dividend, divisor);
             Py_DECREF(dividend);
             Py_DECREF(divisor);
@@ -1573,9 +1569,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
             PyObject *quotient;
-
             TRY_FAST_NUM_BINOP_DISPATCH(nb_floor_divide, dividend, divisor);
-
             quotient = PyNumber_FloorDivide(dividend, divisor);
             Py_DECREF(dividend);
             Py_DECREF(divisor);
@@ -1618,7 +1612,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 /* unicode_concatenate consumed the ref to left */
             } else {
                 TRY_FAST_NUM_BINOP_DISPATCH(nb_add, left, right);
-
                 sum = PyNumber_Add(left, right);
                 Py_DECREF(left);
             }
@@ -1635,9 +1628,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *diff;
-
             TRY_FAST_NUM_BINOP_DISPATCH(nb_subtract, left, right);
-
             diff = PyNumber_Subtract(left, right);
             Py_DECREF(right);
             Py_DECREF(left);
@@ -1771,9 +1762,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *res;
-
             TRY_FAST_NUM_BINOP_DISPATCH(nb_multiply, left, right);
-
             res = PyNumber_InPlaceMultiply(left, right);
             Py_DECREF(left);
             Py_DECREF(right);
@@ -1801,9 +1790,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
             PyObject *quotient;
-
             TRY_FAST_NUM_BINOP_DISPATCH(nb_true_divide, dividend, divisor);
-
             quotient = PyNumber_InPlaceTrueDivide(dividend, divisor);
             Py_DECREF(dividend);
             Py_DECREF(divisor);
@@ -1819,9 +1806,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
             PyObject *quotient;
-
             TRY_FAST_NUM_BINOP_DISPATCH(nb_floor_divide, dividend, divisor);
-
             quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
             Py_DECREF(dividend);
             Py_DECREF(divisor);
@@ -1837,9 +1822,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *mod;
-
             TRY_FAST_NUM_BINOP_DISPATCH(nb_remainder, left, right);
-
             mod = PyNumber_InPlaceRemainder(left, right);
             Py_DECREF(left);
             Py_DECREF(right);
@@ -1860,7 +1843,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 /* unicode_concatenate consumed the ref to left */
             } else {
                 TRY_FAST_NUM_BINOP_DISPATCH(nb_add, left, right);
-
                 sum = PyNumber_InPlaceAdd(left, right);
                 Py_DECREF(left);
             }
@@ -1877,9 +1859,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *diff;
-
             TRY_FAST_NUM_BINOP_DISPATCH(nb_subtract, left, right);
-
             diff = PyNumber_InPlaceSubtract(left, right);
             Py_DECREF(left);
             Py_DECREF(right);
