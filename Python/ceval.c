@@ -1141,7 +1141,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             Py_DECREF(left);                                            \
             Py_DECREF(right);                                           \
             SET_TOP(result);                                            \
-            if (result == NULL) goto error;                             \
+            if (result == NULL) {                                       \
+                goto error;                                             \
+            }                                                           \
             DISPATCH();                                                 \
         }                                                               \
     }
@@ -1588,7 +1590,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
             if (PyUnicode_CheckExact(dividend)) {
                 res = PyUnicode_Format(dividend, divisor);
-            } else {
+            }
+            else {
                 TRY_FAST_NUM_BINOP_DISPATCH(nb_remainder, dividend, divisor);
                 res = PyNumber_Remainder(dividend, divisor);
             }
@@ -1610,7 +1613,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 /* fast path for string concatenation */
                 sum = unicode_concatenate(left, right, f, next_instr);
                 /* unicode_concatenate consumed the ref to left */
-            } else {
+            }
+            else {
                 TRY_FAST_NUM_BINOP_DISPATCH(nb_add, left, right);
                 sum = PyNumber_Add(left, right);
                 Py_DECREF(left);
@@ -1658,7 +1662,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *res;
             if (PyLong_CheckExact(left) && PyLong_CheckExact(right)) {
                 res = PyLong_Type.tp_as_number->nb_lshift(left, right);
-            } else {
+            }
+            else {
                 res = PyNumber_Lshift(left, right);
             }
             Py_DECREF(left);
@@ -1675,7 +1680,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *res;
             if (PyLong_CheckExact(left) && PyLong_CheckExact(right)) {
                 res = PyLong_Type.tp_as_number->nb_rshift(left, right);
-            } else {
+            }
+            else {
                 res = PyNumber_Rshift(left, right);
             }
             Py_DECREF(left);
@@ -1841,7 +1847,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 /* fast path for string concatenation */
                 sum = unicode_concatenate(left, right, f, next_instr);
                 /* unicode_concatenate consumed the ref to left */
-            } else {
+            }
+            else {
                 TRY_FAST_NUM_BINOP_DISPATCH(nb_add, left, right);
                 sum = PyNumber_InPlaceAdd(left, right);
                 Py_DECREF(left);
