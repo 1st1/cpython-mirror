@@ -1806,8 +1806,6 @@ compiler_function(struct compiler *c, stmt_ty s, int is_async)
         return 0;
     }
 
-    if (is_async)
-        co->co_flags |= CO_COROUTINE;
     compiler_make_closure(c, co, funcflags, qualname);
     Py_DECREF(qualname);
     Py_DECREF(co);
@@ -4056,8 +4054,6 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
     case Yield_kind:
         if (c->u->u_ste->ste_type != FunctionBlock)
             return compiler_error(c, "'yield' outside function");
-        if (c->u->u_scope_type == COMPILER_SCOPE_ASYNC_FUNCTION)
-            return compiler_error(c, "'yield' inside async function");
         if (e->v.Yield.value) {
             VISIT(c, expr, e->v.Yield.value);
         }
@@ -4801,8 +4797,12 @@ compute_code_flags(struct compiler *c)
         flags |= CO_NEWLOCALS | CO_OPTIMIZED;
         if (ste->ste_nested)
             flags |= CO_NESTED;
-        if (ste->ste_generator)
+        if (ste->ste_generator && !ste->ste_coroutine)
             flags |= CO_GENERATOR;
+        if (!ste->ste_generator && ste->ste_coroutine)
+            flags |= CO_COROUTINE;
+        if (ste->ste_generator && ste->ste_coroutine)
+            flags |= CO_ASYNC_GENERATOR;
         if (ste->ste_varargs)
             flags |= CO_VARARGS;
         if (ste->ste_varkeywords)
