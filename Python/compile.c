@@ -2719,6 +2719,9 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         if (c->u->u_ste->ste_type != FunctionBlock)
             return compiler_error(c, "'return' outside function");
         if (s->v.Return.value) {
+            if (c->u->u_ste->ste_coroutine && c->u->u_ste->ste_generator)
+                return compiler_error(
+                    c, "'return' with value in async generator");
             VISIT(c, expr, s->v.Return.value);
         }
         else

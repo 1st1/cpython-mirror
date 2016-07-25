@@ -61,6 +61,19 @@ PyObject *_PyAIterWrapper_New(PyObject *aiter);
 PyObject *_PyCoro_GetAwaitableIter(PyObject *o);
 PyAPI_FUNC(PyObject *) PyCoro_New(struct _frame *,
     PyObject *name, PyObject *qualname);
+
+/* Asynchronous Generators */
+
+typedef struct {
+    _PyGenObject_HEAD(ag)
+} PyAsyncGenObject;
+
+PyAPI_DATA(PyTypeObject) PyAsyncGen_Type;
+PyAPI_DATA(PyTypeObject) _PyAsyncGenWrapper_Type;
+
+PyAPI_FUNC(PyObject *) PyAsyncGen_New(struct _frame *,
+    PyObject *name, PyObject *qualname);
+
 #endif
 
 #undef _PyGenObject_HEAD

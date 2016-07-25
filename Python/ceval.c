@@ -1196,7 +1196,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     f->f_stacktop = NULL;       /* remains NULL unless yield suspends frame */
     f->f_executing = 1;
 
-    if (co->co_flags & (CO_GENERATOR | CO_COROUTINE)) {
+    if (co->co_flags & (CO_GENERATOR | CO_COROUTINE | CO_ASYNC_GENERATOR)) {
         if (!throwflag && f->f_exc_type != NULL && f->f_exc_type != Py_None) {
             /* We were in an except handler when we left,
                restore the exception state which was put aside
@@ -2122,7 +2122,20 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         }
 
         TARGET(YIELD_VALUE) {
-            retval = POP();
+            if (co->co_flags & CO_ASYNC_GENERATOR) {
+                PyObject *v = POP();
+                PyObject *e = PyObject_CallFunctionObjArgs(
+                    PyExc_StopIteration, v, NULL);
+                Py_DECREF(v);
+                if (e == NULL) {
+                    PUSH(NULL);
+                    goto error;
+                }
+                PyErr_SetObject(PyExc_StopIteration, e);
+                Py_DECREF(e);
+            } else {
+                retval = POP();
+            }
             f->f_stacktop = stack_pointer;
             why = WHY_YIELD;
             goto fast_yield;
@@ -3589,7 +3602,7 @@ fast_block_end:
     assert((retval != NULL) ^ (PyErr_Occurred() != NULL));
 
 fast_yield:
-    if (co->co_flags & (CO_GENERATOR | CO_COROUTINE)) {
+    if (co->co_flags & (CO_GENERATOR | CO_COROUTINE | CO_ASYNC_GENERATOR)) {
 
         /* The purpose of this block is to put aside the generator's exception
            state and restore that of the calling frame. If the current
@@ -3991,7 +4004,7 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
         freevars[PyTuple_GET_SIZE(co->co_cellvars) + i] = o;
     }
 
-    if (co->co_flags & (CO_GENERATOR | CO_COROUTINE)) {
+    if (co->co_flags & (CO_GENERATOR | CO_COROUTINE | CO_ASYNC_GENERATOR)) {
         PyObject *gen;
         PyObject *coro_wrapper = tstate->coroutine_wrapper;
         int is_coro = co->co_flags & CO_COROUTINE;
@@ -4016,6 +4029,8 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
          * and return that as the value. */
         if (is_coro) {
             gen = PyCoro_New(f, name, qualname);
+        } else if (co->co_flags & CO_ASYNC_GENERATOR) {
+            gen = PyAsyncGen_New(f, name, qualname);
         } else {
             gen = PyGen_NewWithQualName(f, name, qualname);
         }
