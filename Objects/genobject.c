@@ -79,6 +79,31 @@ gen_dealloc(PyGenObject *gen)
     PyObject_GC_Del(gen);
 }
 
+static void
+gen_chain_runtime_error(const char *msg)
+{
+    PyObject *exc, *val, *val2, *tb;
+
+    PyErr_Fetch(&exc, &val, &tb);
+    PyErr_NormalizeException(&exc, &val, &tb);
+    if (tb != NULL) {
+        PyException_SetTraceback(val, tb);
+    }
+
+    Py_DECREF(exc);
+    Py_XDECREF(tb);
+
+    PyErr_SetString(PyExc_RuntimeError, msg);
+    PyErr_Fetch(&exc, &val2, &tb);
+    PyErr_NormalizeException(&exc, &val2, &tb);
+
+    Py_INCREF(val);
+    PyException_SetCause(val2, val);
+    PyException_SetContext(val2, val);
+
+    PyErr_Restore(exc, val2, tb);
+}
+
 static PyObject *
 gen_send_ex(PyGenObject *gen, PyObject *arg, int exc, int closing)
 {
@@ -177,23 +202,10 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc, int closing)
         if (((PyCodeObject *)gen->gi_code)->co_flags &
               (CO_FUTURE_GENERATOR_STOP | CO_COROUTINE | CO_ITERABLE_COROUTINE))
         {
-            PyObject *exc, *val, *val2, *tb;
-            char *msg = "generator raised StopIteration";
+            const char *msg = "generator raised StopIteration";
             if (PyCoro_CheckExact(gen))
                 msg = "coroutine raised StopIteration";
-            PyErr_Fetch(&exc, &val, &tb);
-            PyErr_NormalizeException(&exc, &val, &tb);
-            if (tb != NULL)
-                PyException_SetTraceback(val, tb);
-            Py_DECREF(exc);
-            Py_XDECREF(tb);
-            PyErr_SetString(PyExc_RuntimeError, msg);
-            PyErr_Fetch(&exc, &val2, &tb);
-            PyErr_NormalizeException(&exc, &val2, &tb);
-            Py_INCREF(val);
-            PyException_SetCause(val2, val);
-            PyException_SetContext(val2, val);
-            PyErr_Restore(exc, val2, tb);
+            gen_chain_runtime_error(msg);
         }
         else {
             PyObject *exc, *val, *tb;
@@ -216,21 +228,8 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc, int closing)
     } else if (is_async_gen && !result &&
                PyErr_ExceptionMatches(PyExc_StopAsyncIteration)
     ) {
-        PyObject *exc, *val, *val2, *tb;
-        char *msg = "async generator raised StopAsyncIteration";
-        PyErr_Fetch(&exc, &val, &tb);
-        PyErr_NormalizeException(&exc, &val, &tb);
-        if (tb != NULL)
-            PyException_SetTraceback(val, tb);
-        Py_DECREF(exc);
-        Py_XDECREF(tb);
-        PyErr_SetString(PyExc_RuntimeError, msg);
-        PyErr_Fetch(&exc, &val2, &tb);
-        PyErr_NormalizeException(&exc, &val2, &tb);
-        Py_INCREF(val);
-        PyException_SetCause(val2, val);
-        PyException_SetContext(val2, val);
-        PyErr_Restore(exc, val2, tb);
+        const char *msg = "async generator raised StopAsyncIteration";
+        gen_chain_runtime_error(msg);
     }
 
     if (!result || f->f_stacktop == NULL) {
