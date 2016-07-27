@@ -213,6 +213,24 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc, int closing)
                 PyErr_Restore(exc, val, tb);
             }
         }
+    } else if (is_async_gen && !result &&
+               PyErr_ExceptionMatches(PyExc_StopAsyncIteration)
+    ) {
+        PyObject *exc, *val, *val2, *tb;
+        char *msg = "async generator raised StopAsyncIteration";
+        PyErr_Fetch(&exc, &val, &tb);
+        PyErr_NormalizeException(&exc, &val, &tb);
+        if (tb != NULL)
+            PyException_SetTraceback(val, tb);
+        Py_DECREF(exc);
+        Py_XDECREF(tb);
+        PyErr_SetString(PyExc_RuntimeError, msg);
+        PyErr_Fetch(&exc, &val2, &tb);
+        PyErr_NormalizeException(&exc, &val2, &tb);
+        Py_INCREF(val);
+        PyException_SetCause(val2, val);
+        PyException_SetContext(val2, val);
+        PyErr_Restore(exc, val2, tb);
     }
 
     if (!result || f->f_stacktop == NULL) {

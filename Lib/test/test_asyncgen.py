@@ -160,6 +160,15 @@ class AsyncGenTest(unittest.TestCase):
         with self.assertRaises(ZeroDivisionError):
             ai.__anext__().__next__()
 
+    def test_async_gen_exception_05(self):
+        async def gen():
+            yield 123
+            raise StopAsyncIteration
+
+        with self.assertRaisesRegex(RuntimeError,
+                                    'async generator.*StopAsyncIteration'):
+            to_list(gen())
+
 
 class AsyncGenAsyncioTest(unittest.TestCase):
 
