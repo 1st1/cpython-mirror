@@ -367,8 +367,11 @@ gen_close(PyGenObject *gen, PyObject *args)
     retval = gen_send_ex(gen, Py_None, 1, 1);
     if (retval) {
         char *msg = "generator ignored GeneratorExit";
-        if (PyCoro_CheckExact(gen))
+        if (PyCoro_CheckExact(gen)) {
             msg = "coroutine ignored GeneratorExit";
+        } else if (PyAsyncGen_CheckExact(gen)) {
+            msg = "async generator ignored GeneratorExit";
+        }
         Py_DECREF(retval);
         PyErr_SetString(PyExc_RuntimeError, msg);
         return NULL;
@@ -1186,6 +1189,19 @@ async_gen_traverse(PyAsyncGenObject *gen, visitproc visit, void *arg)
 }
 
 
+static PyObject *
+async_gen_close(PyGenObject *gen, PyObject *arg)
+{
+    Py_RETURN_NONE;
+}
+
+
+static PyMethodDef async_gen_methods[] = {
+    {"aclose", (PyCFunction)async_gen_close, METH_NOARGS, close_doc},
+    {NULL, NULL}        /* Sentinel */
+};
+
+
 static PyAsyncMethods async_gen_as_async = {
     0,                                          /* am_await */
     PyObject_SelfIter,                          /* am_aiter */
@@ -1223,7 +1239,7 @@ PyTypeObject PyAsyncGen_Type = {
     offsetof(PyAsyncGenObject, ag_weakreflist), /* tp_weaklistoffset */
     0,                                          /* tp_iter */
     0,                                          /* tp_iternext */
-    0,                                          /* tp_methods */
+    async_gen_methods,                          /* tp_methods */
     0,                                          /* tp_members */
     0,                                          /* tp_getset */
     0,                                          /* tp_base */
@@ -1269,11 +1285,8 @@ async_gen_wrapper_dealloc(PyAsyncGenWrapper *o)
 
 
 static PyObject *
-async_gen_wrapper_iternext(PyAsyncGenWrapper *o)
+async_gen_wrapper_unwrap(PyObject *result)
 {
-    PyObject *result;
-
-    result = gen_send_ex((PyGenObject*)o->aw_gen, NULL, 0, 0);
     if (result == NULL) {
         if (!PyErr_Occurred()) {
             PyErr_SetNone(PyExc_StopAsyncIteration);
@@ -1294,6 +1307,44 @@ async_gen_wrapper_iternext(PyAsyncGenWrapper *o)
 
     return result;
 }
+
+
+static PyObject *
+async_gen_wrapper_send_ex(PyAsyncGenWrapper *o, PyObject *arg,
+                          int exc, int closing)
+{
+    PyObject *result = gen_send_ex((PyGenObject*)o->aw_gen, arg, 0, 0);
+    return async_gen_wrapper_unwrap(result);
+}
+
+
+static PyObject *
+async_gen_wrapper_iternext(PyAsyncGenWrapper *o)
+{
+    return async_gen_wrapper_send_ex(o, NULL, 0, 0);
+}
+
+
+PyObject *
+async_gen_wrapper_send(PyAsyncGenWrapper *o, PyObject *arg)
+{
+    return async_gen_wrapper_send_ex(o, arg, 0, 0);
+}
+
+
+PyObject *
+async_gen_wrapper_throw(PyAsyncGenWrapper *o, PyObject *args)
+{
+    PyObject *result = gen_throw((PyGenObject*)o->aw_gen, args);
+    return async_gen_wrapper_unwrap(result);
+}
+
+
+static PyMethodDef async_gen_wrapper_methods[] = {
+    {"send", (PyCFunction)async_gen_wrapper_send, METH_O, send_doc},
+    {"throw", (PyCFunction)async_gen_wrapper_throw, METH_VARARGS, throw_doc},
+    {NULL, NULL}        /* Sentinel */
+};
 
 
 static PyAsyncMethods async_gen_wrapper_as_async = {
@@ -1332,7 +1383,7 @@ PyTypeObject _PyAsyncGenWrapper_Type = {
     0,                                          /* tp_weaklistoffset */
     PyObject_SelfIter,                          /* tp_iter */
     (iternextfunc)async_gen_wrapper_iternext,   /* tp_iternext */
-    0,                                          /* tp_methods */
+    async_gen_wrapper_methods,                  /* tp_methods */
     0,                                          /* tp_members */
     0,                                          /* tp_getset */
     0,                                          /* tp_base */

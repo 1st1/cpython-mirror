@@ -339,6 +339,83 @@ class AsyncGenAsyncioTest(unittest.TestCase):
         res = loop.run_until_complete(self.to_list(Gen()))
         self.assertEqual(res, [1, 2])
 
+    def test_async_gen_asyncio_anext_04(self):
+        async def foo():
+            yield 1
+            await asyncio.sleep(0.01, loop=self.loop)
+            try:
+                yield 2
+                yield 3
+            except ZeroDivisionError:
+                yield 1000
+            await asyncio.sleep(0.01, loop=self.loop)
+            yield 4
+
+        async def run1():
+            it = foo().__aiter__()
+
+            self.assertEqual(await it.__anext__(), 1)
+            self.assertEqual(await it.__anext__(), 2)
+            self.assertEqual(await it.__anext__(), 3)
+            self.assertEqual(await it.__anext__(), 4)
+            with self.assertRaises(StopAsyncIteration):
+                await it.__anext__()
+            with self.assertRaises(StopAsyncIteration):
+                await it.__anext__()
+
+        async def run2():
+            it = foo().__aiter__()
+
+            self.assertEqual(await it.__anext__(), 1)
+            self.assertEqual(await it.__anext__(), 2)
+            try:
+                it.__anext__().throw(ZeroDivisionError)
+            except StopIteration as ex:
+                self.assertEqual(ex.args[0], 1000)
+            else:
+                self.fail('StopIteration was not raised')
+            self.assertEqual(await it.__anext__(), 4)
+            with self.assertRaises(StopAsyncIteration):
+                await it.__anext__()
+
+        self.loop.run_until_complete(run1())
+        self.loop.run_until_complete(run2())
+
+    def test_async_gen_asyncio_anext_05(self):
+        async def foo():
+            v = yield 1
+            v = yield v
+            yield v * 100
+
+        async def run():
+            it = foo().__aiter__()
+
+            try:
+                it.__anext__().send(None)
+            except StopIteration as ex:
+                self.assertEqual(ex.args[0], 1)
+            else:
+                self.fail('StopIteration was not raised')
+
+            try:
+                it.__anext__().send(10)
+            except StopIteration as ex:
+                self.assertEqual(ex.args[0], 10)
+            else:
+                self.fail('StopIteration was not raised')
+
+            try:
+                it.__anext__().send(12)
+            except StopIteration as ex:
+                self.assertEqual(ex.args[0], 1200)
+            else:
+                self.fail('StopIteration was not raised')
+
+            with self.assertRaises(StopAsyncIteration):
+                await it.__anext__()
+
+        self.loop.run_until_complete(run())
+
 
 if __name__ == "__main__":
     unittest.main()
