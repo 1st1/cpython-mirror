@@ -138,7 +138,11 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc, int closing)
         } else if (arg && !exc) {
             /* `gen` is an exhausted generator:
                only set exception if called from send(). */
-            PyErr_SetNone(PyExc_StopIteration);
+            if (PyAsyncGen_CheckExact(gen)) {
+                PyErr_SetNone(PyExc_StopAsyncIteration);
+            } else {
+                PyErr_SetNone(PyExc_StopIteration);
+            }
         }
         return NULL;
     }
@@ -1268,9 +1272,13 @@ static PyObject *
 async_gen_wrapper_iternext(PyAsyncGenWrapper *o)
 {
     PyObject *result;
+
     result = gen_send_ex((PyGenObject*)o->aw_gen, NULL, 0, 0);
     if (result == NULL) {
-        return result;
+        if (!PyErr_Occurred()) {
+            PyErr_SetNone(PyExc_StopAsyncIteration);
+        }
+        return NULL;
     }
 
     if (Py_TYPE(result) == &_PyAsyncGenWrappedValue_Type) {
@@ -1407,6 +1415,7 @@ PyObject *
 _PyAsyncGenWrapValue(PyObject *val)
 {
     _PyAsyncGenWrappedValue *o;
+    assert(val);
     o = PyObject_NEW(_PyAsyncGenWrappedValue, &_PyAsyncGenWrappedValue_Type);
     if (o == NULL) {
         return NULL;

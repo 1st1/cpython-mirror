@@ -92,6 +92,42 @@ class AsyncGenSyntaxTest(unittest.TestCase):
 
 class AsyncGenTest(unittest.TestCase):
 
+    def compare_generators(self, sync_gen, async_gen):
+        def sync_iterate(g):
+            res = []
+            while True:
+                try:
+                    res.append(g.__next__())
+                except StopIteration:
+                    res.append('STOP')
+                    break
+                except Exception as ex:
+                    res.append(str(type(ex)))
+            return res
+
+        def async_iterate(g):
+            res = []
+            while True:
+                try:
+                    g.__anext__().__next__()
+                except StopAsyncIteration:
+                    res.append('STOP')
+                    break
+                except StopIteration as ex:
+                    if ex.args:
+                        res.append(ex.args[0])
+                    else:
+                        res.append('EMPTY StopIteration')
+                        break
+                except Exception as ex:
+                    res.append(str(type(ex)))
+            return res
+
+        sync_gen_result = sync_iterate(sync_gen)
+        async_gen_result = async_iterate(async_gen)
+        self.assertEqual(sync_gen_result, async_gen_result)
+        return async_gen_result
+
     def test_async_gen_iteration_01(self):
         async def gen():
             await awaitable()
@@ -178,6 +214,79 @@ class AsyncGenTest(unittest.TestCase):
                                     'async generator.*StopIteration'):
             to_list(gen())
 
+    def test_async_gen_exception_07(self):
+        def sync_gen():
+            try:
+                yield 1
+                1 / 0
+            finally:
+                yield 2
+                yield 3
+
+            yield 100
+
+        async def async_gen():
+            try:
+                yield 1
+                1 / 0
+            finally:
+                yield 2
+                yield 3
+
+            yield 100
+
+        self.compare_generators(sync_gen(), async_gen())
+
+    def test_async_gen_exception_08(self):
+        def sync_gen():
+            try:
+                yield 1
+            finally:
+                yield 2
+                1 / 0
+                yield 3
+
+            yield 100
+
+        async def async_gen():
+            try:
+                yield 1
+                await awaitable()
+            finally:
+                await awaitable()
+                yield 2
+                1 / 0
+                yield 3
+
+            yield 100
+
+        self.compare_generators(sync_gen(), async_gen())
+
+    def test_async_gen_exception_09(self):
+        def sync_gen():
+            try:
+                yield 1
+                1 / 0
+            finally:
+                yield 2
+                yield 3
+
+            yield 100
+
+        async def async_gen():
+            try:
+                await awaitable()
+                yield 1
+                1 / 0
+            finally:
+                yield 2
+                await awaitable()
+                yield 3
+
+            yield 100
+
+        self.compare_generators(sync_gen(), async_gen())
+
 
 class AsyncGenAsyncioTest(unittest.TestCase):
 
@@ -189,6 +298,12 @@ class AsyncGenAsyncioTest(unittest.TestCase):
         self.loop.close()
         self.loop = None
 
+    async def to_list(self, gen):
+        res = []
+        async for i in gen:
+            res.append(i)
+        return res
+
     def test_async_gen_asyncio_01(self):
         async def gen():
             yield 1
@@ -198,13 +313,7 @@ class AsyncGenAsyncioTest(unittest.TestCase):
             return
             yield 3
 
-        async def run():
-            res = []
-            async for i in gen():
-                res.append(i)
-            return res
-
-        res = self.loop.run_until_complete(run())
+        res = self.loop.run_until_complete(self.to_list(gen()))
         self.assertEqual(res, [1, 2])
 
     def test_async_gen_asyncio_02(self):
@@ -215,14 +324,8 @@ class AsyncGenAsyncioTest(unittest.TestCase):
             1 / 0
             yield 3
 
-        async def run():
-            res = []
-            async for i in gen():
-                res.append(i)
-            return res
-
         with self.assertRaises(ZeroDivisionError):
-            self.loop.run_until_complete(run())
+            self.loop.run_until_complete(self.to_list(gen()))
 
     def test_async_gen_asyncio_03(self):
         loop = self.loop
@@ -233,13 +336,7 @@ class AsyncGenAsyncioTest(unittest.TestCase):
                 await asyncio.sleep(0.01, loop=loop)
                 yield 2
 
-        async def run():
-            res = []
-            async for i in Gen():
-                res.append(i)
-            return res
-
-        res = loop.run_until_complete(run())
+        res = loop.run_until_complete(self.to_list(Gen()))
         self.assertEqual(res, [1, 2])
 
 
