@@ -2122,20 +2122,18 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         }
 
         TARGET(YIELD_VALUE) {
+            retval = POP();
+
             if (co->co_flags & CO_ASYNC_GENERATOR) {
-                PyObject *v = POP();
-                PyObject *e = PyObject_CallFunctionObjArgs(
-                    PyExc_StopIteration, v, NULL);
-                Py_DECREF(v);
-                if (e == NULL) {
-                    PUSH(NULL);
+                PyObject *w = _PyAsyncGenWrapValue(retval);
+                Py_DECREF(retval);
+                if (w == NULL) {
+                    retval = NULL;
                     goto error;
                 }
-                PyErr_SetObject(PyExc_StopIteration, e);
-                Py_DECREF(e);
-            } else {
-                retval = POP();
+                retval = w;
             }
+
             f->f_stacktop = stack_pointer;
             why = WHY_YIELD;
             goto fast_yield;

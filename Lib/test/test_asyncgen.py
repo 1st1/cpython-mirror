@@ -169,6 +169,15 @@ class AsyncGenTest(unittest.TestCase):
                                     'async generator.*StopAsyncIteration'):
             to_list(gen())
 
+    def test_async_gen_exception_06(self):
+        async def gen():
+            yield 123
+            raise StopIteration
+
+        with self.assertRaisesRegex(RuntimeError,
+                                    'async generator.*StopIteration'):
+            to_list(gen())
+
 
 class AsyncGenAsyncioTest(unittest.TestCase):
 
@@ -214,6 +223,24 @@ class AsyncGenAsyncioTest(unittest.TestCase):
 
         with self.assertRaises(ZeroDivisionError):
             self.loop.run_until_complete(run())
+
+    def test_async_gen_asyncio_03(self):
+        loop = self.loop
+
+        class Gen:
+            async def __aiter__(self):
+                yield 1
+                await asyncio.sleep(0.01, loop=loop)
+                yield 2
+
+        async def run():
+            res = []
+            async for i in Gen():
+                res.append(i)
+            return res
+
+        res = loop.run_until_complete(run())
+        self.assertEqual(res, [1, 2])
 
 
 if __name__ == "__main__":
