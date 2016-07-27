@@ -231,11 +231,6 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc, int closing)
         gen->gi_frame->f_gen = NULL;
         gen->gi_frame = NULL;
         Py_DECREF(f);
-
-        if (is_async_gen) {
-            PyErr_SetNone(PyExc_StopAsyncIteration);
-            return NULL;
-        }
     }
 
     return result;
