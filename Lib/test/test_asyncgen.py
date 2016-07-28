@@ -416,6 +416,84 @@ class AsyncGenAsyncioTest(unittest.TestCase):
 
         self.loop.run_until_complete(run())
 
+    def test_async_gen_asyncio_aclose_06(self):
+        async def foo():
+            try:
+                yield 1
+                1 / 0
+            finally:
+                await asyncio.sleep(0.01, loop=self.loop)
+                yield 12
+
+        async def run():
+            gen = foo()
+            it = gen.__aiter__()
+            await it.__anext__()
+            await gen.aclose()
+
+        with self.assertRaisesRegex(
+                RuntimeError,
+                "async generator ignored GeneratorExit"):
+            self.loop.run_until_complete(run())
+
+    def test_async_gen_asyncio_aclose_07(self):
+        DONE = 0
+
+        async def foo():
+            nonlocal DONE
+            try:
+                yield 1
+                1 / 0
+            finally:
+                await asyncio.sleep(0.01, loop=self.loop)
+                await asyncio.sleep(0.01, loop=self.loop)
+                DONE += 1
+            DONE += 1000
+
+        async def run():
+            gen = foo()
+            it = gen.__aiter__()
+            await it.__anext__()
+            await gen.aclose()
+
+        self.loop.run_until_complete(run())
+        self.assertEqual(DONE, 1)
+
+    def test_async_gen_asyncio_aclose_08(self):
+        DONE = 0
+
+        fut = asyncio.Future(loop=self.loop)
+
+        async def foo():
+            nonlocal DONE
+            try:
+                yield 1
+                await fut
+                DONE += 1000
+                yield 2
+            finally:
+                await asyncio.sleep(0.01, loop=self.loop)
+                await asyncio.sleep(0.01, loop=self.loop)
+                DONE += 1
+            DONE += 1000
+
+        async def run():
+            gen = foo()
+            it = gen.__aiter__()
+            self.assertEqual(await it.__anext__(), 1)
+            t = self.loop.create_task(it.__anext__())
+            await asyncio.sleep(0.01, loop=self.loop)
+            await gen.aclose()
+            return t
+
+        t = self.loop.run_until_complete(run())
+        self.assertEqual(DONE, 1)
+
+        # Silence ResourceWarnings
+        fut.cancel()
+        t.cancel()
+        self.loop.run_until_complete(asyncio.sleep(0.01, loop=self.loop))
+
 
 if __name__ == "__main__":
     unittest.main()

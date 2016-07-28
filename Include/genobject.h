@@ -71,6 +71,7 @@ typedef struct {
 PyAPI_DATA(PyTypeObject) PyAsyncGen_Type;
 PyAPI_DATA(PyTypeObject) _PyAsyncGenWrapper_Type;
 PyAPI_DATA(PyTypeObject) _PyAsyncGenWrappedValue_Type;
+PyAPI_DATA(PyTypeObject) _PyAsyncGenAClose_Type;
 
 PyAPI_FUNC(PyObject *) PyAsyncGen_New(struct _frame *,
     PyObject *name, PyObject *qualname);
