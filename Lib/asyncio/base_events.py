@@ -12,7 +12,8 @@ Keyword arguments for the callback are not supported; this is a
 conscious design decision, leaving the door open for keyword arguments
 to modify the meaning of the API call itself.
 """
-
+import gc
+gc.disable()
 
 import collections
 import concurrent.futures
@@ -333,6 +334,9 @@ class BaseEventLoop(events.AbstractEventLoop):
         if self._closed:
             raise RuntimeError('Event loop is closed')
 
+    def _finalize_asyncgen(self, ag):
+        self.create_task(ag.aclose())
+
     def run_forever(self):
         """Run until stop() is called."""
         self._check_closed()
@@ -340,6 +344,8 @@ class BaseEventLoop(events.AbstractEventLoop):
             raise RuntimeError('Event loop is running.')
         self._set_coroutine_wrapper(self._debug)
         self._thread_id = threading.get_ident()
+        old_gen_finalizer = sys.get_asyncgen_finalizer()
+        sys.set_asyncgen_finalizer(self._finalize_asyncgen)
         try:
             while True:
                 self._run_once()
@@ -349,6 +355,7 @@ class BaseEventLoop(events.AbstractEventLoop):
             self._stopping = False
             self._thread_id = None
             self._set_coroutine_wrapper(False)
+            sys.set_asyncgen_finalizer(old_gen_finalizer)
 
     def run_until_complete(self, future):
         """Run until the Future is done.

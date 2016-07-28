@@ -48,6 +48,27 @@ _PyGen_Finalize(PyObject *self)
         /* Generator isn't paused, so no need to close */
         return;
 
+    if (PyAsyncGen_CheckExact(self)) {
+        PyThreadState *tstate = PyThreadState_GET();
+        if (tstate->async_gen_finalizer) {
+            PyObject *finalizer = tstate->async_gen_finalizer;
+
+            /* Save the current exception, if any. */
+            PyErr_Fetch(&error_type, &error_value, &error_traceback);
+
+            res = PyObject_CallFunction(finalizer, "O", self);
+
+            if (res == NULL) {
+                PyErr_WriteUnraisable(self);
+            } else {
+                Py_DECREF(res);
+            }
+            /* Restore the saved exception. */
+            PyErr_Restore(error_type, error_value, error_traceback);
+            return;
+        }
+    }
+
     /* Save the current exception, if any. */
     PyErr_Fetch(&error_type, &error_value, &error_traceback);
 

@@ -516,6 +516,30 @@ class AsyncGenAsyncioTest(unittest.TestCase):
         t.cancel()
         self.loop.run_until_complete(asyncio.sleep(0.01, loop=self.loop))
 
+    def test_async_gen_asyncio_gc_aclose_09(self):
+        DONE = 0
+
+        async def gen():
+            nonlocal DONE
+            try:
+                while True:
+                    yield 1
+            finally:
+                await asyncio.sleep(0.01, loop=self.loop)
+                await asyncio.sleep(0.01, loop=self.loop)
+                DONE = 1
+
+        async def run():
+            g = gen()
+            await g.__anext__()
+            await g.__anext__()
+            del g
+
+            await asyncio.sleep(0.1, loop=self.loop)
+
+        self.loop.run_until_complete(run())
+        self.assertEqual(DONE, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

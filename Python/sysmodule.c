@@ -708,6 +708,47 @@ PyDoc_STRVAR(get_coroutine_wrapper_doc,
 Return the wrapper for coroutine objects set by sys.set_coroutine_wrapper."
 );
 
+static PyObject *
+sys_set_asyncgen_finalizer(PyObject *self, PyObject *wrapper)
+{
+    if (wrapper != Py_None) {
+        if (!PyCallable_Check(wrapper)) {
+            PyErr_Format(PyExc_TypeError,
+                         "callable expected, got %.50s",
+                         Py_TYPE(wrapper)->tp_name);
+            return NULL;
+        }
+        _PyEval_SetAsyncGenFinalizer(wrapper);
+    }
+    else {
+        _PyEval_SetAsyncGenFinalizer(NULL);
+    }
+    Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(set_asyncgen_finalizer_doc,
+"set_asyncgen_finalizer(wrapper)\n\
+\n\
+Set a finalizer for async generators objects."
+);
+
+static PyObject *
+sys_get_asyncgen_finalizer(PyObject *self, PyObject *args)
+{
+    PyObject *wrapper = _PyEval_GetAsyncGenFinalizer();
+    if (wrapper == NULL) {
+        wrapper = Py_None;
+    }
+    Py_INCREF(wrapper);
+    return wrapper;
+}
+
+PyDoc_STRVAR(get_asyncgen_finalizer_doc,
+"get_asyncgen_finalizer()\n\
+\n\
+Return the finalizer for async generators set by sys.set_asyncgen_finalizer."
+);
+
 
 static PyTypeObject Hash_InfoType;
 
@@ -1285,6 +1326,10 @@ static PyMethodDef sys_methods[] = {
      set_coroutine_wrapper_doc},
     {"get_coroutine_wrapper", sys_get_coroutine_wrapper, METH_NOARGS,
      get_coroutine_wrapper_doc},
+    {"set_asyncgen_finalizer", sys_set_asyncgen_finalizer, METH_O,
+     set_asyncgen_finalizer_doc},
+    {"get_asyncgen_finalizer", sys_get_asyncgen_finalizer, METH_NOARGS,
+     get_asyncgen_finalizer_doc},
     {NULL,              NULL}           /* sentinel */
 };
 
