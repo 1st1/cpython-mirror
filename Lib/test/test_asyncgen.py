@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import types
 import unittest
 
@@ -286,6 +287,27 @@ class AsyncGenTest(unittest.TestCase):
             yield 100
 
         self.compare_generators(sync_gen(), async_gen())
+
+    def test_async_gen_api_01(self):
+        async def gen():
+            yield 123
+
+        g = gen()
+
+        self.assertEqual(g.__name__, 'gen')
+        g.__name__ = '123'
+        self.assertEqual(g.__name__, '123')
+
+        self.assertIn('.gen', g.__qualname__)
+        g.__qualname__ = '123'
+        self.assertEqual(g.__qualname__, '123')
+
+        self.assertIsNone(g.ag_await)
+        self.assertIsInstance(g.ag_frame, types.FrameType)
+        self.assertFalse(g.ag_running)
+        self.assertIsInstance(g.ag_code, types.CodeType)
+
+        self.assertTrue(inspect.isawaitable(g.aclose()))
 
 
 class AsyncGenAsyncioTest(unittest.TestCase):

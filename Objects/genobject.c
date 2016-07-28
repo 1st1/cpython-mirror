@@ -1245,8 +1245,28 @@ async_gen_aclose(PyAsyncGenObject *gen, PyObject *arg)
 }
 
 
+static PyGetSetDef async_gen_getsetlist[] = {
+    {"__name__", (getter)gen_get_name, (setter)gen_set_name,
+     PyDoc_STR("name of the async generator")},
+    {"__qualname__", (getter)gen_get_qualname, (setter)gen_set_qualname,
+     PyDoc_STR("qualified name of the async generator")},
+    {"ag_await", (getter)coro_get_cr_await, NULL,
+     PyDoc_STR("object being awaited on, or None")},
+    {NULL} /* Sentinel */
+};
+
+static PyMemberDef async_gen_memberlist[] = {
+    {"ag_frame",   T_OBJECT, offsetof(PyAsyncGenObject, ag_frame),   READONLY},
+    {"ag_running", T_BOOL,   offsetof(PyAsyncGenObject, ag_running), READONLY},
+    {"ag_code",    T_OBJECT, offsetof(PyAsyncGenObject, ag_code),    READONLY},
+    {NULL}      /* Sentinel */
+};
+
+PyDoc_STRVAR(async_close_doc,
+"aclose() -> raise GeneratorExit inside generator.");
+
 static PyMethodDef async_gen_methods[] = {
-    {"aclose", (PyCFunction)async_gen_aclose, METH_NOARGS, close_doc},
+    {"aclose", (PyCFunction)async_gen_aclose, METH_NOARGS, async_close_doc},
     {NULL, NULL}        /* Sentinel */
 };
 
@@ -1289,8 +1309,8 @@ PyTypeObject PyAsyncGen_Type = {
     0,                                          /* tp_iter */
     0,                                          /* tp_iternext */
     async_gen_methods,                          /* tp_methods */
-    0,                                          /* tp_members */
-    0,                                          /* tp_getset */
+    async_gen_memberlist,                       /* tp_members */
+    async_gen_getsetlist,                       /* tp_getset */
     0,                                          /* tp_base */
     0,                                          /* tp_dict */
     0,                                          /* tp_descr_get */
