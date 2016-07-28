@@ -2019,36 +2019,42 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *aiter = TOP();
             PyTypeObject *type = Py_TYPE(aiter);
 
-            if (type->tp_as_async != NULL)
-                getter = type->tp_as_async->am_anext;
+            if (PyAsyncGen_CheckExact(aiter)) {
+                awaitable = type->tp_as_async->am_anext(aiter);
+            } else {
+                if (type->tp_as_async != NULL){
+                    getter = type->tp_as_async->am_anext;
+                }
 
-            if (getter != NULL) {
-                next_iter = (*getter)(aiter);
-                if (next_iter == NULL) {
+                if (getter != NULL) {
+                    next_iter = (*getter)(aiter);
+                    if (next_iter == NULL) {
+                        goto error;
+                    }
+                }
+                else {
+                    PyErr_Format(
+                        PyExc_TypeError,
+                        "'async for' requires an iterator with "
+                        "__anext__ method, got %.100s",
+                        type->tp_name);
                     goto error;
                 }
-            }
-            else {
-                PyErr_Format(
-                    PyExc_TypeError,
-                    "'async for' requires an iterator with "
-                    "__anext__ method, got %.100s",
-                    type->tp_name);
-                goto error;
-            }
 
-            awaitable = _PyCoro_GetAwaitableIter(next_iter);
-            if (awaitable == NULL) {
-                PyErr_Format(
-                    PyExc_TypeError,
-                    "'async for' received an invalid object "
-                    "from __anext__: %.100s",
-                    Py_TYPE(next_iter)->tp_name);
+                awaitable = _PyCoro_GetAwaitableIter(next_iter);
+                if (awaitable == NULL) {
+                    PyErr_Format(
+                        PyExc_TypeError,
+                        "'async for' received an invalid object "
+                        "from __anext__: %.100s",
+                        Py_TYPE(next_iter)->tp_name);
 
-                Py_DECREF(next_iter);
-                goto error;
-            } else
-                Py_DECREF(next_iter);
+                    Py_DECREF(next_iter);
+                    goto error;
+                } else {
+                    Py_DECREF(next_iter);
+                }
+            }
 
             PUSH(awaitable);
             PREDICT(LOAD_CONST);
