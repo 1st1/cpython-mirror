@@ -80,6 +80,8 @@ PyAPI_FUNC(PyObject *) PyAsyncGen_New(struct _frame *,
 
 PyObject *_PyAsyncGenWrapValue(PyObject *);
 
+int PyAsyncGen_ClearFreeLists(void);
+
 #endif
 
 #undef _PyGenObject_HEAD

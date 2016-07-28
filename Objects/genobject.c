@@ -9,12 +9,11 @@ static PyObject *gen_close(PyGenObject *gen, PyObject *args);
 static PyObject *async_gen_wrapper_new(PyAsyncGenObject *gen);
 static PyObject *async_gen_aclose_new(PyAsyncGenObject *gen);
 
-static const char *NON_INIT_CORO_MSG =
-                            "can't send non-None value to a "
-                            "just-started coroutine";
+static char *NON_INIT_CORO_MSG = "can't send non-None value to a "
+                                 "just-started coroutine";
 
-static const char *ASYNC_GEN_IGNORED_EXIT_MSG =
-                            "async generator ignored GeneratorExit";
+static char *ASYNC_GEN_IGNORED_EXIT_MSG =
+                                 "async generator ignored GeneratorExit";
 
 static int
 gen_traverse(PyGenObject *gen, visitproc visit, void *arg)
@@ -1182,6 +1181,29 @@ typedef struct {
 } _PyAsyncGenWrappedValue;
 
 
+#ifndef _PyAsyncGen_MAXFREELIST
+#define _PyAsyncGen_MAXFREELIST 80
+#endif
+
+/* Freelists boost performance 6-10%; they also reduce memory
+   fragmentation, as _PyAsyncGenWrappedValue and PyAsyncGenWrapper
+   are short-living objects that are instantiated for every
+   __anext__ call.
+*/
+
+static _PyAsyncGenWrappedValue *ag_value_fl[_PyAsyncGen_MAXFREELIST];
+static int ag_value_fl_free = 0;
+
+static PyAsyncGenWrapper *ag_wrapper_fl[_PyAsyncGen_MAXFREELIST];
+static int ag_wrapper_fl_free = 0;
+
+#define _PyAsyncGenWrappedValue_CheckExact(o) \
+                    (Py_TYPE(o) == &_PyAsyncGenWrappedValue_Type)
+
+#define PyAsyncGenWrapper_CheckExact(o) \
+                    (Py_TYPE(o) == &_PyAsyncGenWrapper_Type)
+
+
 static PyObject *
 async_gen_repr(PyAsyncGenObject *o)
 {
@@ -1303,6 +1325,35 @@ PyAsyncGen_New(PyFrameObject *f, PyObject *name, PyObject *qualname)
 }
 
 
+int
+PyAsyncGen_ClearFreeLists(void)
+{
+    int ret = ag_value_fl_free + ag_wrapper_fl_free;
+
+    while (ag_value_fl_free) {
+        _PyAsyncGenWrappedValue *o;
+        o = ag_value_fl[--ag_value_fl_free];
+        assert(_PyAsyncGenWrappedValue_CheckExact(o));
+        PyObject_Del(o);
+    }
+
+    while (ag_wrapper_fl_free) {
+        PyAsyncGenWrapper *o;
+        o = ag_wrapper_fl[--ag_wrapper_fl_free];
+        assert(Py_TYPE(o) == &_PyAsyncGenWrapper_Type);
+        PyObject_Del(o);
+    }
+
+    return ret;
+}
+
+void
+PyAsyncGen_Fini(void)
+{
+    PyAsyncGen_ClearFreeLists();
+}
+
+
 static PyObject *
 async_gen_unwrap_value(PyObject *result)
 {
@@ -1313,7 +1364,7 @@ async_gen_unwrap_value(PyObject *result)
         return NULL;
     }
 
-    if (Py_TYPE(result) == &_PyAsyncGenWrappedValue_Type) {
+    if (_PyAsyncGenWrappedValue_CheckExact(result)) {
         /* async yield */
         PyObject *e = PyObject_CallFunctionObjArgs(
             PyExc_StopIteration,
@@ -1336,7 +1387,12 @@ static void
 async_gen_wrapper_dealloc(PyAsyncGenWrapper *o)
 {
     Py_CLEAR(o->aw_gen);
-    PyObject_DEL(o);
+    if (ag_wrapper_fl_free < _PyAsyncGen_MAXFREELIST) {
+        assert(PyAsyncGenWrapper_CheckExact(o));
+        ag_wrapper_fl[ag_wrapper_fl_free++] = o;
+    } else {
+        PyObject_Del(o);
+    }
 }
 
 
@@ -1453,9 +1509,15 @@ static PyObject *
 async_gen_wrapper_new(PyAsyncGenObject *gen)
 {
     PyAsyncGenWrapper *o;
-    o = PyObject_NEW(PyAsyncGenWrapper, &_PyAsyncGenWrapper_Type);
-    if (o == NULL) {
-        return NULL;
+    if (ag_wrapper_fl_free) {
+        ag_wrapper_fl_free--;
+        o = ag_wrapper_fl[ag_wrapper_fl_free];
+        _Py_NewReference((PyObject *)o);
+    } else {
+        o = PyObject_New(PyAsyncGenWrapper, &_PyAsyncGenWrapper_Type);
+        if (o == NULL) {
+            return NULL;
+        }
     }
     o->aw_gen = gen;
     o->aw_closed = 0;
@@ -1471,7 +1533,12 @@ static void
 async_gen_wrapped_val_dealloc(_PyAsyncGenWrappedValue *o)
 {
     Py_CLEAR(o->val);
-    PyObject_DEL(o);
+    if (ag_value_fl_free < _PyAsyncGen_MAXFREELIST) {
+        assert(_PyAsyncGenWrappedValue_CheckExact(o));
+        ag_value_fl[ag_value_fl_free++] = o;
+    } else {
+        PyObject_Del(o);
+    }
 }
 
 
@@ -1523,9 +1590,17 @@ _PyAsyncGenWrapValue(PyObject *val)
 {
     _PyAsyncGenWrappedValue *o;
     assert(val);
-    o = PyObject_NEW(_PyAsyncGenWrappedValue, &_PyAsyncGenWrappedValue_Type);
-    if (o == NULL) {
-        return NULL;
+
+    if (ag_value_fl_free) {
+        ag_value_fl_free--;
+        o = ag_value_fl[ag_value_fl_free];
+        assert(_PyAsyncGenWrappedValue_CheckExact(o));
+        _Py_NewReference((PyObject*)o);
+    } else {
+        o = PyObject_New(_PyAsyncGenWrappedValue, &_PyAsyncGenWrappedValue_Type);
+        if (o == NULL) {
+            return NULL;
+        }
     }
     o->val = val;
     Py_INCREF(val);
@@ -1540,7 +1615,7 @@ static void
 async_gen_aclose_dealloc(PyAsyncGenAClose *o)
 {
     Py_CLEAR(o->ac_gen);
-    PyObject_DEL(o);
+    PyObject_Del(o);
 }
 
 
@@ -1548,7 +1623,7 @@ static PyObject *
 async_gen_wrapper_gensend(PyGenObject *gen, PyObject *arg, int err)
 {
     PyObject *retval = gen_send_ex(gen, arg, err, 0);
-    if (retval && Py_TYPE(retval) == &_PyAsyncGenWrappedValue_Type) {
+    if (retval && _PyAsyncGenWrappedValue_CheckExact(retval)) {
         Py_DECREF(retval);
         PyErr_SetString(
             PyExc_RuntimeError, ASYNC_GEN_IGNORED_EXIT_MSG);
@@ -1637,7 +1712,7 @@ async_gen_aclose_throw(PyAsyncGenAClose *o, PyObject *args)
     }
 
     retval = gen_throw((PyGenObject*)o->ac_gen, args);
-    if (retval && Py_TYPE(retval) == &_PyAsyncGenWrappedValue_Type) {
+    if (retval && _PyAsyncGenWrappedValue_CheckExact(retval)) {
         Py_DECREF(retval);
         PyErr_SetString(PyExc_RuntimeError, ASYNC_GEN_IGNORED_EXIT_MSG);
         return NULL;
@@ -1722,7 +1797,7 @@ static PyObject *
 async_gen_aclose_new(PyAsyncGenObject *gen)
 {
     PyAsyncGenAClose *o;
-    o = PyObject_NEW(PyAsyncGenAClose, &_PyAsyncGenAClose_Type);
+    o = PyObject_New(PyAsyncGenAClose, &_PyAsyncGenAClose_Type);
     if (o == NULL) {
         return NULL;
     }
