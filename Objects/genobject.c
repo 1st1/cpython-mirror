@@ -9,6 +9,12 @@ static PyObject *gen_close(PyGenObject *gen, PyObject *args);
 static PyObject *async_gen_wrapper_new(PyAsyncGenObject *gen);
 static PyObject *async_gen_aclose_new(PyAsyncGenObject *gen);
 
+static const char *NON_INIT_CORO_MSG =
+                            "can't send non-None value to a "
+                            "just-started coroutine";
+
+static const char *ASYNC_GEN_IGNORED_EXIT_MSG =
+                            "async generator ignored GeneratorExit";
 
 static int
 gen_traverse(PyGenObject *gen, visitproc visit, void *arg)
@@ -147,8 +153,7 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc, int closing)
             char *msg = "can't send non-None value to a "
                         "just-started generator";
             if (PyCoro_CheckExact(gen))
-                msg = "can't send non-None value to a "
-                      "just-started coroutine";
+                msg = NON_INIT_CORO_MSG;
             PyErr_SetString(PyExc_TypeError, msg);
             return NULL;
         }
@@ -365,7 +370,7 @@ gen_close(PyGenObject *gen, PyObject *args)
         if (PyCoro_CheckExact(gen)) {
             msg = "coroutine ignored GeneratorExit";
         } else if (PyAsyncGen_CheckExact(gen)) {
-            msg = "async generator ignored GeneratorExit";
+            msg = ASYNC_GEN_IGNORED_EXIT_MSG;
         }
         Py_DECREF(retval);
         PyErr_SetString(PyExc_RuntimeError, msg);
@@ -1160,6 +1165,7 @@ _PyAIterWrapper_New(PyObject *aiter)
 typedef struct {
     PyObject_HEAD
     PyAsyncGenObject *aw_gen;
+    int aw_closed;
 } PyAsyncGenWrapper;
 
 
@@ -1346,6 +1352,10 @@ async_gen_wrapper_send_ex(PyAsyncGenWrapper *o, PyObject *arg,
 static PyObject *
 async_gen_wrapper_iternext(PyAsyncGenWrapper *o)
 {
+    if (o->aw_closed) {
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
+    }
     return async_gen_wrapper_send_ex(o, NULL, 0, 0);
 }
 
@@ -1353,6 +1363,10 @@ async_gen_wrapper_iternext(PyAsyncGenWrapper *o)
 static PyObject *
 async_gen_wrapper_send(PyAsyncGenWrapper *o, PyObject *arg)
 {
+    if (o->aw_closed) {
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
+    }
     return async_gen_wrapper_send_ex(o, arg, 0, 0);
 }
 
@@ -1360,14 +1374,19 @@ async_gen_wrapper_send(PyAsyncGenWrapper *o, PyObject *arg)
 static PyObject *
 async_gen_wrapper_throw(PyAsyncGenWrapper *o, PyObject *args)
 {
+    if (o->aw_closed) {
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
+    }
     PyObject *result = gen_throw((PyGenObject*)o->aw_gen, args);
     return async_gen_unwrap_value(result);
 }
 
 
 static PyObject *
-async_gen_wrapper_close(PyGenObject *gen, PyObject *args)
+async_gen_wrapper_close(PyAsyncGenWrapper *o, PyObject *args)
 {
+    o->aw_closed = 1;
     Py_RETURN_NONE;
 }
 
@@ -1439,6 +1458,7 @@ async_gen_wrapper_new(PyAsyncGenObject *gen)
         return NULL;
     }
     o->aw_gen = gen;
+    o->aw_closed = 0;
     Py_INCREF(gen);
     return (PyObject*)o;
 }
@@ -1531,7 +1551,7 @@ async_gen_wrapper_gensend(PyGenObject *gen, PyObject *arg, int err)
     if (retval && Py_TYPE(retval) == &_PyAsyncGenWrappedValue_Type) {
         Py_DECREF(retval);
         PyErr_SetString(
-            PyExc_RuntimeError, "async generator ignored GeneratorExit");
+            PyExc_RuntimeError, ASYNC_GEN_IGNORED_EXIT_MSG);
         return NULL;
     }
     return retval;
@@ -1554,9 +1574,7 @@ async_gen_aclose_send(PyAsyncGenAClose *o, PyObject *arg)
         PyObject *yf;
 
         if (arg != Py_None) {
-            PyErr_SetString(
-                PyExc_RuntimeError,
-                "coroutine must be started with a send(None) call");
+            PyErr_SetString(PyExc_RuntimeError, NON_INIT_CORO_MSG);
             return NULL;
         }
 
@@ -1609,17 +1627,19 @@ async_gen_aclose_throw(PyAsyncGenAClose *o, PyObject *args)
     PyObject *retval;
 
     if (o->ac_state == 0) {
-        PyErr_SetString(
-            PyExc_RuntimeError,
-            "coroutine must be started with a send(None) call");
+        PyErr_SetString(PyExc_RuntimeError, NON_INIT_CORO_MSG);
+        return NULL;
+    }
+
+    if (o->ac_state == 2) {
+        PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
 
     retval = gen_throw((PyGenObject*)o->ac_gen, args);
     if (retval && Py_TYPE(retval) == &_PyAsyncGenWrappedValue_Type) {
         Py_DECREF(retval);
-        PyErr_SetString(
-            PyExc_RuntimeError, "async generator ignored GeneratorExit");
+        PyErr_SetString(PyExc_RuntimeError, ASYNC_GEN_IGNORED_EXIT_MSG);
         return NULL;
     }
     return retval;
@@ -1634,8 +1654,9 @@ async_gen_aclose_iternext(PyAsyncGenAClose *o)
 
 
 static PyObject *
-async_gen_aclose_close(PyGenObject *gen, PyObject *args)
+async_gen_aclose_close(PyAsyncGenAClose *o, PyObject *args)
 {
+    o->ac_state = 2;
     Py_RETURN_NONE;
 }
 
