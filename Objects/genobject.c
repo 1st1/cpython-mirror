@@ -1230,14 +1230,6 @@ async_gen_anext(PyAsyncGenObject *o)
 }
 
 
-static int
-async_gen_traverse(PyAsyncGenObject *gen, visitproc visit, void *arg)
-{
-    gen_traverse((PyGenObject*)gen, visit, arg);
-    return 0;
-}
-
-
 static PyObject *
 async_gen_aclose(PyAsyncGenObject *gen, PyObject *arg)
 {
