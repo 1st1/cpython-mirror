@@ -745,6 +745,7 @@ class AsyncGenAsyncioTest(unittest.TestCase):
             try:
                 await g.athrow(FooEr)
             except asyncio.CancelledError:
+                self.assertEqual(DONE, 1)
                 raise
             else:
                 self.fail('CancelledError was not raised')
