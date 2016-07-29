@@ -288,6 +288,13 @@ class AsyncGenTest(unittest.TestCase):
 
         self.compare_generators(sync_gen(), async_gen())
 
+    def test_async_gen_exception_10(self):
+        async def gen():
+            yield 123
+        with self.assertRaisesRegex(TypeError,
+                                    "non-None value .* async generator"):
+            gen().__anext__().send(100)
+
     def test_async_gen_api_01(self):
         async def gen():
             yield 123
@@ -538,6 +545,207 @@ class AsyncGenAsyncioTest(unittest.TestCase):
             await asyncio.sleep(0.1, loop=self.loop)
 
         self.loop.run_until_complete(run())
+        self.assertEqual(DONE, 1)
+
+    def test_async_gen_asyncio_asend_01(self):
+        DONE = 0
+
+        # Sanity check:
+        def sgen():
+            v = yield 1
+            yield v * 2
+        sg = sgen()
+        v = sg.send(None)
+        self.assertEqual(v, 1)
+        v = sg.send(100)
+        self.assertEqual(v, 200)
+
+        async def gen():
+            nonlocal DONE
+            try:
+                await asyncio.sleep(0.01, loop=self.loop)
+                v = yield 1
+                await asyncio.sleep(0.01, loop=self.loop)
+                yield v * 2
+                await asyncio.sleep(0.01, loop=self.loop)
+                return
+            finally:
+                await asyncio.sleep(0.01, loop=self.loop)
+                await asyncio.sleep(0.01, loop=self.loop)
+                DONE = 1
+
+        async def run():
+            g = gen()
+
+            v = await g.asend(None)
+            self.assertEqual(v, 1)
+
+            v = await g.asend(100)
+            self.assertEqual(v, 200)
+
+            with self.assertRaises(StopAsyncIteration):
+                await g.asend(None)
+
+        self.loop.run_until_complete(run())
+        self.assertEqual(DONE, 1)
+
+    def test_async_gen_asyncio_asend_02(self):
+        DONE = 0
+
+        async def sleep_n_crash(delay):
+            await asyncio.sleep(delay, loop=self.loop)
+            1 / 0
+
+        async def gen():
+            nonlocal DONE
+            try:
+                await asyncio.sleep(0.01, loop=self.loop)
+                v = yield 1
+                await sleep_n_crash(0.01)
+                DONE += 1000
+                yield v * 2
+            finally:
+                await asyncio.sleep(0.01, loop=self.loop)
+                await asyncio.sleep(0.01, loop=self.loop)
+                DONE = 1
+
+        async def run():
+            g = gen()
+
+            v = await g.asend(None)
+            self.assertEqual(v, 1)
+
+            await g.asend(100)
+
+        with self.assertRaises(ZeroDivisionError):
+            self.loop.run_until_complete(run())
+        self.assertEqual(DONE, 1)
+
+    def test_async_gen_asyncio_asend_03(self):
+        DONE = 0
+
+        async def sleep_n_crash(delay):
+            fut = asyncio.ensure_future(asyncio.sleep(delay, loop=self.loop),
+                                        loop=self.loop)
+            self.loop.call_later(delay / 2, lambda: fut.cancel())
+            return await fut
+
+        async def gen():
+            nonlocal DONE
+            try:
+                await asyncio.sleep(0.01, loop=self.loop)
+                v = yield 1
+                await sleep_n_crash(0.01)
+                DONE += 1000
+                yield v * 2
+            finally:
+                await asyncio.sleep(0.01, loop=self.loop)
+                await asyncio.sleep(0.01, loop=self.loop)
+                DONE = 1
+
+        async def run():
+            g = gen()
+
+            v = await g.asend(None)
+            self.assertEqual(v, 1)
+
+            await g.asend(100)
+
+        with self.assertRaises(asyncio.CancelledError):
+            self.loop.run_until_complete(run())
+        self.assertEqual(DONE, 1)
+
+    def test_async_gen_asyncio_athrow_01(self):
+        DONE = 0
+
+        class FooEr(Exception):
+            pass
+
+        # Sanity check:
+        def sgen():
+            try:
+                v = yield 1
+            except FooEr:
+                v = 1000
+            yield v * 2
+        sg = sgen()
+        v = sg.send(None)
+        self.assertEqual(v, 1)
+        v = sg.throw(FooEr)
+        self.assertEqual(v, 2000)
+        with self.assertRaises(StopIteration):
+            sg.send(None)
+
+        async def gen():
+            nonlocal DONE
+            try:
+                await asyncio.sleep(0.01, loop=self.loop)
+                try:
+                    v = yield 1
+                except FooEr:
+                    v = 1000
+                    await asyncio.sleep(0.01, loop=self.loop)
+                yield v * 2
+                await asyncio.sleep(0.01, loop=self.loop)
+                # return
+            finally:
+                await asyncio.sleep(0.01, loop=self.loop)
+                await asyncio.sleep(0.01, loop=self.loop)
+                DONE = 1
+
+        async def run():
+            g = gen()
+
+            v = await g.asend(None)
+            self.assertEqual(v, 1)
+
+            v = await g.athrow(FooEr)
+            self.assertEqual(v, 2000)
+
+            with self.assertRaises(StopAsyncIteration):
+                await g.asend(None)
+
+        self.loop.run_until_complete(run())
+        self.assertEqual(DONE, 1)
+
+    def test_async_gen_asyncio_athrow_02(self):
+        DONE = 0
+
+        class FooEr(Exception):
+            pass
+
+        async def sleep_n_crash(delay):
+            fut = asyncio.ensure_future(asyncio.sleep(delay, loop=self.loop),
+                                        loop=self.loop)
+            self.loop.call_later(delay / 2, lambda: fut.cancel())
+            return await fut
+
+        async def gen():
+            nonlocal DONE
+            try:
+                await asyncio.sleep(0.01, loop=self.loop)
+                try:
+                    v = yield 1
+                except FooEr:
+                    await sleep_n_crash(0.01)
+                yield v * 2
+                await asyncio.sleep(0.01, loop=self.loop)
+                # return
+            finally:
+                await asyncio.sleep(0.01, loop=self.loop)
+                await asyncio.sleep(0.01, loop=self.loop)
+                DONE = 1
+
+        async def run():
+            g = gen()
+
+            v = await g.asend(None)
+            self.assertEqual(v, 1)
+
+            await g.athrow(FooEr)
+
+        with self.assertRaises(asyncio.CancelledError):
+            self.loop.run_until_complete(run())
         self.assertEqual(DONE, 1)
 
 
