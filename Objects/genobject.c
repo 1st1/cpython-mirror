@@ -49,8 +49,9 @@ _PyGen_Finalize(PyObject *self)
         return;
 
     if (PyAsyncGen_CheckExact(self)) {
-        PyObject *finalizer = ((PyAsyncGenObject*)self)->ag_finalizer;
-        if (finalizer) {
+        PyAsyncGenObject *agen = (PyAsyncGenObject*)self;
+        PyObject *finalizer = agen->ag_finalizer;
+        if (finalizer && !agen->ag_closed) {
             /* Save the current exception, if any. */
             PyErr_Fetch(&error_type, &error_value, &error_traceback);
 
@@ -1418,6 +1419,7 @@ PyAsyncGen_New(PyFrameObject *f, PyObject *name, PyObject *qualname)
         return NULL;
     }
     o->ag_finalizer = NULL;
+    o->ag_closed = 0;
     return (PyObject*)o;
 }
 
@@ -1452,12 +1454,19 @@ PyAsyncGen_Fini(void)
 
 
 static PyObject *
-async_gen_unwrap_value(PyObject *result)
+async_gen_unwrap_value(PyAsyncGenObject *gen, PyObject *result)
 {
     if (result == NULL) {
         if (!PyErr_Occurred()) {
             PyErr_SetNone(PyExc_StopAsyncIteration);
         }
+
+        if (PyErr_ExceptionMatches(PyExc_StopAsyncIteration)
+            || PyErr_ExceptionMatches(PyExc_GeneratorExit)
+        ) {
+            gen->ag_closed = 1;
+        }
+
         return NULL;
     }
 
@@ -1512,7 +1521,7 @@ async_gen_asend_send(PyAsyncGenASend *o, PyObject *arg)
     }
 
     result = gen_send_ex((PyGenObject*)o->aw_gen, arg, 0, 0);
-    result = async_gen_unwrap_value(result);
+    result = async_gen_unwrap_value(o->aw_gen, result);
 
     if (result == NULL) {
         o->aw_state = 2;
@@ -1538,7 +1547,7 @@ async_gen_asend_throw(PyAsyncGenASend *o, PyObject *args)
     }
 
     PyObject *result = gen_throw((PyGenObject*)o->aw_gen, args);
-    result = async_gen_unwrap_value(result);
+    result = async_gen_unwrap_value(o->aw_gen, result);
 
     if (result == NULL) {
         o->aw_state = 2;
@@ -1744,6 +1753,11 @@ async_gen_athrow_send(PyAsyncGenAThrow *o, PyObject *arg)
     }
 
     if (o->ac_state == 0) {
+        if (o->ac_gen->ag_closed) {
+            PyErr_SetNone(PyExc_StopIteration);
+            return NULL;
+        }
+
         if (arg != Py_None) {
             PyErr_SetString(PyExc_RuntimeError, NON_INIT_CORO_MSG);
             return NULL;
@@ -1753,6 +1767,8 @@ async_gen_athrow_send(PyAsyncGenAThrow *o, PyObject *arg)
 
         if (o->ac_args == NULL) {
             /* aclose() mode */
+            o->ac_gen->ag_closed = 1;
+
             retval = _gen_throw((PyGenObject *)gen,
                                 0,  /* Do not close generator when
                                        PyExc_GeneratorExit is passed */
@@ -1776,7 +1792,7 @@ async_gen_athrow_send(PyAsyncGenAThrow *o, PyObject *arg)
                                 0,  /* Do not close generator when
                                        PyExc_GeneratorExit is passed */
                                 typ, val, tb);
-            retval = async_gen_unwrap_value(retval);
+            retval = async_gen_unwrap_value(o->ac_gen, retval);
         }
         if (retval == NULL) {
             goto check_error;
@@ -1787,7 +1803,7 @@ async_gen_athrow_send(PyAsyncGenAThrow *o, PyObject *arg)
     if (o->ac_state == 1) {
         PyObject *retval = gen_send_ex((PyGenObject *)gen, arg, 0, 0);
         if (o->ac_args) {
-            return async_gen_unwrap_value(retval);
+            return async_gen_unwrap_value(o->ac_gen, retval);
         } else {
             /* aclose() mode */
             if (retval && _PyAsyncGenWrappedValue_CheckExact(retval)) {
@@ -1836,12 +1852,17 @@ async_gen_athrow_throw(PyAsyncGenAThrow *o, PyObject *args)
     }
 
     retval = gen_throw((PyGenObject*)o->ac_gen, args);
-    if (retval && _PyAsyncGenWrappedValue_CheckExact(retval)) {
-        Py_DECREF(retval);
-        PyErr_SetString(PyExc_RuntimeError, ASYNC_GEN_IGNORED_EXIT_MSG);
-        return NULL;
+    if (o->ac_args) {
+        return async_gen_unwrap_value(o->ac_gen, retval);
+    } else {
+        /* aclose() mode */
+        if (retval && _PyAsyncGenWrappedValue_CheckExact(retval)) {
+            Py_DECREF(retval);
+            PyErr_SetString(PyExc_RuntimeError, ASYNC_GEN_IGNORED_EXIT_MSG);
+            return NULL;
+        }
+        return retval;
     }
-    return retval;
 }
 
 
