@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import sys
 import types
 import unittest
 
@@ -92,6 +93,12 @@ class AsyncGenSyntaxTest(unittest.TestCase):
 
 
 class AsyncGenTest(unittest.TestCase):
+
+    def setUp(self):
+        sys.set_asyncgen_finalizer(lambda o: None)
+
+    def tearDown(self):
+        sys.set_asyncgen_finalizer(None)
 
     def compare_generators(self, sync_gen, async_gen):
         def sync_iterate(g):
@@ -315,6 +322,15 @@ class AsyncGenTest(unittest.TestCase):
         self.assertIsInstance(g.ag_code, types.CodeType)
 
         self.assertTrue(inspect.isawaitable(g.aclose()))
+
+    def test_async_gen_wo_finalizer(self):
+        async def foo():
+            yield
+
+        sys.set_asyncgen_finalizer(None)
+        with self.assertRaisesRegex(RuntimeError,
+                                    'cannot.*without finalizer'):
+            foo().__anext__().__next__()
 
 
 class AsyncGenAsyncioTest(unittest.TestCase):

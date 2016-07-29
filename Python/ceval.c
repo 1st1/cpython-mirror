@@ -2021,6 +2021,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
             if (PyAsyncGen_CheckExact(aiter)) {
                 awaitable = type->tp_as_async->am_anext(aiter);
+                if (awaitable == NULL) {
+                    goto error;
+                }
             } else {
                 if (type->tp_as_async != NULL){
                     getter = type->tp_as_async->am_anext;

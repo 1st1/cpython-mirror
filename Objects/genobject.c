@@ -49,10 +49,8 @@ _PyGen_Finalize(PyObject *self)
         return;
 
     if (PyAsyncGen_CheckExact(self)) {
-        PyThreadState *tstate = PyThreadState_GET();
-        if (tstate->async_gen_finalizer) {
-            PyObject *finalizer = tstate->async_gen_finalizer;
-
+        PyObject *finalizer = ((PyAsyncGenObject*)self)->ag_finalizer;
+        if (finalizer) {
             /* Save the current exception, if any. */
             PyErr_Fetch(&error_type, &error_value, &error_traceback);
 
@@ -99,6 +97,9 @@ gen_dealloc(PyGenObject *gen)
         return;                     /* resurrected.  :( */
 
     _PyObject_GC_UNTRACK(self);
+    if (PyAsyncGen_CheckExact(gen)) {
+        Py_CLEAR(((PyAsyncGenObject*)gen)->ag_finalizer);
+    }
     Py_CLEAR(gen->gi_frame);
     Py_CLEAR(gen->gi_code);
     Py_CLEAR(gen->gi_name);
@@ -1231,6 +1232,14 @@ static int ag_asend_fl_free = 0;
                     (Py_TYPE(o) == &_PyAsyncGenASend_Type)
 
 
+static int
+async_gen_traverse(PyAsyncGenObject *gen, visitproc visit, void *arg)
+{
+    Py_VISIT(gen->ag_finalizer);
+    return gen_traverse((PyGenObject*)gen, visit, arg);
+}
+
+
 static PyObject *
 async_gen_repr(PyAsyncGenObject *o)
 {
@@ -1239,16 +1248,38 @@ async_gen_repr(PyAsyncGenObject *o)
 }
 
 
-static void
-async_gen_dealloc(PyAsyncGenObject *gen)
+static int
+async_gen_init_finalizer(PyAsyncGenObject *o)
 {
-    gen_dealloc((PyGenObject*)gen);
+    PyThreadState *tstate;
+    PyObject *finalizer;
+
+    if (o->ag_finalizer) {
+        return 0;
+    }
+
+    tstate = PyThreadState_GET();
+    finalizer = tstate->async_gen_finalizer;
+
+    if (!finalizer) {
+        PyErr_SetString(
+            PyExc_RuntimeError,
+            "cannot iterate async generator without finalizer set");
+        return 1;
+    }
+
+    Py_INCREF(finalizer);
+    o->ag_finalizer = finalizer;
+    return 0;
 }
 
 
 static PyObject *
 async_gen_anext(PyAsyncGenObject *o)
 {
+    if (async_gen_init_finalizer(o)) {
+        return NULL;
+    }
     return async_gen_asend_new(o, NULL);
 }
 
@@ -1256,20 +1287,29 @@ async_gen_anext(PyAsyncGenObject *o)
 static PyObject *
 async_gen_asend(PyAsyncGenObject *o, PyObject *arg)
 {
+    if (async_gen_init_finalizer(o)) {
+        return NULL;
+    }
     return async_gen_asend_new(o, arg);
 }
 
 
 static PyObject *
-async_gen_athrow(PyAsyncGenObject *gen, PyObject *arg)
+async_gen_aclose(PyAsyncGenObject *o, PyObject *arg)
 {
-    return async_gen_athrow_new(gen, NULL);
+    if (async_gen_init_finalizer(o)) {
+        return NULL;
+    }
+    return async_gen_athrow_new(o, NULL);
 }
 
 static PyObject *
-async_gen_throw(PyAsyncGenObject *gen, PyObject *args)
+async_gen_athrow(PyAsyncGenObject *o, PyObject *args)
 {
-    return async_gen_athrow_new(gen, args);
+    if (async_gen_init_finalizer(o)) {
+        return NULL;
+    }
+    return async_gen_athrow_new(o, args);
 }
 
 
@@ -1301,8 +1341,8 @@ PyDoc_STRVAR(async_athrow_doc,
 
 static PyMethodDef async_gen_methods[] = {
     {"asend", (PyCFunction)async_gen_asend, METH_O, async_asend_doc},
-    {"athrow",(PyCFunction)async_gen_throw, METH_VARARGS, async_athrow_doc},
-    {"aclose", (PyCFunction)async_gen_athrow, METH_NOARGS, async_aclose_doc},
+    {"athrow",(PyCFunction)async_gen_athrow, METH_VARARGS, async_athrow_doc},
+    {"aclose", (PyCFunction)async_gen_aclose, METH_NOARGS, async_aclose_doc},
     {NULL, NULL}        /* Sentinel */
 };
 
@@ -1320,7 +1360,7 @@ PyTypeObject PyAsyncGen_Type = {
     sizeof(PyAsyncGenObject),                   /* tp_basicsize */
     0,                                          /* tp_itemsize */
     /* methods */
-    (destructor)async_gen_dealloc,              /* tp_dealloc */
+    (destructor)gen_dealloc,                    /* tp_dealloc */
     0,                                          /* tp_print */
     0,                                          /* tp_getattr */
     0,                                          /* tp_setattr */
@@ -1338,7 +1378,7 @@ PyTypeObject PyAsyncGen_Type = {
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
         Py_TPFLAGS_HAVE_FINALIZE,               /* tp_flags */
     0,                                          /* tp_doc */
-    (traverseproc)gen_traverse,                 /* tp_traverse */
+    (traverseproc)async_gen_traverse,           /* tp_traverse */
     0,                                          /* tp_clear */
     0,                                          /* tp_richcompare */
     offsetof(PyAsyncGenObject, ag_weakreflist), /* tp_weaklistoffset */
@@ -1377,6 +1417,7 @@ PyAsyncGen_New(PyFrameObject *f, PyObject *name, PyObject *qualname)
     if (o == NULL) {
         return NULL;
     }
+    o->ag_finalizer = NULL;
     return (PyObject*)o;
 }
 
@@ -1703,8 +1744,6 @@ async_gen_athrow_send(PyAsyncGenAThrow *o, PyObject *arg)
     }
 
     if (o->ac_state == 0) {
-        PyObject *yf;
-
         if (arg != Py_None) {
             PyErr_SetString(PyExc_RuntimeError, NON_INIT_CORO_MSG);
             return NULL;

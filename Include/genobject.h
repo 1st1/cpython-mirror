@@ -66,6 +66,7 @@ PyAPI_FUNC(PyObject *) PyCoro_New(struct _frame *,
 
 typedef struct {
     _PyGenObject_HEAD(ag)
+    PyObject *ag_finalizer;
 } PyAsyncGenObject;
 
 PyAPI_DATA(PyTypeObject) PyAsyncGen_Type;
