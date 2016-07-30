@@ -69,49 +69,130 @@ def silence_coro_gc():
 class AsyncBadSyntaxTest(unittest.TestCase):
 
     def test_badsyntax_1(self):
-        with self.assertRaisesRegex(SyntaxError, "'await' outside"):
-            import test.badsyntax_async1
-
-    def test_badsyntax_2(self):
-        with self.assertRaisesRegex(SyntaxError, "'await' outside"):
-            import test.badsyntax_async2
-
-    def test_badsyntax_3(self):
-        with self.assertRaisesRegex(SyntaxError, 'invalid syntax'):
-            import test.badsyntax_async3
-
-    def test_badsyntax_4(self):
-        with self.assertRaisesRegex(SyntaxError, 'invalid syntax'):
-            import test.badsyntax_async4
-
-    def test_badsyntax_5(self):
-        with self.assertRaisesRegex(SyntaxError, 'invalid syntax'):
-            import test.badsyntax_async5
-
-    def test_badsyntax_7(self):
-        with self.assertRaisesRegex(
-            SyntaxError, "'yield from' inside async function"):
-
-            import test.badsyntax_async7
-
-    def test_badsyntax_8(self):
-        with self.assertRaisesRegex(SyntaxError, 'invalid syntax'):
-            import test.badsyntax_async8
-
-    def test_badsyntax_9(self):
-        ns = {}
-        for comp in {'(await a for a in b)',
-                     '[await a for a in b]',
-                     '{await a for a in b}',
-                     '{await a: c for a in b}'}:
-
-            with self.assertRaisesRegex(SyntaxError, 'await.*in comprehen'):
-                exec('async def f():\n\t{}'.format(comp), ns, ns)
-
-    def test_badsyntax_10(self):
-        # Tests for issue 24619
-
         samples = [
+            """def foo():
+                await something()
+            """,
+
+            """await something()""",
+
+            """async def foo():
+                yield from []
+            """,
+
+            """async def foo():
+                await await fut
+            """,
+
+            """async def foo(a=await something()):
+                pass
+            """,
+
+            """async def foo(a:await something()):
+                pass
+            """,
+
+            """async def foo():
+                def bar():
+                 [i async for i in els]
+            """,
+
+            """async def foo():
+                def bar():
+                 [await i for i in els]
+            """,
+
+            """async def foo():
+                def bar():
+                 [i for i in els
+                    async for b in els]
+            """,
+
+            """async def foo():
+                def bar():
+                 [i for i in els
+                    for c in b
+                    async for b in els]
+            """,
+
+            """async def foo():
+                def bar():
+                 [i for i in els
+                    async for b in els
+                    for c in b]
+            """,
+
+            """async def foo():
+                def bar():
+                 [i for i in els
+                    for b in await els]
+            """,
+
+            """async def foo():
+                def bar():
+                 [i for i in els
+                    for b in els
+                        if await b]
+            """,
+
+            """async def foo():
+                def bar():
+                 [i for i in await els]
+            """,
+
+            """async def foo():
+                def bar():
+                 [i for i in els if await i]
+            """,
+
+            """def bar():
+                 [i async for i in els]
+            """,
+
+            """def bar():
+                 [await i for i in els]
+            """,
+
+            """def bar():
+                 [i for i in els
+                    async for b in els]
+            """,
+
+            """def bar():
+                 [i for i in els
+                    for c in b
+                    async for b in els]
+            """,
+
+            """def bar():
+                 [i for i in els
+                    async for b in els
+                    for c in b]
+            """,
+
+            """def bar():
+                 [i for i in els
+                    for b in await els]
+            """,
+
+            """def bar():
+                 [i for i in els
+                    for b in els
+                        if await b]
+            """,
+
+            """def bar():
+                 [i for i in await els]
+            """,
+
+            """def bar():
+                 [i for i in els if await i]
+            """,
+
+            """async def foo():
+                await
+            """,
+
             """async def foo():
                    def bar(): pass
                    await = 1

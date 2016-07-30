@@ -202,6 +202,16 @@ static int compiler_call_helper(struct compiler *c, int n,
 static int compiler_try_except(struct compiler *, stmt_ty);
 static int compiler_set_qualname(struct compiler *);
 
+static int compiler_sync_comprehension_generator(
+                                      struct compiler *c,
+                                      asdl_seq *generators, int gen_index,
+                                      expr_ty elt, expr_ty val, int type);
+
+static int compiler_async_comprehension_generator(
+                                      struct compiler *c,
+                                      asdl_seq *generators, int gen_index,
+                                      expr_ty elt, expr_ty val, int type);
+
 static PyCodeObject *assemble(struct compiler *, int addNone);
 static PyObject *__doc__;
 
@@ -3627,10 +3637,27 @@ compiler_call_helper(struct compiler *c,
     - iterate over the generator sequence instead of using recursion
 */
 
+
 static int
 compiler_comprehension_generator(struct compiler *c,
                                  asdl_seq *generators, int gen_index,
                                  expr_ty elt, expr_ty val, int type)
+{
+    comprehension_ty gen;
+    gen = (comprehension_ty)asdl_seq_GET(generators, gen_index);
+    if (gen->is_async) {
+        return compiler_async_comprehension_generator(
+            c, generators, gen_index, elt, val, type);
+    } else {
+        return compiler_sync_comprehension_generator(
+            c, generators, gen_index, elt, val, type);
+    }
+}
+
+static int
+compiler_sync_comprehension_generator(struct compiler *c,
+                                      asdl_seq *generators, int gen_index,
+                                      expr_ty elt, expr_ty val, int type)
 {
     /* generate code for the iterator, then each of the ifs,
        and then write to the element */
@@ -3718,6 +3745,98 @@ compiler_comprehension_generator(struct compiler *c,
 }
 
 static int
+compiler_async_comprehension_generator(struct compiler *c,
+                                      asdl_seq *generators, int gen_index,
+                                      expr_ty elt, expr_ty val, int type)
+{
+    /* generate code for the iterator, then each of the ifs,
+       and then write to the element */
+
+    comprehension_ty gen;
+    basicblock *start, *anchor, *skip, *if_cleanup;
+    Py_ssize_t i, n;
+
+    start = compiler_new_block(c);
+    skip = compiler_new_block(c);
+    if_cleanup = compiler_new_block(c);
+    anchor = compiler_new_block(c);
+
+    if (start == NULL || skip == NULL || if_cleanup == NULL ||
+        anchor == NULL)
+        return 0;
+
+    gen = (comprehension_ty)asdl_seq_GET(generators, gen_index);
+
+    printf("a---> %d\n", gen->is_async);
+
+    if (gen_index == 0) {
+        /* Receive outermost iter as an implicit argument */
+        c->u->u_argcount = 1;
+        ADDOP_I(c, LOAD_FAST, 0);
+    }
+    else {
+        /* Sub-iter - calculate on the fly */
+        VISIT(c, expr, gen->iter);
+        ADDOP(c, GET_ITER);
+    }
+    compiler_use_next_block(c, start);
+    ADDOP_JREL(c, FOR_ITER, anchor);
+    NEXT_BLOCK(c);
+    VISIT(c, expr, gen->target);
+
+    /* XXX this needs to be cleaned up...a lot! */
+    n = asdl_seq_LEN(gen->ifs);
+    for (i = 0; i < n; i++) {
+        expr_ty e = (expr_ty)asdl_seq_GET(gen->ifs, i);
+        VISIT(c, expr, e);
+        ADDOP_JABS(c, POP_JUMP_IF_FALSE, if_cleanup);
+        NEXT_BLOCK(c);
+    }
+
+    if (++gen_index < asdl_seq_LEN(generators))
+        if (!compiler_comprehension_generator(c,
+                                              generators, gen_index,
+                                              elt, val, type))
+        return 0;
+
+    /* only append after the last for generator */
+    if (gen_index >= asdl_seq_LEN(generators)) {
+        /* comprehension specific code */
+        switch (type) {
+        case COMP_GENEXP:
+            VISIT(c, expr, elt);
+            ADDOP(c, YIELD_VALUE);
+            ADDOP(c, POP_TOP);
+            break;
+        case COMP_LISTCOMP:
+            VISIT(c, expr, elt);
+            ADDOP_I(c, LIST_APPEND, gen_index + 1);
+            break;
+        case COMP_SETCOMP:
+            VISIT(c, expr, elt);
+            ADDOP_I(c, SET_ADD, gen_index + 1);
+            break;
+        case COMP_DICTCOMP:
+            /* With 'd[k] = v', v is evaluated before k, so we do
+               the same. */
+            VISIT(c, expr, val);
+            VISIT(c, expr, elt);
+            ADDOP_I(c, MAP_ADD, gen_index + 1);
+            break;
+        default:
+            return 0;
+        }
+
+        compiler_use_next_block(c, skip);
+    }
+    compiler_use_next_block(c, if_cleanup);
+    ADDOP_JABS(c, JUMP_ABSOLUTE, start);
+    compiler_use_next_block(c, anchor);
+
+    return 1;
+}
+
+static int
 compiler_comprehension(struct compiler *c, expr_ty e, int type,
                        identifier name, asdl_seq *generators, expr_ty elt,
                        expr_ty val)
@@ -3725,6 +3844,7 @@ compiler_comprehension(struct compiler *c, expr_ty e, int type,
     PyCodeObject *co = NULL;
     expr_ty outermost_iter;
     PyObject *qualname = NULL;
+    int is_async_function = c->u->u_ste->ste_coroutine;
 
     outermost_iter = ((comprehension_ty)
                       asdl_seq_GET(generators, 0))->iter;
@@ -3732,6 +3852,12 @@ compiler_comprehension(struct compiler *c, expr_ty e, int type,
     if (!compiler_enter_scope(c, name, COMPILER_SCOPE_COMPREHENSION,
                               (void *)e, e->lineno))
         goto error;
+
+    if (c->u->u_ste->ste_coroutine && !is_async_function) {
+        compiler_error(c, "asynchronous comprehension outside of "
+                          "an asynchronous function");
+        goto error_in_scope;
+    }
 
     if (type != COMP_GENEXP) {
         int op;
@@ -4140,11 +4266,8 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
         if (c->u->u_ste->ste_type != FunctionBlock)
             return compiler_error(c, "'await' outside function");
 
-        if (c->u->u_scope_type == COMPILER_SCOPE_COMPREHENSION)
-            return compiler_error(
-                c, "'await' expressions in comprehensions are not supported");
-
-        if (c->u->u_scope_type != COMPILER_SCOPE_ASYNC_FUNCTION)
+        if (c->u->u_scope_type != COMPILER_SCOPE_ASYNC_FUNCTION &&
+                c->u->u_scope_type != COMPILER_SCOPE_COMPREHENSION)
             return compiler_error(c, "'await' outside async function");
 
         VISIT(c, expr, e->v.Await.value);
