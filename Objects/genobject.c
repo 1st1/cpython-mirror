@@ -1541,12 +1541,14 @@ async_gen_asend_iternext(PyAsyncGenASend *o)
 static PyObject *
 async_gen_asend_throw(PyAsyncGenASend *o, PyObject *args)
 {
+    PyObject *result;
+
     if (o->aw_state == 2) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
 
-    PyObject *result = gen_throw((PyGenObject*)o->aw_gen, args);
+    result = gen_throw((PyGenObject*)o->aw_gen, args);
     result = async_gen_unwrap_value(o->aw_gen, result);
 
     if (result == NULL) {
