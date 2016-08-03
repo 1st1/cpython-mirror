@@ -217,11 +217,12 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc, int closing)
                 PyErr_SetNone(PyExc_StopIteration);
             }
         } else {
+            PyObject *e = PyObject_CallFunctionObjArgs(
+                               PyExc_StopIteration, result, NULL);
+
             /* Async generators cannot return anything but None */
             assert(!PyAsyncGen_CheckExact(gen));
 
-            PyObject *e = PyObject_CallFunctionObjArgs(
-                               PyExc_StopIteration, result, NULL);
             if (e != NULL) {
                 PyErr_SetObject(PyExc_StopIteration, e);
                 Py_DECREF(e);
