@@ -335,7 +335,8 @@ class BaseEventLoop(events.AbstractEventLoop):
             raise RuntimeError('Event loop is closed')
 
     def _finalize_asyncgen(self, ag):
-        self.create_task(ag.aclose())
+        if not self.is_closed():
+            self.create_task(ag.aclose())
 
     def run_forever(self):
         """Run until stop() is called."""
