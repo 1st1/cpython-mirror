@@ -29,6 +29,7 @@ import time
 import traceback
 import sys
 import warnings
+import weakref
 
 from . import compat
 from . import coroutines
@@ -242,6 +243,7 @@ class BaseEventLoop(events.AbstractEventLoop):
         self._current_handle = None
         self._task_factory = None
         self._coroutine_wrapper_set = False
+        self._asyncgens = weakref.WeakSet()
 
     def __repr__(self):
         return ('<%s running=%s closed=%s debug=%s>'
@@ -334,9 +336,33 @@ class BaseEventLoop(events.AbstractEventLoop):
         if self._closed:
             raise RuntimeError('Event loop is closed')
 
-    def _finalize_asyncgen(self, ag):
+    def _asyncgen_finalizer_hook(self, ag):
+        if ag in self._asyncgens:
+            self._asyncgens.remove(ag)
+
         if not self.is_closed():
             self.create_task(ag.aclose())
+
+    def _asyncgen_firstiter_hook(self, ag):
+        self._asyncgens.add(ag)
+
+    def shutdown(self, *, timeout=None):
+        if self.is_running():
+            raise RuntimeError('Event loop is running.')
+        if self.is_closed():
+            return
+
+        if not len(self._asyncgens):
+            return
+
+        shutdown_coro = tasks.gather(
+            *[ag.aclose() for ag in self._asyncgens],
+            loop=self)
+        if timeout is not None:
+            shutdown_coro = tasks.wait_for(shutdown_coro, timeout=timeout)
+
+        self._asyncgens.clear()
+        self.run_until_complete(shutdown_coro)
 
     def run_forever(self):
         """Run until stop() is called."""
@@ -345,8 +371,9 @@ class BaseEventLoop(events.AbstractEventLoop):
             raise RuntimeError('Event loop is running.')
         self._set_coroutine_wrapper(self._debug)
         self._thread_id = threading.get_ident()
-        old_gen_finalizer = sys.get_asyncgen_finalizer()
-        sys.set_asyncgen_finalizer(self._finalize_asyncgen)
+        old_agen_hooks = sys.get_asyncgen_hooks()
+        sys.set_asyncgen_hooks(firstiter=self._asyncgen_firstiter_hook,
+                               finalizer=self._asyncgen_finalizer_hook)
         try:
             while True:
                 self._run_once()
@@ -356,7 +383,7 @@ class BaseEventLoop(events.AbstractEventLoop):
             self._stopping = False
             self._thread_id = None
             self._set_coroutine_wrapper(False)
-            sys.set_asyncgen_finalizer(old_gen_finalizer)
+            sys.set_asyncgen_hooks(*old_agen_hooks)
 
     def run_until_complete(self, future):
         """Run until the Future is done.

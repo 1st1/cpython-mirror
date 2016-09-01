@@ -1255,23 +1255,35 @@ async_gen_init_finalizer(PyAsyncGenObject *o)
 {
     PyThreadState *tstate;
     PyObject *finalizer;
+    PyObject *firstiter;
 
-    if (o->ag_finalizer) {
+    if (o->ag_hooks_inited) {
         return 0;
     }
 
-    tstate = PyThreadState_GET();
-    finalizer = tstate->async_gen_finalizer;
+    o->ag_hooks_inited = 1;
 
-    if (!finalizer) {
-        PyErr_SetString(
-            PyExc_RuntimeError,
-            "cannot iterate async generator without finalizer set");
-        return 1;
+    tstate = PyThreadState_GET();
+
+    finalizer = tstate->async_gen_finalizer;
+    if (finalizer) {
+        Py_INCREF(finalizer);
+        o->ag_finalizer = finalizer;
     }
 
-    Py_INCREF(finalizer);
-    o->ag_finalizer = finalizer;
+    firstiter = tstate->async_gen_firstiter;
+    if (firstiter) {
+        PyObject *res;
+
+        Py_INCREF(firstiter);
+        res = PyObject_CallFunction(firstiter, "O", o);
+        Py_DECREF(firstiter);
+        if (res == NULL) {
+            return 1;
+        }
+        Py_DECREF(res);
+    }
+
     return 0;
 }
 
@@ -1421,6 +1433,7 @@ PyAsyncGen_New(PyFrameObject *f, PyObject *name, PyObject *qualname)
     }
     o->ag_finalizer = NULL;
     o->ag_closed = 0;
+    o->ag_hooks_inited = 0;
     return (PyObject*)o;
 }
 

@@ -137,6 +137,7 @@ typedef struct _ts {
     PyObject *coroutine_wrapper;
     int in_coroutine_wrapper;
 
+    PyObject *async_gen_firstiter;
     PyObject *async_gen_finalizer;
 
     /* XXX signal handlers should also be here */

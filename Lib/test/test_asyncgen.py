@@ -94,12 +94,6 @@ class AsyncGenSyntaxTest(unittest.TestCase):
 
 class AsyncGenTest(unittest.TestCase):
 
-    def setUp(self):
-        sys.set_asyncgen_finalizer(lambda o: None)
-
-    def tearDown(self):
-        sys.set_asyncgen_finalizer(None)
-
     def compare_generators(self, sync_gen, async_gen):
         def sync_iterate(g):
             res = []
@@ -322,15 +316,6 @@ class AsyncGenTest(unittest.TestCase):
         self.assertIsInstance(g.ag_code, types.CodeType)
 
         self.assertTrue(inspect.isawaitable(g.aclose()))
-
-    def test_async_gen_wo_finalizer(self):
-        async def foo():
-            yield
-
-        sys.set_asyncgen_finalizer(None)
-        with self.assertRaisesRegex(RuntimeError,
-                                    'cannot.*without finalizer'):
-            foo().__anext__().__next__()
 
 
 class AsyncGenAsyncioTest(unittest.TestCase):
@@ -769,6 +754,35 @@ class AsyncGenAsyncioTest(unittest.TestCase):
         with self.assertRaises(asyncio.CancelledError):
             self.loop.run_until_complete(run())
         self.assertEqual(DONE, 1)
+
+    def test_async_gen_asyncio_shutdown_01(self):
+        finalized = 0
+
+        async def waiter(timeout):
+            nonlocal finalized
+            try:
+                await asyncio.sleep(timeout, loop=self.loop)
+                yield 1
+            finally:
+                await asyncio.sleep(0, loop=self.loop)
+                finalized += 1
+
+        async def wait():
+            async for _ in waiter(1):
+                pass
+
+        t1 = self.loop.create_task(wait())
+        t2 = self.loop.create_task(wait())
+
+        self.loop.run_until_complete(asyncio.sleep(0.1, loop=self.loop))
+
+        self.loop.shutdown()
+        self.assertEqual(finalized, 2)
+
+        # Silence warnings
+        t1.cancel()
+        t2.cancel()
+        self.loop.run_until_complete(asyncio.sleep(0.1, loop=self.loop))
 
 
 if __name__ == "__main__":

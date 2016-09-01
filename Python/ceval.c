@@ -4515,12 +4515,28 @@ _PyEval_GetCoroutineWrapper(void)
 }
 
 void
-_PyEval_SetAsyncGenFinalizer(PyObject *wrapper)
+_PyEval_SetAsyncGenFirstiter(PyObject *firstiter)
 {
     PyThreadState *tstate = PyThreadState_GET();
 
-    Py_XINCREF(wrapper);
-    Py_XSETREF(tstate->async_gen_finalizer, wrapper);
+    Py_XINCREF(firstiter);
+    Py_XSETREF(tstate->async_gen_firstiter, firstiter);
+}
+
+PyObject *
+_PyEval_GetAsyncGenFirstiter(void)
+{
+    PyThreadState *tstate = PyThreadState_GET();
+    return tstate->async_gen_firstiter;
+}
+
+void
+_PyEval_SetAsyncGenFinalizer(PyObject *finalizer)
+{
+    PyThreadState *tstate = PyThreadState_GET();
+
+    Py_XINCREF(finalizer);
+    Py_XSETREF(tstate->async_gen_finalizer, finalizer);
 }
 
 PyObject *
