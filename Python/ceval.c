@@ -5583,3 +5583,16 @@ _Py_GetDXProfile(PyObject *self, PyObject *args)
 }
 
 #endif
+
+Py_ssize_t
+_PyEval_RequestCodeExtraIndex(freefunc free)
+{
+    PyThreadState *tstate = PyThreadState_Get();
+    Py_ssize_t new_index;
+    if (tstate->co_extra_maxindex == MAX_CO_EXTRA_INDEX - 1) {
+        return -1;
+    }
+    new_index = tstate->co_extra_maxindex++;
+    tstate->co_extra_freefuncs[new_index] = free;
+    return new_index;
+}

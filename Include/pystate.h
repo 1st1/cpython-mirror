@@ -8,6 +8,8 @@
 extern "C" {
 #endif
 
+#define MAX_CO_EXTRA_INDEX 255
+
 /* State shared between threads */
 
 struct _ts; /* Forward */
@@ -137,6 +139,9 @@ typedef struct _ts {
 
     PyObject *coroutine_wrapper;
     int in_coroutine_wrapper;
+
+    Py_ssize_t co_extra_maxindex;
+    freefunc co_extra_freefuncs[MAX_CO_EXTRA_INDEX];
 
     /* XXX signal handlers should also be here */
 
