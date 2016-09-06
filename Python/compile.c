@@ -3903,6 +3903,13 @@ compiler_comprehension(struct compiler *c, expr_ty e, int type,
     VISIT(c, expr, outermost_iter);
     ADDOP(c, GET_ITER);
     ADDOP_I(c, CALL_FUNCTION, 1);
+
+    if (c->u->u_ste->ste_coroutine) {
+        ADDOP(c, GET_AWAITABLE);
+        ADDOP_O(c, LOAD_CONST, Py_None, consts);
+        ADDOP(c, YIELD_FROM);
+    }
+
     return 1;
 error_in_scope:
     compiler_exit_scope(c);

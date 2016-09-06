@@ -1612,6 +1612,59 @@ class CoroutineTest(unittest.TestCase):
                 warnings.simplefilter("error")
                 run_async(foo())
 
+    def test_comp_1(self):
+        async def f(i):
+            return i
+
+        async def run_list():
+            return [await c for c in [f(1), f(41)]]
+
+        async def run_set():
+            return {await c for c in [f(1), f(41)]}
+
+        async def run_dict1():
+            return {await c: 'a' for c in [f(1), f(41)]}
+
+        async def run_dict2():
+            return {i: await c for i, c in enumerate([f(1), f(41)])}
+
+        self.assertEqual(run_async(run_list()), ([], [1, 41]))
+        self.assertEqual(run_async(run_set()), ([], {1, 41}))
+        self.assertEqual(run_async(run_dict1()), ([], {1: 'a', 41: 'a'}))
+        self.assertEqual(run_async(run_dict2()), ([], {0: 1, 1: 41}))
+
+    def test_comp_2(self):
+        async def f(i):
+            return i
+
+        async def run_list():
+            return [s for c in [f(''), f('abc'), f(''), f(['de', 'fg'])]
+                    for s in await c]
+
+        self.assertEqual(
+            run_async(run_list()),
+            ([], ['a', 'b', 'c', 'de', 'fg']))
+
+        async def run_set():
+            return {d
+                    for c in [f([f([10, 30]),
+                                 f([20])])]
+                    for s in await c
+                    for d in await s}
+
+        self.assertEqual(
+            run_async(run_set()),
+            ([], {10, 20, 30}))
+
+        async def run_set2():
+            return {await s
+                    for c in [f([f(10), f(20)])]
+                    for s in await c}
+
+        self.assertEqual(
+            run_async(run_set2()),
+            ([], {10, 20}))
+
     def test_copy(self):
         async def func(): pass
         coro = func()
