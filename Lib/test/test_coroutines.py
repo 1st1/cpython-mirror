@@ -1665,6 +1665,91 @@ class CoroutineTest(unittest.TestCase):
             run_async(run_set2()),
             ([], {10, 20}))
 
+    def test_comp_3(self):
+        async def f(it):
+            for i in it:
+                yield i
+
+        async def run_list():
+            return [i + 1 async for i in f([10, 20])]
+        self.assertEqual(
+            run_async(run_list()),
+            ([], [11, 21]))
+
+        async def run_set():
+            return {i + 1 async for i in f([10, 20])}
+        self.assertEqual(
+            run_async(run_set()),
+            ([], {11, 21}))
+
+        async def run_dict():
+            return {i + 1: i + 2 async for i in f([10, 20])}
+        self.assertEqual(
+            run_async(run_dict()),
+            ([], {11: 12, 21: 22}))
+
+        async def run_gen():
+            gen = (i + 1 async for i in f([10, 20]))
+            return [g + 100 async for g in gen]
+        self.assertEqual(
+            run_async(run_gen()),
+            ([], [111, 121]))
+
+    def test_comp_4(self):
+        async def f(it):
+            for i in it:
+                yield i
+
+        async def run_list():
+            return [i + 1 async for i in f([10, 20]) if i > 10]
+        self.assertEqual(
+            run_async(run_list()),
+            ([], [21]))
+
+        async def run_set():
+            return {i + 1 async for i in f([10, 20]) if i > 10}
+        self.assertEqual(
+            run_async(run_set()),
+            ([], {21}))
+
+        async def run_dict():
+            return {i + 1: i + 2 async for i in f([10, 20]) if i > 10}
+        self.assertEqual(
+            run_async(run_dict()),
+            ([], {21: 22}))
+
+        async def run_gen():
+            gen = (i + 1 async for i in f([10, 20]) if i > 10)
+            return [g + 100 async for g in gen]
+        self.assertEqual(
+            run_async(run_gen()),
+            ([], [121]))
+
+    def test_comp_5(self):
+        async def f(it):
+            for i in it:
+                yield i
+
+        async def run_list():
+            return [i + 1 for pair in ([10, 20], [30, 40]) if pair[0] > 10
+                    async for i in f(pair) if i > 30]
+        self.assertEqual(
+            run_async(run_list()),
+            ([], [41]))
+
+    def test_comp_6(self):
+        async def f(it):
+            for i in it:
+                yield i
+
+        async def run_list():
+            return [i + 1 async for seq in f([(10, 20), (30,)])
+                    for i in seq]
+
+        self.assertEqual(
+            run_async(run_list()),
+            ([], [11, 21, 31]))
+
     def test_copy(self):
         async def func(): pass
         coro = func()

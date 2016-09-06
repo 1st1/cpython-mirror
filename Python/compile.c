@@ -3749,25 +3749,35 @@ compiler_async_comprehension_generator(struct compiler *c,
                                       asdl_seq *generators, int gen_index,
                                       expr_ty elt, expr_ty val, int type)
 {
-    /* generate code for the iterator, then each of the ifs,
-       and then write to the element */
+    static PyObject *stop_aiter_error = NULL;
 
     comprehension_ty gen;
-    basicblock *start, *anchor, *skip, *if_cleanup;
+    basicblock *start, *anchor, *skip, *if_cleanup, *try,
+               *after_try, *except, *try_cleanup;
     Py_ssize_t i, n;
 
+    if (stop_aiter_error == NULL) {
+        stop_aiter_error = PyUnicode_InternFromString("StopAsyncIteration");
+        if (stop_aiter_error == NULL)
+            return 0;
+    }
+
     start = compiler_new_block(c);
+    try = compiler_new_block(c);
+    after_try = compiler_new_block(c);
+    try_cleanup = compiler_new_block(c);
+    except = compiler_new_block(c);
     skip = compiler_new_block(c);
     if_cleanup = compiler_new_block(c);
     anchor = compiler_new_block(c);
 
     if (start == NULL || skip == NULL || if_cleanup == NULL ||
-        anchor == NULL)
+            anchor == NULL || try == NULL || after_try == NULL ||
+            except == NULL || after_try == NULL) {
         return 0;
+    }
 
     gen = (comprehension_ty)asdl_seq_GET(generators, gen_index);
-
-    printf("a---> %d\n", gen->is_async);
 
     if (gen_index == 0) {
         /* Receive outermost iter as an implicit argument */
@@ -3777,14 +3787,45 @@ compiler_async_comprehension_generator(struct compiler *c,
     else {
         /* Sub-iter - calculate on the fly */
         VISIT(c, expr, gen->iter);
-        ADDOP(c, GET_ITER);
+        ADDOP(c, GET_AITER);
+        ADDOP_O(c, LOAD_CONST, Py_None, consts);
+        ADDOP(c, YIELD_FROM);
     }
-    compiler_use_next_block(c, start);
-    ADDOP_JREL(c, FOR_ITER, anchor);
-    NEXT_BLOCK(c);
-    VISIT(c, expr, gen->target);
 
-    /* XXX this needs to be cleaned up...a lot! */
+    compiler_use_next_block(c, try);
+
+
+    ADDOP_JREL(c, SETUP_EXCEPT, except);
+    if (!compiler_push_fblock(c, EXCEPT, try))
+        return 0;
+
+    ADDOP(c, GET_ANEXT);
+    ADDOP_O(c, LOAD_CONST, Py_None, consts);
+    ADDOP(c, YIELD_FROM);
+    VISIT(c, expr, gen->target);
+    ADDOP(c, POP_BLOCK);
+    compiler_pop_fblock(c, EXCEPT, try);
+    ADDOP_JREL(c, JUMP_FORWARD, after_try);
+
+
+    compiler_use_next_block(c, except);
+    ADDOP(c, DUP_TOP);
+    ADDOP_O(c, LOAD_GLOBAL, stop_aiter_error, names);
+    ADDOP_I(c, COMPARE_OP, PyCmp_EXC_MATCH);
+    ADDOP_JABS(c, POP_JUMP_IF_FALSE, try_cleanup);
+
+    ADDOP(c, POP_TOP);
+    ADDOP(c, POP_TOP);
+    ADDOP(c, POP_TOP);
+    ADDOP(c, POP_EXCEPT); /* for SETUP_EXCEPT */
+    ADDOP_JABS(c, JUMP_ABSOLUTE, anchor);
+
+
+    compiler_use_next_block(c, try_cleanup);
+    ADDOP(c, END_FINALLY);
+
+    compiler_use_next_block(c, after_try);
+
     n = asdl_seq_LEN(gen->ifs);
     for (i = 0; i < n; i++) {
         expr_ty e = (expr_ty)asdl_seq_GET(gen->ifs, i);
@@ -3830,8 +3871,9 @@ compiler_async_comprehension_generator(struct compiler *c,
         compiler_use_next_block(c, skip);
     }
     compiler_use_next_block(c, if_cleanup);
-    ADDOP_JABS(c, JUMP_ABSOLUTE, start);
+    ADDOP_JABS(c, JUMP_ABSOLUTE, try);
     compiler_use_next_block(c, anchor);
+    ADDOP(c, POP_TOP);
 
     return 1;
 }
@@ -3842,12 +3884,11 @@ compiler_comprehension(struct compiler *c, expr_ty e, int type,
                        expr_ty val)
 {
     PyCodeObject *co = NULL;
-    expr_ty outermost_iter;
+    comprehension_ty outermost;
     PyObject *qualname = NULL;
     int is_async_function = c->u->u_ste->ste_coroutine;
 
-    outermost_iter = ((comprehension_ty)
-                      asdl_seq_GET(generators, 0))->iter;
+    outermost = (comprehension_ty) asdl_seq_GET(generators, 0);
 
     if (!compiler_enter_scope(c, name, COMPILER_SCOPE_COMPREHENSION,
                               (void *)e, e->lineno))
@@ -3900,11 +3941,19 @@ compiler_comprehension(struct compiler *c, expr_ty e, int type,
     Py_DECREF(qualname);
     Py_DECREF(co);
 
-    VISIT(c, expr, outermost_iter);
-    ADDOP(c, GET_ITER);
+    VISIT(c, expr, outermost->iter);
+
+    if (outermost->is_async) {
+        ADDOP(c, GET_AITER);
+        ADDOP_O(c, LOAD_CONST, Py_None, consts);
+        ADDOP(c, YIELD_FROM);
+    } else {
+        ADDOP(c, GET_ITER);
+    }
+
     ADDOP_I(c, CALL_FUNCTION, 1);
 
-    if (c->u->u_ste->ste_coroutine) {
+    if (c->u->u_ste->ste_coroutine && type != COMP_GENEXP) {
         ADDOP(c, GET_AWAITABLE);
         ADDOP_O(c, LOAD_CONST, Py_None, consts);
         ADDOP(c, YIELD_FROM);
