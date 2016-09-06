@@ -4,6 +4,8 @@ import sys
 import types
 import unittest
 
+from unittest import mock
+
 
 class AwaitException(Exception):
     pass
@@ -785,6 +787,36 @@ class AsyncGenAsyncioTest(unittest.TestCase):
         t2.cancel()
         self.loop.run_until_complete(asyncio.sleep(0.1, loop=self.loop))
 
+    def test_async_gen_asyncio_shutdown_02(self):
+        logged = 0
+
+        def logger(loop, context):
+            nonlocal logged
+            if 'asynchronous generator closing' in context['message']:
+                logged += 1
+
+        async def waiter(timeout):
+            try:
+                await asyncio.sleep(timeout, loop=self.loop)
+                yield 1
+            finally:
+                1 / 0
+
+        async def wait():
+            async for _ in waiter(1):
+                pass
+
+        t = self.loop.create_task(wait())
+        self.loop.run_until_complete(asyncio.sleep(0.1, loop=self.loop))
+
+        self.loop.set_exception_handler(logger)
+        self.loop.shutdown_asyncgens()
+
+        self.assertEqual(logged, 1)
+
+        # Silence warnings
+        t.cancel()
+        self.loop.run_until_complete(asyncio.sleep(0.1, loop=self.loop))
 
 if __name__ == "__main__":
     unittest.main()

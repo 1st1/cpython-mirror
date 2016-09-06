@@ -373,14 +373,25 @@ class BaseEventLoop(events.AbstractEventLoop):
             return
 
         shutdown_coro = tasks.gather(
-            *[ag.aclose() for ag in self._asyncgens], loop=self)
+            *[ag.aclose() for ag in self._asyncgens],
+            return_exceptions=True,
+            loop=self)
 
         if timeout is not None:
             shutdown_coro = tasks.wait_for(shutdown_coro, timeout=timeout,
                                            loop=self)
 
         self._asyncgens.clear()
-        self.run_until_complete(shutdown_coro)
+        results = self.run_until_complete(shutdown_coro)
+        for result in results:
+            if isinstance(result, Exception):
+                self.call_exception_handler({
+                    'message': 'an error occurred during asynchronous '
+                               'generator closing',
+                    'exception': result
+                })
+            elif isinstance(result, BaseException):
+                raise result
 
     def run_forever(self):
         """Run until stop() is called."""
