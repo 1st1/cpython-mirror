@@ -248,6 +248,17 @@ class AbstractEventLoop:
         """
         raise NotImplementedError
 
+    def shutdown_asyncgens(self, *, timeout=30):
+        """Shutdown all active asynchronous generators.
+
+        This method is synchronous, and should be called before calling
+        loop.close().
+
+        *timeout* is set to 30 seconds by default.  Pass ``None`` to
+        disable the timeout.
+        """
+        raise NotImplementedError
+
     # Methods scheduling callbacks.  All these return Handles.
 
     def _timer_handle_cancelled(self, handle):

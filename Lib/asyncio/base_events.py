@@ -244,6 +244,7 @@ class BaseEventLoop(events.AbstractEventLoop):
         self._task_factory = None
         self._coroutine_wrapper_set = False
         self._asyncgens = weakref.WeakSet()
+        self._asyncgens_shutdown_called = False
 
     def __repr__(self):
         return ('<%s running=%s closed=%s debug=%s>'
@@ -344,22 +345,39 @@ class BaseEventLoop(events.AbstractEventLoop):
             self.create_task(ag.aclose())
 
     def _asyncgen_firstiter_hook(self, ag):
+        if self._asyncgens_shutdown_called:
+            warnings.warn(
+                "asynchronous generator {!r} was scheduled after "
+                "loop.shutdown_asyncgens() call".format(ag),
+                ResourceWarning, source=self)
+
         self._asyncgens.add(ag)
 
-    def shutdown(self, *, timeout=None):
+    def shutdown_asyncgens(self, *, timeout=30):
+        """Shutdown all active asynchronous generators.
+
+        This method is synchronous, and should be called before calling
+        loop.close().
+
+        *timeout* is set to 30 seconds by default.  Pass ``None`` to
+        disable the timeout.
+        """
         if self.is_running():
             raise RuntimeError('Event loop is running.')
         if self.is_closed():
-            return
+            raise RuntimeError('Event loop is closed.')
+
+        self._asyncgens_shutdown_called = True
 
         if not len(self._asyncgens):
             return
 
         shutdown_coro = tasks.gather(
-            *[ag.aclose() for ag in self._asyncgens],
-            loop=self)
+            *[ag.aclose() for ag in self._asyncgens], loop=self)
+
         if timeout is not None:
-            shutdown_coro = tasks.wait_for(shutdown_coro, timeout=timeout)
+            shutdown_coro = tasks.wait_for(shutdown_coro, timeout=timeout,
+                                           loop=self)
 
         self._asyncgens.clear()
         self.run_until_complete(shutdown_coro)
