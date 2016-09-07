@@ -1189,11 +1189,18 @@ _PyAIterWrapper_New(PyObject *aiter)
 /* ========= Asynchronous Generators ========= */
 
 
+typedef enum {
+    AWAITABLE_STATE_INIT,   /* new awaitable, has not yet been iterated */
+    AWAITABLE_STATE_ITER,   /* being iterated */
+    AWAITABLE_STATE_CLOSED, /* closed */
+} AwaitableState;
+
+
 typedef struct {
     PyObject_HEAD
     PyAsyncGenObject *aw_gen;
     PyObject *aw_sendval;
-    int aw_state;
+    AwaitableState aw_state;
 } PyAsyncGenASend;
 
 
@@ -1201,7 +1208,7 @@ typedef struct {
     PyObject_HEAD
     PyAsyncGenObject *ac_gen;
     PyObject *ac_args;
-    int ac_state;
+    AwaitableState ac_state;
 } PyAsyncGenAThrow;
 
 
@@ -1522,23 +1529,23 @@ async_gen_asend_send(PyAsyncGenASend *o, PyObject *arg)
 {
     PyObject *result;
 
-    if (o->aw_state == 2) {
+    if (o->aw_state == AWAITABLE_STATE_CLOSED) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
 
-    if (o->aw_state == 0) {
+    if (o->aw_state == AWAITABLE_STATE_INIT) {
         if (arg == NULL || arg == Py_None) {
             arg = o->aw_sendval;
         }
-        o->aw_state = 1;
+        o->aw_state = AWAITABLE_STATE_ITER;
     }
 
     result = gen_send_ex((PyGenObject*)o->aw_gen, arg, 0, 0);
     result = async_gen_unwrap_value(o->aw_gen, result);
 
     if (result == NULL) {
-        o->aw_state = 2;
+        o->aw_state = AWAITABLE_STATE_CLOSED;
     }
 
     return result;
@@ -1557,7 +1564,7 @@ async_gen_asend_throw(PyAsyncGenASend *o, PyObject *args)
 {
     PyObject *result;
 
-    if (o->aw_state == 2) {
+    if (o->aw_state == AWAITABLE_STATE_CLOSED) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
@@ -1566,7 +1573,7 @@ async_gen_asend_throw(PyAsyncGenASend *o, PyObject *args)
     result = async_gen_unwrap_value(o->aw_gen, result);
 
     if (result == NULL) {
-        o->aw_state = 2;
+        o->aw_state = AWAITABLE_STATE_CLOSED;
     }
 
     return result;
@@ -1576,7 +1583,7 @@ async_gen_asend_throw(PyAsyncGenASend *o, PyObject *args)
 static PyObject *
 async_gen_asend_close(PyAsyncGenASend *o, PyObject *args)
 {
-    o->aw_state = 2;
+    o->aw_state = AWAITABLE_STATE_CLOSED;
     Py_RETURN_NONE;
 }
 
@@ -1654,7 +1661,7 @@ async_gen_asend_new(PyAsyncGenObject *gen, PyObject *sendval)
         }
     }
     o->aw_gen = gen;
-    o->aw_state = 0;
+    o->aw_state = AWAITABLE_STATE_INIT;
     o->aw_sendval = sendval;
     Py_XINCREF(sendval);
     Py_INCREF(gen);
@@ -1763,12 +1770,13 @@ async_gen_athrow_send(PyAsyncGenAThrow *o, PyObject *arg)
     PyFrameObject *f = gen->gi_frame;
     PyObject *retval;
 
-    if (f == NULL || f->f_stacktop == NULL || o->ac_state == 2) {
+    if (f == NULL || f->f_stacktop == NULL ||
+            o->ac_state == AWAITABLE_STATE_CLOSED) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
 
-    if (o->ac_state == 0) {
+    if (o->ac_state == AWAITABLE_STATE_INIT) {
         if (o->ac_gen->ag_closed) {
             PyErr_SetNone(PyExc_StopIteration);
             return NULL;
@@ -1779,7 +1787,7 @@ async_gen_athrow_send(PyAsyncGenAThrow *o, PyObject *arg)
             return NULL;
         }
 
-        o->ac_state = 1;
+        o->ac_state = AWAITABLE_STATE_ITER;
 
         if (o->ac_args == NULL) {
             /* aclose() mode */
@@ -1816,7 +1824,7 @@ async_gen_athrow_send(PyAsyncGenAThrow *o, PyObject *arg)
         return retval;
     }
 
-    if (o->ac_state == 1) {
+    if (o->ac_state == AWAITABLE_STATE_ITER) {
         PyObject *retval = gen_send_ex((PyGenObject *)gen, arg, 0, 0);
         if (o->ac_args) {
             return async_gen_unwrap_value(o->ac_gen, retval);
@@ -1844,7 +1852,7 @@ check_error:
     if (PyErr_ExceptionMatches(PyExc_StopAsyncIteration)
         || PyErr_ExceptionMatches(PyExc_GeneratorExit)
     ) {
-        o->ac_state = 2;
+        o->ac_state = AWAITABLE_STATE_CLOSED;
         PyErr_Clear();          /* ignore these errors */
         PyErr_SetNone(PyExc_StopIteration);
     }
@@ -1857,12 +1865,12 @@ async_gen_athrow_throw(PyAsyncGenAThrow *o, PyObject *args)
 {
     PyObject *retval;
 
-    if (o->ac_state == 0) {
+    if (o->ac_state == AWAITABLE_STATE_INIT) {
         PyErr_SetString(PyExc_RuntimeError, NON_INIT_CORO_MSG);
         return NULL;
     }
 
-    if (o->ac_state == 2) {
+    if (o->ac_state == AWAITABLE_STATE_CLOSED) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
@@ -1892,7 +1900,7 @@ async_gen_athrow_iternext(PyAsyncGenAThrow *o)
 static PyObject *
 async_gen_athrow_close(PyAsyncGenAThrow *o, PyObject *args)
 {
-    o->ac_state = 2;
+    o->ac_state = AWAITABLE_STATE_CLOSED;
     Py_RETURN_NONE;
 }
 
@@ -1964,7 +1972,7 @@ async_gen_athrow_new(PyAsyncGenObject *gen, PyObject *args)
     }
     o->ac_gen = gen;
     o->ac_args = args;
-    o->ac_state = 0;
+    o->ac_state = AWAITABLE_STATE_INIT;
     Py_INCREF(gen);
     Py_XINCREF(args);
     return (PyObject*)o;
