@@ -1750,6 +1750,18 @@ class CoroutineTest(unittest.TestCase):
             run_async(run_list()),
             ([], [11, 21, 31]))
 
+    def test_comp_7(self):
+        async def f():
+            yield 1
+            yield 2
+            raise Exception('aaa')
+
+        async def run_list():
+            return [i async for i in f()]
+
+        with self.assertRaisesRegex(Exception, 'aaa'):
+            run_async(run_list())
+
     def test_copy(self):
         async def func(): pass
         coro = func()
