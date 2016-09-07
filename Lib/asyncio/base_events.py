@@ -353,7 +353,8 @@ class BaseEventLoop(events.AbstractEventLoop):
 
         self._asyncgens.add(ag)
 
-    def shutdown_asyncgens(self, *, timeout=30):
+    @coroutine
+    def shutdown_asyncgens(self):
         """Shutdown all active asynchronous generators.
 
         This method is synchronous, and should be called before calling
@@ -362,11 +363,6 @@ class BaseEventLoop(events.AbstractEventLoop):
         *timeout* is set to 30 seconds by default.  Pass ``None`` to
         disable the timeout.
         """
-        if self.is_running():
-            raise RuntimeError('Event loop is running.')
-        if self.is_closed():
-            raise RuntimeError('Event loop is closed.')
-
         self._asyncgens_shutdown_called = True
 
         if not len(self._asyncgens):
@@ -377,12 +373,9 @@ class BaseEventLoop(events.AbstractEventLoop):
             return_exceptions=True,
             loop=self)
 
-        if timeout is not None:
-            shutdown_coro = tasks.wait_for(shutdown_coro, timeout=timeout,
-                                           loop=self)
-
         self._asyncgens.clear()
-        results = self.run_until_complete(shutdown_coro)
+
+        results = yield from shutdown_coro
         for result in results:
             if isinstance(result, Exception):
                 self.call_exception_handler({
@@ -390,8 +383,6 @@ class BaseEventLoop(events.AbstractEventLoop):
                                'generator closing',
                     'exception': result
                 })
-            elif isinstance(result, BaseException):
-                raise result
 
     def run_forever(self):
         """Run until stop() is called."""

@@ -778,8 +778,7 @@ class AsyncGenAsyncioTest(unittest.TestCase):
 
         self.loop.run_until_complete(asyncio.sleep(0.1, loop=self.loop))
 
-        self.loop.shutdown_asyncgens()
-        self.loop.shutdown_asyncgens(timeout=0.1)
+        self.loop.run_until_complete(self.loop.shutdown_asyncgens())
         self.assertEqual(finalized, 2)
 
         # Silence warnings
@@ -810,7 +809,7 @@ class AsyncGenAsyncioTest(unittest.TestCase):
         self.loop.run_until_complete(asyncio.sleep(0.1, loop=self.loop))
 
         self.loop.set_exception_handler(logger)
-        self.loop.shutdown_asyncgens()
+        self.loop.run_until_complete(self.loop.shutdown_asyncgens())
 
         self.assertEqual(logged, 1)
 
