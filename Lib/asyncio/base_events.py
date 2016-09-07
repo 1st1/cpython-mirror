@@ -357,11 +357,7 @@ class BaseEventLoop(events.AbstractEventLoop):
     def shutdown_asyncgens(self):
         """Shutdown all active asynchronous generators.
 
-        This method is synchronous, and should be called before calling
-        loop.close().
-
-        *timeout* is set to 30 seconds by default.  Pass ``None`` to
-        disable the timeout.
+        This coroutine method should be scheduled before calling loop.close().
         """
         self._asyncgens_shutdown_called = True
 
