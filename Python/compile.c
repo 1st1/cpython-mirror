@@ -3752,7 +3752,7 @@ compiler_async_comprehension_generator(struct compiler *c,
     static PyObject *stop_aiter_error = NULL;
 
     comprehension_ty gen;
-    basicblock *start, *anchor, *skip, *if_cleanup, *try,
+    basicblock *anchor, *skip, *if_cleanup, *try,
                *after_try, *except, *try_cleanup;
     Py_ssize_t i, n;
 
@@ -3762,7 +3762,6 @@ compiler_async_comprehension_generator(struct compiler *c,
             return 0;
     }
 
-    start = compiler_new_block(c);
     try = compiler_new_block(c);
     after_try = compiler_new_block(c);
     try_cleanup = compiler_new_block(c);
@@ -3771,8 +3770,8 @@ compiler_async_comprehension_generator(struct compiler *c,
     if_cleanup = compiler_new_block(c);
     anchor = compiler_new_block(c);
 
-    if (start == NULL || skip == NULL || if_cleanup == NULL ||
-            anchor == NULL || try == NULL || after_try == NULL ||
+    if (skip == NULL || if_cleanup == NULL || anchor == NULL ||
+            try == NULL || after_try == NULL ||
             except == NULL || after_try == NULL) {
         return 0;
     }
