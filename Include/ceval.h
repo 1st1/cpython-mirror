@@ -217,6 +217,10 @@ PyAPI_FUNC(int) _PyEval_SliceIndex(PyObject *, Py_ssize_t *);
 PyAPI_FUNC(void) _PyEval_SignalAsyncExc(void);
 #endif
 
+#ifndef Py_LIMITED_API
+PyAPI_FUNC(void) _PyEval_FreeOpcodeCache(void *);
+#endif
+
 /* Masks and values used by FORMAT_VALUE opcode. */
 #define FVC_MASK      0x3
 #define FVC_NONE      0x0

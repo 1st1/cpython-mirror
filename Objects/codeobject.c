@@ -161,6 +161,7 @@ PyCode_New(int argcount, int kwonlyargcount,
     co->co_zombieframe = NULL;
     co->co_weakreflist = NULL;
     co->co_extra = NULL;
+    co->co_opt = 0;
     return co;
 }
 

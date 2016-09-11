@@ -1,4 +1,3 @@
-
 /* Execute compiled code */
 
 /* XXX TO DO:
@@ -215,7 +214,18 @@ static _Py_atomic_int pendingcalls_to_do = {0};
    Guarded by the GIL. */
 static int pending_async_exc = 0;
 
+
+/* Code access macros */
+#ifdef WORDS_BIGENDIAN
+    #define OPCODE(word) ((word) >> 8)
+    #define OPARG(word) ((word) & 255)
+#else
+    #define OPCODE(word) ((word) & 255)
+    #define OPARG(word) ((word) >> 8)
+#endif
+
 #include "ceval_gil.h"
+#include "ceval_cache.h"
 
 int
 PyEval_ThreadsInitialized(void)
@@ -746,6 +756,7 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
     const unsigned short *first_instr;
     PyObject *names;
     PyObject *consts;
+    _PyCodeObjectCache *cache = NULL;
 
 #ifdef LLTRACE
     _Py_IDENTIFIER(__ltrace__);
@@ -862,17 +873,9 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
 #define GETITEM(v, i) PyTuple_GetItem((v), (i))
 #endif
 
-/* Code access macros */
-
-#ifdef WORDS_BIGENDIAN
-    #define OPCODE(word) ((word) >> 8)
-    #define OPARG(word) ((word) & 255)
-#else
-    #define OPCODE(word) ((word) & 255)
-    #define OPARG(word) ((word) >> 8)
-#endif
 /* The integer overflow is checked by an assertion below. */
 #define INSTR_OFFSET()  (2*(int)(next_instr - first_instr))
+#define OPCACHE_OFFSET()  ((int)(next_instr - first_instr) - 1)
 #define NEXTOPARG()  do { \
         unsigned short word = *next_instr; \
         opcode = OPCODE(word); \
@@ -1083,6 +1086,23 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
     assert(stack_pointer != NULL);
     f->f_stacktop = NULL;       /* remains NULL unless yield suspends frame */
     f->f_executing = 1;
+
+    if (co->co_opt < OPCACHE_CALLS_THRESHOLD) {
+        co->co_opt++;
+        if (co->co_opt == OPCACHE_CALLS_THRESHOLD) {
+            if (init_opcode_cache(co)) {
+                goto exit_eval_frame;
+            }
+            if (_PyCode_GetExtra((PyObject *)co, 0, (void **)&cache)) {
+                goto exit_eval_frame;
+            }
+        }
+    }
+    else {
+        if (_PyCode_GetExtra((PyObject *)co, 0, (void **)&cache)) {
+            goto exit_eval_frame;
+        }
+    }
 
     if (co->co_flags & (CO_GENERATOR | CO_COROUTINE | CO_ASYNC_GENERATOR)) {
         if (!throwflag && f->f_exc_type != NULL && f->f_exc_type != Py_None) {
@@ -2350,6 +2370,21 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
             if (PyDict_CheckExact(f->f_globals)
                 && PyDict_CheckExact(f->f_builtins))
             {
+                _PyCodeObjectCache_LOAD_GLOBAL *lg_cache;
+                lg_cache = OPCACHE_GET_LOAD_GLOBAL(cache, OPCACHE_OFFSET());
+                if (lg_cache &&
+                    lg_cache->optimized &&
+                    lg_cache->globals_tag ==
+                        ((PyDictObject *)f->f_globals)->ma_version_tag &&
+                    lg_cache->builtins_tag ==
+                        ((PyDictObject *)f->f_builtins)->ma_version_tag)
+                {
+                    PyObject *res = lg_cache->ptr;
+                    Py_INCREF(res);
+                    PUSH(res);
+                    DISPATCH();
+                }
+
                 v = _PyDict_LoadGlobal((PyDictObject *)f->f_globals,
                                        (PyDictObject *)f->f_builtins,
                                        name);
@@ -2363,6 +2398,16 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
                     goto error;
                 }
                 Py_INCREF(v);
+
+                if (lg_cache) {
+                    lg_cache->globals_tag =
+                        ((PyDictObject *)f->f_globals)->ma_version_tag;
+                    lg_cache->builtins_tag =
+                        ((PyDictObject *)f->f_builtins)->ma_version_tag;
+                    lg_cache->ptr = v;
+                    lg_cache->optimized = 1;
+                }
+
             }
             else {
                 /* Slow-path if globals or builtins is not a dict */

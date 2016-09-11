@@ -224,7 +224,10 @@ new_threadstate(PyInterpreterState *interp, int init)
 
         tstate->coroutine_wrapper = NULL;
         tstate->in_coroutine_wrapper = 0;
-        tstate->co_extra_user_count = 0;
+
+        /* Index 1 is reserved for ceval opcode cache */
+        tstate->co_extra_user_count = 1;
+        tstate->co_extra_freefuncs[0] = _PyEval_FreeOpcodeCache;
 
         tstate->async_gen_firstiter = NULL;
         tstate->async_gen_finalizer = NULL;

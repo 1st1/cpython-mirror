@@ -16,6 +16,7 @@ typedef struct {
     int co_stacksize;		/* #entries needed for evaluation stack */
     int co_flags;		/* CO_..., see below */
     int co_firstlineno;   /* first source line number */
+    int co_opt;   /* Used by ceval opcode cache */
     PyObject *co_code;		/* instruction opcodes */
     PyObject *co_consts;	/* list (constants used) */
     PyObject *co_names;		/* list of strings (names used) */
