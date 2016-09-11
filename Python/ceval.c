@@ -341,6 +341,14 @@ static _Py_atomic_int eval_breaker = {0};
 static int pending_async_exc = 0;
 #endif /* WITH_THREAD */
 
+void
+_PyEval_Fini(void)
+{
+#if OPCACHE_COLLECT_STATS
+    opcode_cache_print_stats();
+#endif
+}
+
 /* This function is used to signal that async exceptions are waiting to be
    raised, therefore it is also useful in non-threaded builds. */
 
@@ -2372,17 +2380,21 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
             {
                 _PyCodeObjectCache_LOAD_GLOBAL *lg_cache;
                 lg_cache = OPCACHE_GET_LOAD_GLOBAL(cache, OPCACHE_OFFSET());
-                if (lg_cache &&
-                    lg_cache->optimized &&
-                    lg_cache->globals_tag ==
-                        ((PyDictObject *)f->f_globals)->ma_version_tag &&
-                    lg_cache->builtins_tag ==
-                        ((PyDictObject *)f->f_builtins)->ma_version_tag)
-                {
-                    PyObject *res = lg_cache->ptr;
-                    Py_INCREF(res);
-                    PUSH(res);
-                    DISPATCH();
+                if (lg_cache && lg_cache->optimized) {
+                    if (lg_cache->globals_tag ==
+                            ((PyDictObject *)f->f_globals)->ma_version_tag &&
+                        cache->builtins_tag ==
+                            ((PyDictObject *)f->f_builtins)->ma_version_tag)
+
+                    {
+                        PyObject *res = lg_cache->ptr;
+                        OPCACHE_STATS_HIT(LOAD_GLOBAL);
+                        Py_INCREF(res);
+                        PUSH(res);
+                        DISPATCH();
+                    } else {
+                        OPCACHE_STATS_MISS(LOAD_GLOBAL);
+                    }
                 }
 
                 v = _PyDict_LoadGlobal((PyDictObject *)f->f_globals,
@@ -2402,7 +2414,7 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
                 if (lg_cache) {
                     lg_cache->globals_tag =
                         ((PyDictObject *)f->f_globals)->ma_version_tag;
-                    lg_cache->builtins_tag =
+                    cache->builtins_tag =
                         ((PyDictObject *)f->f_builtins)->ma_version_tag;
                     lg_cache->ptr = v;
                     lg_cache->optimized = 1;

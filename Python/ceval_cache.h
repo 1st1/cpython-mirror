@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <inttypes.h>
 
 
 /* WARNING: This file is full of magic. */
@@ -8,6 +9,7 @@
     XX(LOAD_GLOBAL)
 
 
+#define OPCACHE_COLLECT_STATS   0
 #define OPCACHE_CALLS_THRESHOLD 1000
 
 
@@ -20,7 +22,6 @@
 typedef struct {
     OPCACHE_OPCODE_HEAD
     uint64_t globals_tag;
-    uint64_t builtins_tag;
     PyObject *ptr;
 } _PyCodeObjectCache_LOAD_GLOBAL;
 
@@ -44,6 +45,7 @@ Let's say we want to add cache to MY_OPCODE opcode:
 
 typedef struct {
     uint8_t *index;
+    uint64_t builtins_tag;
 
     OPCACHE_OPCODES(_OPCACHE_OPCODE_FIELD)
 } _PyCodeObjectCache;
@@ -150,3 +152,42 @@ _PyEval_FreeOpcodeCache(void *co_extra)
     PyMem_Free(cache->index);
     PyMem_Free(cache);
 }
+
+
+/* --- Stats --- */
+
+
+#if OPCACHE_COLLECT_STATS
+
+static uint64_t opcode_stats_hits[255];
+static uint64_t opcode_stats_misses[255];
+
+
+#define OPCACHE_STATS_HIT(opcode) do {                   \
+        opcode_stats_hits[opcode]++;                     \
+    } while (0);
+
+#define OPCACHE_STATS_MISS(opcode) do {                  \
+        opcode_stats_misses[opcode]++;                   \
+    } while (0);
+
+
+static void
+opcode_cache_print_stats(void)
+{
+#   define _OPCODE_PRINT_STAT(OPCODE)                              \
+    printf("--- " #OPCODE " ---\n");                               \
+    printf("hits:   %" PRIu64 "\n", opcode_stats_hits[OPCODE]);    \
+    printf("misses: %" PRIu64 "\n", opcode_stats_misses[OPCODE]);
+
+    OPCACHE_OPCODES(_OPCODE_PRINT_STAT)
+#   undef _OPCODE_PRINT_STAT
+}
+
+
+#else
+
+#define OPCACHE_STATS_HIT(opcode)
+#define OPCACHE_STATS_MISS(opcode)
+
+#endif

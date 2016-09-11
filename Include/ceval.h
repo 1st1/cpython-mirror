@@ -219,6 +219,7 @@ PyAPI_FUNC(void) _PyEval_SignalAsyncExc(void);
 
 #ifndef Py_LIMITED_API
 PyAPI_FUNC(void) _PyEval_FreeOpcodeCache(void *);
+PyAPI_FUNC(void) _PyEval_Fini(void);
 #endif
 
 /* Masks and values used by FORMAT_VALUE opcode. */

@@ -739,6 +739,8 @@ Py_FinalizeEx(void)
     }
 #endif
 
+    _PyEval_Fini();
+
     call_ll_exitfuncs();
     return status;
 }
