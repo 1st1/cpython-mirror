@@ -227,6 +227,7 @@ static int pending_async_exc = 0;
 #include "ceval_gil.h"
 #include "ceval_cache.h"
 
+
 int
 PyEval_ThreadsInitialized(void)
 {
@@ -2411,13 +2412,12 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
                 }
                 Py_INCREF(v);
 
-                if (lg_cache) {
+                if (!OPCACHE_UPDATE_LOAD_GLOBAL(lg_cache)) {
                     lg_cache->globals_tag =
                         ((PyDictObject *)f->f_globals)->ma_version_tag;
                     cache->builtins_tag =
                         ((PyDictObject *)f->f_builtins)->ma_version_tag;
                     lg_cache->ptr = v;
-                    lg_cache->optimized = 1;
                 }
 
             }
@@ -2863,7 +2863,8 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
         TARGET(LOAD_ATTR) {
             PyObject *name = GETITEM(names, oparg);
             PyObject *owner = TOP();
-            PyObject *res = PyObject_GetAttr(owner, name);
+            PyObject *res;
+            res = PyObject_GetAttr(owner, name);
             Py_DECREF(owner);
             SET_TOP(res);
             if (res == NULL)

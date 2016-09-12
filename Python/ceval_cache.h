@@ -9,8 +9,9 @@
     XX(LOAD_GLOBAL)
 
 
-#define OPCACHE_COLLECT_STATS   0
-#define OPCACHE_CALLS_THRESHOLD 1000
+#define OPCACHE_COLLECT_STATS       0
+#define OPCACHE_CALLS_THRESHOLD     1000
+#define OPCACHE_MISSES_BEFORE_DEOPT 20
 
 
 #define OPCACHE_OPCODE_HEAD                                     \
@@ -27,7 +28,6 @@ typedef struct {
 
 
 /*
-
 - How to implement cache for a new opcode?
 
 Let's say we want to add cache to MY_OPCODE opcode:
@@ -49,22 +49,6 @@ typedef struct {
 
     OPCACHE_OPCODES(_OPCACHE_OPCODE_FIELD)
 } _PyCodeObjectCache;
-
-
-#define _OPCACHE_DEFINE_GETTER(OPCODE)                              \
-    static inline _PyCodeObjectCache_##OPCODE *                     \
-    OPCACHE_GET_##OPCODE(_PyCodeObjectCache *cache, int offset)     \
-    {                                                               \
-        Py_ssize_t position;                                        \
-        if (cache == NULL) {                                        \
-            return NULL;                                            \
-        }                                                           \
-        position = cache->index[offset];                            \
-        assert(cache->OPCODE##_size > position);                    \
-        return &cache->OPCODE##_cache[position];                    \
-    }
-OPCACHE_OPCODES(_OPCACHE_DEFINE_GETTER)
-#undef _OPCACHE_DEFINE_GETTER
 
 
 static int
@@ -159,9 +143,19 @@ _PyEval_FreeOpcodeCache(void *co_extra)
 
 #if OPCACHE_COLLECT_STATS
 
+static uint64_t opcode_stats_opts[255];
+static uint64_t opcode_stats_deopts[255];
 static uint64_t opcode_stats_hits[255];
 static uint64_t opcode_stats_misses[255];
 
+
+#define _OPCACHE_STATS_OPT(opcode) do {                  \
+        opcode_stats_opts[opcode]++;                     \
+    } while (0);
+
+#define _OPCACHE_STATS_DEOPT(opcode) do {                \
+        opcode_stats_deopts[opcode]++;                   \
+    } while (0);
 
 #define OPCACHE_STATS_HIT(opcode) do {                   \
         opcode_stats_hits[opcode]++;                     \
@@ -177,8 +171,10 @@ opcode_cache_print_stats(void)
 {
 #   define _OPCODE_PRINT_STAT(OPCODE)                              \
     printf("--- " #OPCODE " ---\n");                               \
+    printf("opts:   %" PRIu64 "\n", opcode_stats_opts[OPCODE]);    \
+    printf("deopts: %" PRIu64 "\n", opcode_stats_deopts[OPCODE]);  \
     printf("hits:   %" PRIu64 "\n", opcode_stats_hits[OPCODE]);    \
-    printf("misses: %" PRIu64 "\n", opcode_stats_misses[OPCODE]);
+    printf("misses: %" PRIu64 "\n\n", opcode_stats_misses[OPCODE]);
 
     OPCACHE_OPCODES(_OPCODE_PRINT_STAT)
 #   undef _OPCODE_PRINT_STAT
@@ -187,7 +183,62 @@ opcode_cache_print_stats(void)
 
 #else
 
+#define _OPCACHE_STATS_OPT(opcode)
+#define _OPCACHE_STATS_DEOPT(opcode)
+
 #define OPCACHE_STATS_HIT(opcode)
 #define OPCACHE_STATS_MISS(opcode)
 
 #endif
+
+
+#define _OPCACHE_DEFINE_GETTER(OPCODE)                              \
+    static inline _PyCodeObjectCache_##OPCODE *                     \
+    OPCACHE_GET_##OPCODE(_PyCodeObjectCache *cache, int offset)     \
+    {                                                               \
+        Py_ssize_t position;                                        \
+        _PyCodeObjectCache_##OPCODE *opcache;                       \
+        if (cache == NULL) {                                        \
+            return NULL;                                            \
+        }                                                           \
+        position = cache->index[offset];                            \
+        assert(cache->OPCODE##_size > position);                    \
+        opcache = &cache->OPCODE##_cache[position];                 \
+        return opcache->optimized >= 0 ? opcache : NULL;            \
+    }
+OPCACHE_OPCODES(_OPCACHE_DEFINE_GETTER)
+#undef _OPCACHE_DEFINE_GETTER
+
+
+#define _OPCACHE_DEFINE_MAYBE_DEOPT(OPCODE)                         \
+    static inline void                                              \
+    OPCACHE_MAYBE_DEOPT_##OPCODE(                                   \
+        _PyCodeObjectCache_##OPCODE *opcache)                       \
+    {                                                               \
+        if (opcache->optimized >= 0) {                              \
+            opcache->optimized--;                                   \
+            if (opcache->optimized == 0) {                          \
+                opcache->optimized = -1;                            \
+                _OPCACHE_STATS_DEOPT(OPCODE);                       \
+            }                                                       \
+        }                                                           \
+    }
+OPCACHE_OPCODES(_OPCACHE_DEFINE_MAYBE_DEOPT)
+#undef _OPCACHE_DEFINE_MAYBE_DEOPT
+
+
+#define _OPCACHE_DEFINE_UPDATER(OPCODE)                             \
+    static inline int                                               \
+    OPCACHE_UPDATE_##OPCODE(_PyCodeObjectCache_##OPCODE *opcache)   \
+    {                                                               \
+        if (opcache == NULL) return -1;                             \
+        if (opcache->optimized == 0) { /* first time */             \
+            opcache->optimized = OPCACHE_MISSES_BEFORE_DEOPT;       \
+            _OPCACHE_STATS_OPT(OPCODE);                             \
+        } else {                                                    \
+            OPCACHE_MAYBE_DEOPT_##OPCODE(opcache);                  \
+        }                                                           \
+        return 0;                                                   \
+    }
+OPCACHE_OPCODES(_OPCACHE_DEFINE_UPDATER)
+#undef _OPCACHE_DEFINE_UPDATER

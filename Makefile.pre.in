@@ -863,7 +863,7 @@ Objects/setobject.o: $(srcdir)/Objects/stringlib/eq.h
 $(OPCODETARGETS_H): $(OPCODETARGETGEN_FILES)
 	$(PYTHON_FOR_GEN) $(OPCODETARGETGEN) $(OPCODETARGETS_H)
 
-Python/ceval.o: $(OPCODETARGETS_H) $(srcdir)/Python/ceval_gil.h
+Python/ceval.o: $(OPCODETARGETS_H) $(srcdir)/Python/ceval_gil.h $(srcdir)/Python/ceval_cache.h
 
 Python/frozen.o: Python/importlib.h Python/importlib_external.h
 
