@@ -51,6 +51,17 @@ typedef struct {
 } _PyCodeObjectCache;
 
 
+#if OPCACHE_COLLECT_STATS
+
+static uint64_t opcode_stats_opts[255];
+static uint64_t opcode_stats_deopts[255];
+static uint64_t opcode_stats_hits[255];
+static uint64_t opcode_stats_misses[255];
+static uint64_t opcode_stats_memory = 0;
+
+#endif
+
+
 static int
 init_opcode_cache(PyCodeObject *co)
 {
@@ -108,6 +119,17 @@ init_opcode_cache(PyCodeObject *co)
         goto error;
     }
 
+#   if OPCACHE_COLLECT_STATS
+    opcode_stats_memory += sizeof(_PyCodeObjectCache);
+#   define _OPCODE_SIZE(OPCODE)                           \
+    if (OPCODE##_size) {                                  \
+        opcode_stats_memory += OPCODE##_size *            \
+            sizeof(_PyCodeObjectCache_##OPCODE);          \
+    }
+    OPCACHE_OPCODES(_OPCODE_SIZE)
+#   undef _OPCODE_SIZE
+#   endif
+
     return 0;
 
 error:
@@ -143,12 +165,6 @@ _PyEval_FreeOpcodeCache(void *co_extra)
 
 #if OPCACHE_COLLECT_STATS
 
-static uint64_t opcode_stats_opts[255];
-static uint64_t opcode_stats_deopts[255];
-static uint64_t opcode_stats_hits[255];
-static uint64_t opcode_stats_misses[255];
-
-
 #define _OPCACHE_STATS_OPT(opcode) do {                  \
         opcode_stats_opts[opcode]++;                     \
     } while (0);
@@ -169,6 +185,9 @@ static uint64_t opcode_stats_misses[255];
 static void
 opcode_cache_print_stats(void)
 {
+    printf("=== OPCODE CACHE === \n");
+    printf("memory: %" PRIu64 "\n", opcode_stats_memory);
+
 #   define _OPCODE_PRINT_STAT(OPCODE)                              \
     printf("--- " #OPCODE " ---\n");                               \
     printf("opts:   %" PRIu64 "\n", opcode_stats_opts[OPCODE]);    \
