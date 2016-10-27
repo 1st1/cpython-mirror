@@ -1449,6 +1449,7 @@ task_all_tasks(PyObject *loop)
         }
         if (task_loop == loop) {
             if (PySet_Add(set, task) == -1) {
+                Py_DECREF(task_loop);
                 Py_DECREF(task);
                 goto fail;
             }
