@@ -1789,7 +1789,7 @@ TaskObj_dealloc(PyObject *self)
 }
 
 static PyObject *
-TaskObj_SetErrorSoon(TaskObj *task, PyObject *et, const char *format, ...)
+task_set_error_soon(TaskObj *task, PyObject *et, const char *format, ...)
 {
     PyObject* msg;
 
@@ -1949,7 +1949,7 @@ task_step_impl(TaskObj *task, PyObject *exc)
         if (result == (PyObject*)task) {
             /* We have a task that wants to await on itself */
             PyObject *res;
-            res = TaskObj_SetErrorSoon(
+            res = task_set_error_soon(
                 task, PyExc_RuntimeError,
                 "Task cannot await on itself: %R", task);
             Py_DECREF(result);
@@ -2105,7 +2105,7 @@ task_step_impl(TaskObj *task, PyObject *exc)
     if (res == 1) {
         /* `result` is a generator */
         PyObject *ret;
-        ret = TaskObj_SetErrorSoon(
+        ret = task_set_error_soon(
             task, PyExc_RuntimeError,
             "yield was used instead of yield from for "
             "generator in task %R with %S", task, result);
@@ -2115,11 +2115,11 @@ task_step_impl(TaskObj *task, PyObject *exc)
 
     /* The `result` is none of the above */
     Py_DECREF(result);
-    return TaskObj_SetErrorSoon(
+    return task_set_error_soon(
         task, PyExc_RuntimeError, "Task got bad yield: %R", result);
 
 yield_insteadof_yf:
-    o = TaskObj_SetErrorSoon(
+    o = task_set_error_soon(
         task, PyExc_RuntimeError,
         "yield was used instead of yield from "
         "in task %R with %R",
@@ -2128,7 +2128,7 @@ yield_insteadof_yf:
     return o;
 
 different_loop:
-    o = TaskObj_SetErrorSoon(
+    o = task_set_error_soon(
         task, PyExc_RuntimeError,
         "Task %R got Future %R attached to a different loop",
         task, result);
