@@ -1767,7 +1767,7 @@ class TaskTests(test_utils.TestCase):
 
     @unittest.skipUnless(PY34,
                          'need python 3.4 or later')
-    def test_log_destroyed_pending_task(self):
+    def _test_log_destroyed_pending_task(self):
         @asyncio.coroutine
         def kill_me(loop):
             future = asyncio.Future(loop=loop)
