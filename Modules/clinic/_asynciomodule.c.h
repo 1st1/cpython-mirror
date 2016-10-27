@@ -2,6 +2,44 @@
 preserve
 [clinic start generated code]*/
 
+PyDoc_STRVAR(_asyncio_Future___init____doc__,
+"Future(*, loop=None)\n"
+"--\n"
+"\n"
+"This class is *almost* compatible with concurrent.futures.Future.\n"
+"\n"
+"    Differences:\n"
+"\n"
+"    - result() and exception() do not take a timeout argument and\n"
+"      raise an exception when the future isn\'t done yet.\n"
+"\n"
+"    - Callbacks registered with add_done_callback() are always called\n"
+"      via the event loop\'s call_soon_threadsafe().\n"
+"\n"
+"    - This class is not compatible with the wait() and as_completed()\n"
+"      methods in the concurrent.futures package.");
+
+static int
+_asyncio_Future___init___impl(FutureObj *self, PyObject *loop);
+
+static int
+_asyncio_Future___init__(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    int return_value = -1;
+    static const char * const _keywords[] = {"loop", NULL};
+    static _PyArg_Parser _parser = {"|$O:Future", _keywords, 0};
+    PyObject *loop = NULL;
+
+    if (!_PyArg_ParseTupleAndKeywordsFast(args, kwargs, &_parser,
+        &loop)) {
+        goto exit;
+    }
+    return_value = _asyncio_Future___init___impl((FutureObj *)self, loop);
+
+exit:
+    return return_value;
+}
+
 PyDoc_STRVAR(_asyncio_Future_result__doc__,
 "result($self, /)\n"
 "--\n"
@@ -154,6 +192,34 @@ static PyObject *
 _asyncio_Future_done(FutureObj *self, PyObject *Py_UNUSED(ignored))
 {
     return _asyncio_Future_done_impl(self);
+}
+
+PyDoc_STRVAR(_asyncio_Task___init____doc__,
+"Task(coro, *, loop=None)\n"
+"--\n"
+"\n"
+"A coroutine wrapped in a Future.");
+
+static int
+_asyncio_Task___init___impl(TaskObj *self, PyObject *coro, PyObject *loop);
+
+static int
+_asyncio_Task___init__(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    int return_value = -1;
+    static const char * const _keywords[] = {"coro", "loop", NULL};
+    static _PyArg_Parser _parser = {"O|$O:Task", _keywords, 0};
+    PyObject *coro;
+    PyObject *loop = NULL;
+
+    if (!_PyArg_ParseTupleAndKeywordsFast(args, kwargs, &_parser,
+        &coro, &loop)) {
+        goto exit;
+    }
+    return_value = _asyncio_Task___init___impl((TaskObj *)self, coro, loop);
+
+exit:
+    return return_value;
 }
 
 PyDoc_STRVAR(_asyncio_Task_current_task__doc__,
@@ -342,4 +408,4 @@ _asyncio_Task_print_stack(TaskObj *self, PyObject **args, Py_ssize_t nargs, PyOb
 exit:
     return return_value;
 }
-/*[clinic end generated code: output=d7351dfc16c5c7d6 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=bdc0b4f86cd6e509 input=a9049054013a1b77]*/

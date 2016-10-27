@@ -313,17 +313,32 @@ future_cancel(FutureObj *fut)
     Py_RETURN_TRUE;
 }
 
+/*[clinic input]
+_asyncio.Future.__init__
+
+    *
+    loop: 'O' = NULL
+
+This class is *almost* compatible with concurrent.futures.Future.
+
+    Differences:
+
+    - result() and exception() do not take a timeout argument and
+      raise an exception when the future isn't done yet.
+
+    - Callbacks registered with add_done_callback() are always called
+      via the event loop's call_soon_threadsafe().
+
+    - This class is not compatible with the wait() and as_completed()
+      methods in the concurrent.futures package.
+[clinic start generated code]*/
+
 static int
-FutureObj_init(FutureObj *fut, PyObject *args, PyObject *kwds)
+_asyncio_Future___init___impl(FutureObj *self, PyObject *loop)
+/*[clinic end generated code: output=9ed75799eaccb5d6 input=8e1681f23605be2d]*/
+
 {
-    static char *kwlist[] = {"loop", NULL};
-    PyObject *loop = NULL;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|$O", kwlist, &loop)) {
-        return -1;
-    }
-
-    return future_init(fut, loop);
+    return future_init(self, loop);
 }
 
 static int
@@ -861,7 +876,7 @@ static PyTypeObject FutureType = {
     .tp_repr = (reprfunc)FutureObj_repr,
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE
         | Py_TPFLAGS_HAVE_FINALIZE,
-    .tp_doc = "Fast asyncio.Future implementation.",
+    .tp_doc = _asyncio_Future___init____doc__,
     .tp_traverse = (traverseproc)FutureObj_traverse,
     .tp_clear = (inquiry)FutureObj_clear,
     .tp_weaklistoffset = offsetof(FutureObj, fut_weakreflist),
@@ -869,7 +884,7 @@ static PyTypeObject FutureType = {
     .tp_methods = FutureType_methods,
     .tp_getset = FutureType_getsetlist,
     .tp_dictoffset = offsetof(FutureObj, dict),
-    .tp_init = (initproc)FutureObj_init,
+    .tp_init = (initproc)_asyncio_Future___init__,
     .tp_new = PyType_GenericNew,
     .tp_finalize = (destructor)FutureObj_finalize,
 };
@@ -1251,37 +1266,39 @@ task_call_step_soon(TaskObj *task, PyObject *arg)
     return 0;
 }
 
+/*[clinic input]
+_asyncio.Task.__init__
+
+    coro: 'O'
+    *
+    loop: 'O' = NULL
+
+A coroutine wrapped in a Future.
+[clinic start generated code]*/
+
 static int
-TaskObj_init(TaskObj *task, PyObject *args, PyObject *kwds)
+_asyncio_Task___init___impl(TaskObj *self, PyObject *coro, PyObject *loop)
+/*[clinic end generated code: output=9f24774c2287fc2f input=71d8d28c201a18cd]*/
 {
-    static char *kwlist[] = {"coro", "loop", NULL};
-    PyObject *loop = NULL;
-    PyObject *coro = NULL;
     PyObject *res;
     _Py_IDENTIFIER(add);
 
-    if (!PyArg_ParseTupleAndKeywords(
-            args, kwds, "O|$O", kwlist, &coro, &loop))
-    {
+    if (future_init((FutureObj*)self, loop)) {
         return -1;
     }
 
-    if (future_init((FutureObj*)task, loop)) {
-        return -1;
-    }
-
-    task->task_fut_waiter = NULL;
-    task->task_must_cancel = 0;
-    task->task_log_destroy_pending = 1;
+    self->task_fut_waiter = NULL;
+    self->task_must_cancel = 0;
+    self->task_log_destroy_pending = 1;
 
     Py_INCREF(coro);
-    task->task_coro = coro;
+    self->task_coro = coro;
 
-    if (task_call_step_soon(task, NULL)) {
+    if (task_call_step_soon(self, NULL)) {
         return -1;
     }
 
-    res = _PyObject_CallMethodId(all_tasks, &PyId_add, "O", task, NULL);
+    res = _PyObject_CallMethodId(all_tasks, &PyId_add, "O", self, NULL);
     if (res == NULL) {
         return -1;
     }
@@ -1733,7 +1750,7 @@ static PyTypeObject TaskType = {
     .tp_repr = (reprfunc)FutureObj_repr,
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE
         | Py_TPFLAGS_HAVE_FINALIZE,
-    .tp_doc = "A coroutine wrapped in a Future.",
+    .tp_doc = _asyncio_Task___init____doc__,
     .tp_traverse = (traverseproc)TaskObj_traverse,
     .tp_clear = (inquiry)TaskObj_clear,
     .tp_weaklistoffset = offsetof(TaskObj, task_weakreflist),
@@ -1741,7 +1758,7 @@ static PyTypeObject TaskType = {
     .tp_methods = TaskType_methods,
     .tp_getset = TaskType_getsetlist,
     .tp_dictoffset = offsetof(TaskObj, dict),
-    .tp_init = (initproc)TaskObj_init,
+    .tp_init = (initproc)_asyncio_Task___init__,
     .tp_new = PyType_GenericNew,
     .tp_finalize = (destructor)TaskObj_finalize,
 };
