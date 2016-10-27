@@ -1508,7 +1508,74 @@ TaskObj_print_stack(TaskObj *task, PyObject *args, PyObject *kwds)
         asyncio_task_print_stack_func, task, limit, file, NULL);
 }
 
-static void TaskObj_dealloc(PyObject *self);
+static void
+TaskObj_finalize(TaskObj *task)
+{
+    _Py_IDENTIFIER(call_exception_handler);
+    _Py_IDENTIFIER(task);
+    _Py_IDENTIFIER(message);
+    _Py_IDENTIFIER(source_traceback);
+
+    PyObject *message = NULL;
+    PyObject *context = NULL;
+    PyObject *func = NULL;
+    PyObject *res = NULL;
+
+    PyObject *error_type, *error_value, *error_traceback;
+
+    if (task->task_state != STATE_PENDING || !task->task_log_destroy_pending) {
+        goto done;
+    }
+
+    /* Save the current exception, if any. */
+    PyErr_Fetch(&error_type, &error_value, &error_traceback);
+
+    context = PyDict_New();
+    if (context == NULL) {
+        goto finally;
+    }
+
+    message = PyUnicode_FromString("Task was destroyed but it is pending!");
+    if (message == NULL) {
+        goto finally;
+    }
+
+    if (_PyDict_SetItemId(context, &PyId_message, message) < 0 ||
+        _PyDict_SetItemId(context, &PyId_task, (PyObject*)task) < 0)
+    {
+        goto finally;
+    }
+
+    if (task->task_source_tb != NULL) {
+        if (_PyDict_SetItemId(context, &PyId_source_traceback,
+                              task->task_source_tb) < 0)
+        {
+            goto finally;
+        }
+    }
+
+    func = _PyObject_GetAttrId(task->task_loop, &PyId_call_exception_handler);
+    if (func != NULL) {
+        res = _PyObject_CallArg1(func, context);
+        if (res == NULL) {
+            PyErr_WriteUnraisable(func);
+        }
+    }
+
+finally:
+    Py_CLEAR(context);
+    Py_CLEAR(message);
+    Py_CLEAR(func);
+    Py_CLEAR(res);
+
+    /* Restore the saved exception. */
+    PyErr_Restore(error_type, error_value, error_traceback);
+
+done:
+    FutureObj_finalize((FutureObj*)task);
+}
+
+static void TaskObj_dealloc(PyObject *);  /* Needs Task_CheckExact */
 
 static PyMethodDef TaskType_methods[] = {
     {"_repr_info", (PyCFunction)TaskObj__repr_info, METH_NOARGS, NULL},
@@ -1594,10 +1661,33 @@ static PyTypeObject TaskType = {
     .tp_dictoffset = offsetof(TaskObj, dict),
     .tp_init = (initproc)TaskObj_init,
     .tp_new = PyType_GenericNew,
-    .tp_finalize = (destructor)FutureObj_finalize,
+    .tp_finalize = (destructor)TaskObj_finalize,
 };
 
 #define Task_CheckExact(obj) (Py_TYPE(obj) == &TaskType)
+
+static void
+TaskObj_dealloc(PyObject *self)
+{
+    TaskObj *task = (TaskObj *)self;
+
+    if (Task_CheckExact(self)) {
+        /* When fut is subclass of Task, finalizer is called from
+         * subtype_dealloc.
+         */
+        if (PyObject_CallFinalizerFromDealloc(self) < 0) {
+            // resurrected.
+            return;
+        }
+    }
+
+    if (task->task_weakreflist != NULL) {
+        PyObject_ClearWeakRefs(self);
+    }
+
+    (void)TaskObj_clear(task);
+    Py_TYPE(task)->tp_free(task);
+}
 
 static PyObject *
 TaskObj_SetErrorSoon(TaskObj *task, PyObject *et, const char *format, ...)
@@ -2039,29 +2129,6 @@ task_wakeup(TaskObj *task, PyObject *o)
         Py_DECREF(fut_result);
         return task_step(task, NULL);
     }
-}
-
-static void
-TaskObj_dealloc(PyObject *self)
-{
-    TaskObj *task = (TaskObj *)self;
-
-    if (Task_CheckExact(self)) {
-        /* When fut is subclass of Task, finalizer is called from
-         * subtype_dealloc.
-         */
-        if (PyObject_CallFinalizerFromDealloc(self) < 0) {
-            // resurrected.
-            return;
-        }
-    }
-
-    if (task->task_weakreflist != NULL) {
-        PyObject_ClearWeakRefs(self);
-    }
-
-    (void)TaskObj_clear(task);
-    Py_TYPE(task)->tp_free(task);
 }
 
 
