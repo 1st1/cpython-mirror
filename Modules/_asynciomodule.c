@@ -1105,7 +1105,7 @@ TaskSendMethWrapper_clear(TaskSendMethWrapper *o)
 static void
 TaskSendMethWrapper_dealloc(TaskSendMethWrapper *o)
 {
-    _PyObject_GC_UNTRACK(o);
+    PyObject_GC_UnTrack(o);
     (void)TaskSendMethWrapper_clear(o);
     Py_TYPE(o)->tp_free(o);
 }
