@@ -843,7 +843,7 @@ static PyMethodDef FutureType_methods[] = {
     {"_result", (getter)FutureObj_get_result, NULL, NULL},                    \
     {"_exception", (getter)FutureObj_get_exception, NULL, NULL},              \
     {"_log_traceback", (getter)FutureObj_get_log_traceback, NULL, NULL},      \
-    {"_source_traceback", (getter)FutureObj_get_source_traceback, NULL, NULL},\
+    {"_source_traceback", (getter)FutureObj_get_source_traceback, NULL, NULL},
 
 static PyGetSetDef FutureType_getsetlist[] = {
     FUTURE_COMMON_GETSETLIST
