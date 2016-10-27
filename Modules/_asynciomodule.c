@@ -2217,8 +2217,24 @@ task_wakeup(TaskObj *task, PyObject *o)
 /*********************** Module **************************/
 
 
+static void
+module_free(void *m)
+{
+    Py_CLEAR(current_tasks);
+    Py_CLEAR(all_tasks);
+    Py_CLEAR(traceback_extract_stack);
+    Py_CLEAR(asyncio_get_event_loop);
+    Py_CLEAR(asyncio_future_repr_info_func);
+    Py_CLEAR(asyncio_task_repr_info_func);
+    Py_CLEAR(asyncio_task_get_stack_func);
+    Py_CLEAR(asyncio_task_print_stack_func);
+    Py_CLEAR(asyncio_InvalidStateError);
+    Py_CLEAR(asyncio_CancelledError);
+    Py_CLEAR(inspect_isgenerator);
+}
+
 static int
-init_module(void)
+module_init(void)
 {
     PyObject *module = NULL;
     PyObject *cls;
@@ -2273,17 +2289,7 @@ init_module(void)
 
 fail:
     Py_CLEAR(module);
-    Py_CLEAR(current_tasks);
-    Py_CLEAR(all_tasks);
-    Py_CLEAR(traceback_extract_stack);
-    Py_CLEAR(asyncio_get_event_loop);
-    Py_CLEAR(asyncio_future_repr_info_func);
-    Py_CLEAR(asyncio_task_repr_info_func);
-    Py_CLEAR(asyncio_task_get_stack_func);
-    Py_CLEAR(asyncio_task_print_stack_func);
-    Py_CLEAR(asyncio_InvalidStateError);
-    Py_CLEAR(asyncio_CancelledError);
-    Py_CLEAR(inspect_isgenerator);
+    module_free(NULL);
     return -1;
 
 #undef WITH_MOD
@@ -2301,14 +2307,14 @@ static struct PyModuleDef _asynciomodule = {
     NULL,                       /* m_slots */
     NULL,                       /* m_traverse */
     NULL,                       /* m_clear */
-    NULL                        /* m_free */
+    (freefunc)module_free       /* m_free */
 };
 
 
 PyMODINIT_FUNC
 PyInit__asyncio(void)
 {
-    if (init_module() < 0) {
+    if (module_init() < 0) {
         return NULL;
     }
     if (PyType_Ready(&FutureType) < 0) {
