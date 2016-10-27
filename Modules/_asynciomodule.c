@@ -332,7 +332,6 @@ This class is *almost* compatible with concurrent.futures.Future.
     - This class is not compatible with the wait() and as_completed()
       methods in the concurrent.futures package.
 [clinic start generated code]*/
-
 static int
 _asyncio_Future___init___impl(FutureObj *self, PyObject *loop)
 /*[clinic end generated code: output=9ed75799eaccb5d6 input=8e1681f23605be2d]*/
