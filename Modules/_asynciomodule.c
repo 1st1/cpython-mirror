@@ -1170,7 +1170,7 @@ TaskSendMethWrapper_new(TaskObj *task, PyObject *arg)
     Py_XINCREF(arg);
     o->sw_arg = arg;
 
-    _PyObject_GC_TRACK(o);
+    PyObject_GC_Track(o);
     return (PyObject*) o;
 }
 
