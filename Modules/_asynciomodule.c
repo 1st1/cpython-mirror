@@ -1963,7 +1963,8 @@ task_step_impl(TaskObj *task, PyObject *exc)
             result = _PyObject_CallMethodIdObjArgs(
                 coro, &PyId_send, Py_None, NULL);
         }
-    } else {
+    }
+    else {
         result = _PyObject_CallMethodIdObjArgs(
             coro, &PyId_throw, exc, NULL);
         if (clear_exc) {
@@ -2109,7 +2110,8 @@ task_step_impl(TaskObj *task, PyObject *exc)
             if (oloop != task->task_loop) {
                 Py_DECREF(oloop);
                 goto different_loop;
-            } else {
+            }
+            else {
                 Py_DECREF(oloop);
             }
 
