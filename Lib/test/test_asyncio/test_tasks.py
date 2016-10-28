@@ -1,5 +1,6 @@
 """Tests for tasks.py."""
 
+import collections
 import contextlib
 import functools
 import io
@@ -1975,6 +1976,65 @@ class BaseTaskTests:
 class CTask_CFuture_Tests(BaseTaskTests, test_utils.TestCase):
     Task = getattr(tasks, '_CTask', None)
     Future = getattr(futures, '_CFuture', None)
+
+
+@unittest.skipUnless(hasattr(futures, '_CFuture'),
+                     'requires the C _asyncio module')
+class SubCTask_SubCFuture_Tests(BaseTaskTests, test_utils.TestCase):
+    BaseTask = getattr(tasks, '_CTask', None)
+    BaseFuture = getattr(futures, '_CFuture', None)
+
+    class Task(BaseTask):
+        def __init__(self, *args, **kwargs):
+            self.calls = collections.defaultdict(lambda: 0)
+            super().__init__(*args, **kwargs)
+
+        def _step(self, *args):
+            self.calls['_step'] += 1
+            return super()._step(*args)
+
+        def _wakeup(self, *args):
+            self.calls['_wakeup'] += 1
+            return super()._wakeup(*args)
+
+        def add_done_callback(self, *args):
+            self.calls['add_done_callback'] += 1
+            return super().add_done_callback(*args)
+
+    class Future(BaseFuture):
+        def __init__(self, *args, **kwargs):
+            self.calls = collections.defaultdict(lambda: 0)
+            super().__init__(*args, **kwargs)
+
+        def add_done_callback(self, *args):
+            self.calls['add_done_callback'] += 1
+            return super().add_done_callback(*args)
+
+    # Disable the "test_task_source_traceback" test
+    # (the test is hardcoded for a particular call stack, which
+    # is slightly different for Task subclasses)
+    test_task_source_traceback = None
+
+    def test_subclasses_ctask_cfuture(self):
+        fut = self.Future(loop=self.loop)
+        self.assertIsInstance(fut, asyncio.Future)
+
+        async def func():
+            self.loop.call_soon(lambda: fut.set_result('spam'))
+            return await fut
+
+        task = self.Task(func(), loop=self.loop)
+        self.assertIsInstance(task, asyncio.Task)
+
+        result = self.loop.run_until_complete(task)
+
+        self.assertEqual(result, 'spam')
+
+        self.assertEqual(
+            dict(task.calls),
+            {'_step': 2, '_wakeup': 1, 'add_done_callback': 1})
+
+        self.assertEqual(dict(fut.calls), {'add_done_callback': 1})
 
 
 @unittest.skipUnless(hasattr(futures, '_CFuture'),

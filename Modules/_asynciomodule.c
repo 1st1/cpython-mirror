@@ -9,11 +9,13 @@ module _asyncio
 
 
 /* identifiers used from some functions */
+_Py_IDENTIFIER(add_done_callback);
 _Py_IDENTIFIER(call_soon);
 _Py_IDENTIFIER(cancel);
 _Py_IDENTIFIER(send);
 _Py_IDENTIFIER(throw);
-_Py_IDENTIFIER(add_done_callback);
+_Py_IDENTIFIER(_step);
+_Py_IDENTIFIER(_wakeup);
 
 
 /* State of the _asyncio module */
@@ -1088,6 +1090,9 @@ class _asyncio.Task "TaskObj *" "&Task_Type"
 [clinic start generated code]*/
 /*[clinic end generated code: output=da39a3ee5e6b4b0d input=719dcef0fcc03b37]*/
 
+static int task_call_step_soon(TaskObj *, PyObject *);
+static inline PyObject * task_call_wakeup(TaskObj *, PyObject *);
+static inline PyObject * task_call_step(TaskObj *, PyObject *);
 static PyObject * task_wakeup(TaskObj *, PyObject *);
 static PyObject * task_step(TaskObj *, PyObject *);
 
@@ -1113,7 +1118,7 @@ static PyObject *
 TaskSendMethWrapper_call(TaskSendMethWrapper *o,
                          PyObject *args, PyObject *kwds)
 {
-    return task_step(o->sw_task, o->sw_arg);
+    return task_call_step(o->sw_task, o->sw_arg);
 }
 
 static int
@@ -1185,7 +1190,7 @@ TaskWakeupMethWrapper_call(TaskWakeupMethWrapper *o,
         return NULL;
     }
 
-    return task_wakeup(o->ww_task, fut);
+    return task_call_wakeup(o->ww_task, fut);
 }
 
 static int
@@ -1241,29 +1246,6 @@ TaskWakeupMethWrapper_new(TaskObj *task)
 }
 
 /* ----- Task */
-
-static int
-task_call_step_soon(TaskObj *task, PyObject *arg)
-{
-    PyObject *handle;
-    PyObject *cb = TaskSendMethWrapper_new(task, arg);
-
-    if (cb == NULL) {
-        return -1;
-    }
-
-    handle = _PyObject_CallMethodId(
-        task->task_loop, &PyId_call_soon, "O", cb, NULL);
-
-    Py_DECREF(cb);
-
-    if (handle == NULL) {
-        return -1;
-    }
-
-    Py_DECREF(handle);
-    return 0;
-}
 
 /*[clinic input]
 _asyncio.Task.__init__
@@ -1632,6 +1614,10 @@ TaskObj_step(TaskObj *task, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
+    if (exc == Py_None) {
+        exc = NULL;
+    }
+
     return task_step(task, exc);
 }
 
@@ -1788,6 +1774,56 @@ TaskObj_dealloc(PyObject *self)
     Py_TYPE(task)->tp_free(task);
 }
 
+static inline PyObject *
+task_call_wakeup(TaskObj *task, PyObject *fut)
+{
+    if (Task_CheckExact(task)) {
+        return task_wakeup(task, fut);
+    }
+    else {
+        /* `task` is a subclass of Task */
+        return _PyObject_CallMethodId(
+            (PyObject*)task, &PyId__wakeup, "O", fut, NULL);
+    }
+}
+
+static inline PyObject *
+task_call_step(TaskObj *task, PyObject *arg)
+{
+    if (Task_CheckExact(task)) {
+        return task_step(task, arg);
+    }
+    else {
+        /* `task` is a subclass of Task */
+        if (arg == NULL) {
+            arg = Py_None;
+        }
+        return _PyObject_CallMethodId(
+            (PyObject*)task, &PyId__step, "O", arg, NULL);
+    }
+}
+
+static int
+task_call_step_soon(TaskObj *task, PyObject *arg)
+{
+    PyObject *handle;
+
+    PyObject *cb = TaskSendMethWrapper_new(task, arg);
+    if (cb == NULL) {
+        return -1;
+    }
+
+    handle = _PyObject_CallMethodId(
+        task->task_loop, &PyId_call_soon, "O", cb, NULL);
+    Py_DECREF(cb);
+    if (handle == NULL) {
+        return -1;
+    }
+
+    Py_DECREF(handle);
+    return 0;
+}
+
 static PyObject *
 task_set_error_soon(TaskObj *task, PyObject *et, const char *format, ...)
 {
@@ -1936,27 +1972,21 @@ task_step_impl(TaskObj *task, PyObject *exc)
         Py_RETURN_NONE;
     }
 
+    if (result == (PyObject*)task) {
+        /* We have a task that wants to await on itself */
+        goto self_await;
+    }
+
     /* Check if `result` is FutureObj or TaskObj (and not a subclass) */
     if (Future_CheckExact(result) || Task_CheckExact(result)) {
         PyObject *wrapper;
         PyObject *res;
+        FutureObj *fut = (FutureObj*)result;
 
         /* Check if `result` future is attached to a different loop */
-        if (((FutureObj*)result)->fut_loop != task->task_loop) {
+        if (fut->fut_loop != task->task_loop) {
             goto different_loop;
         }
-
-        if (result == (PyObject*)task) {
-            /* We have a task that wants to await on itself */
-            PyObject *res;
-            res = task_set_error_soon(
-                task, PyExc_RuntimeError,
-                "Task cannot await on itself: %R", task);
-            Py_DECREF(result);
-            return res;
-        }
-
-        FutureObj *fut = (FutureObj*)result;
 
         if (fut->fut_blocking) {
             fut->fut_blocking = 0;
@@ -2118,6 +2148,13 @@ task_step_impl(TaskObj *task, PyObject *exc)
     return task_set_error_soon(
         task, PyExc_RuntimeError, "Task got bad yield: %R", result);
 
+self_await:
+    o = task_set_error_soon(
+        task, PyExc_RuntimeError,
+        "Task cannot await on itself: %R", task);
+    Py_DECREF(result);
+    return o;
+
 yield_insteadof_yf:
     o = task_set_error_soon(
         task, PyExc_RuntimeError,
@@ -2197,10 +2234,10 @@ task_wakeup(TaskObj *task, PyObject *o)
             return NULL;
         case 0:
             Py_DECREF(fut_result);
-            return task_step(task, NULL);
+            return task_call_step(task, NULL);
         default:
             assert(res == 1);
-            result = task_step(task, fut_result);
+            result = task_call_step(task, fut_result);
             Py_DECREF(fut_result);
             return result;
         }
@@ -2216,7 +2253,7 @@ task_wakeup(TaskObj *task, PyObject *o)
             PyErr_NormalizeException(&et, &ev, &tb);
         }
 
-        res = task_step(task, ev);
+        res = task_call_step(task, ev);
 
         Py_XDECREF(et);
         Py_XDECREF(tb);
@@ -2226,7 +2263,7 @@ task_wakeup(TaskObj *task, PyObject *o)
     }
     else {
         Py_DECREF(fut_result);
-        return task_step(task, NULL);
+        return task_call_step(task, NULL);
     }
 }
 
