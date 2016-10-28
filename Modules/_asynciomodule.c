@@ -334,6 +334,7 @@ This class is *almost* compatible with concurrent.futures.Future.
     - This class is not compatible with the wait() and as_completed()
       methods in the concurrent.futures package.
 [clinic start generated code]*/
+
 static int
 _asyncio_Future___init___impl(FutureObj *self, PyObject *loop)
 /*[clinic end generated code: output=9ed75799eaccb5d6 input=8e1681f23605be2d]*/
@@ -710,11 +711,16 @@ FutureObj_get_state(FutureObj *fut)
     return ret;
 }
 
-static PyObject*
-FutureObj__repr_info(FutureObj *fut)
+/*[clinic input]
+_asyncio.Future._repr_info
+[clinic start generated code]*/
+
+static PyObject *
+_asyncio_Future__repr_info_impl(FutureObj *self)
+/*[clinic end generated code: output=fa69e901bd176cfb input=f21504d8e2ae1ca2]*/
 {
     return PyObject_CallFunctionObjArgs(
-        asyncio_future_repr_info_func, fut, NULL);
+        asyncio_future_repr_info_func, self, NULL);
 }
 
 static PyObject *
@@ -846,7 +852,7 @@ static PyMethodDef FutureType_methods[] = {
     _ASYNCIO_FUTURE_CANCEL_METHODDEF
     _ASYNCIO_FUTURE_CANCELLED_METHODDEF
     _ASYNCIO_FUTURE_DONE_METHODDEF
-    {"_repr_info", (PyCFunction)FutureObj__repr_info, METH_NOARGS, NULL},
+    _ASYNCIO_FUTURE__REPR_INFO_METHODDEF
     {NULL, NULL}        /* Sentinel */
 };
 
@@ -1481,11 +1487,16 @@ _asyncio_Task_all_tasks_impl(PyTypeObject *type, PyObject *loop)
     return res;
 }
 
+/*[clinic input]
+_asyncio.Task._repr_info
+[clinic start generated code]*/
+
 static PyObject *
-TaskObj__repr_info(FutureObj *fut)
+_asyncio_Task__repr_info_impl(TaskObj *self)
+/*[clinic end generated code: output=6a490eb66d5ba34b input=3c6d051ed3ddec8b]*/
 {
     return PyObject_CallFunctionObjArgs(
-        asyncio_task_repr_info_func, fut, NULL);
+        asyncio_task_repr_info_func, self, NULL);
 }
 
 /*[clinic input]
@@ -1604,27 +1615,30 @@ _asyncio_Task_print_stack_impl(TaskObj *self, PyObject *limit,
         asyncio_task_print_stack_func, self, limit, file, NULL);
 }
 
+/*[clinic input]
+_asyncio.Task._step
+
+    exc: 'O' = NULL
+[clinic start generated code]*/
+
 static PyObject *
-TaskObj_step(TaskObj *task, PyObject *args, PyObject *kwds)
+_asyncio_Task__step_impl(TaskObj *self, PyObject *exc)
+/*[clinic end generated code: output=7ed23f0cefd5ae42 input=ada4b2324e5370af]*/
 {
-    static char *kwlist[] = {"exc", NULL};
-    PyObject *exc = NULL;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|O", kwlist, &exc)) {
-        return NULL;
-    }
-
-    if (exc == Py_None) {
-        exc = NULL;
-    }
-
-    return task_step(task, exc);
+    return task_step(self, exc == Py_None ? NULL : exc);
 }
 
+/*[clinic input]
+_asyncio.Task._wakeup
+
+    fut: 'O'
+[clinic start generated code]*/
+
 static PyObject *
-TaskObj_wakeup(TaskObj *task, PyObject *arg)
+_asyncio_Task__wakeup_impl(TaskObj *self, PyObject *fut)
+/*[clinic end generated code: output=75cb341c760fd071 input=11ee4918a5bdbf21]*/
 {
-    return task_wakeup(task, arg);
+    return task_wakeup(self, fut);
 }
 
 static void
@@ -1710,9 +1724,9 @@ static PyMethodDef TaskType_methods[] = {
     _ASYNCIO_TASK_CANCEL_METHODDEF
     _ASYNCIO_TASK_GET_STACK_METHODDEF
     _ASYNCIO_TASK_PRINT_STACK_METHODDEF
-    {"_repr_info", (PyCFunction)TaskObj__repr_info, METH_NOARGS, NULL},
-    {"_step", (PyCFunction)TaskObj_step, METH_VARARGS | METH_KEYWORDS, NULL},
-    {"_wakeup", (PyCFunction)TaskObj_wakeup, METH_O, NULL},
+    _ASYNCIO_TASK__WAKEUP_METHODDEF
+    _ASYNCIO_TASK__STEP_METHODDEF
+    _ASYNCIO_TASK__REPR_INFO_METHODDEF
     {NULL, NULL}        /* Sentinel */
 };
 

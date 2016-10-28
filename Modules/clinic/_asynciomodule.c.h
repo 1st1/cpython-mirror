@@ -194,6 +194,23 @@ _asyncio_Future_done(FutureObj *self, PyObject *Py_UNUSED(ignored))
     return _asyncio_Future_done_impl(self);
 }
 
+PyDoc_STRVAR(_asyncio_Future__repr_info__doc__,
+"_repr_info($self, /)\n"
+"--\n"
+"\n");
+
+#define _ASYNCIO_FUTURE__REPR_INFO_METHODDEF    \
+    {"_repr_info", (PyCFunction)_asyncio_Future__repr_info, METH_NOARGS, _asyncio_Future__repr_info__doc__},
+
+static PyObject *
+_asyncio_Future__repr_info_impl(FutureObj *self);
+
+static PyObject *
+_asyncio_Future__repr_info(FutureObj *self, PyObject *Py_UNUSED(ignored))
+{
+    return _asyncio_Future__repr_info_impl(self);
+}
+
 PyDoc_STRVAR(_asyncio_Task___init____doc__,
 "Task(coro, *, loop=None)\n"
 "--\n"
@@ -286,6 +303,23 @@ _asyncio_Task_all_tasks(PyTypeObject *type, PyObject **args, Py_ssize_t nargs, P
 
 exit:
     return return_value;
+}
+
+PyDoc_STRVAR(_asyncio_Task__repr_info__doc__,
+"_repr_info($self, /)\n"
+"--\n"
+"\n");
+
+#define _ASYNCIO_TASK__REPR_INFO_METHODDEF    \
+    {"_repr_info", (PyCFunction)_asyncio_Task__repr_info, METH_NOARGS, _asyncio_Task__repr_info__doc__},
+
+static PyObject *
+_asyncio_Task__repr_info_impl(TaskObj *self);
+
+static PyObject *
+_asyncio_Task__repr_info(TaskObj *self, PyObject *Py_UNUSED(ignored))
+{
+    return _asyncio_Task__repr_info_impl(self);
 }
 
 PyDoc_STRVAR(_asyncio_Task_cancel__doc__,
@@ -408,4 +442,62 @@ _asyncio_Task_print_stack(TaskObj *self, PyObject **args, Py_ssize_t nargs, PyOb
 exit:
     return return_value;
 }
-/*[clinic end generated code: output=bdc0b4f86cd6e509 input=a9049054013a1b77]*/
+
+PyDoc_STRVAR(_asyncio_Task__step__doc__,
+"_step($self, /, exc=None)\n"
+"--\n"
+"\n");
+
+#define _ASYNCIO_TASK__STEP_METHODDEF    \
+    {"_step", (PyCFunction)_asyncio_Task__step, METH_FASTCALL, _asyncio_Task__step__doc__},
+
+static PyObject *
+_asyncio_Task__step_impl(TaskObj *self, PyObject *exc);
+
+static PyObject *
+_asyncio_Task__step(TaskObj *self, PyObject **args, Py_ssize_t nargs, PyObject *kwnames)
+{
+    PyObject *return_value = NULL;
+    static const char * const _keywords[] = {"exc", NULL};
+    static _PyArg_Parser _parser = {"|O:_step", _keywords, 0};
+    PyObject *exc = NULL;
+
+    if (!_PyArg_ParseStack(args, nargs, kwnames, &_parser,
+        &exc)) {
+        goto exit;
+    }
+    return_value = _asyncio_Task__step_impl(self, exc);
+
+exit:
+    return return_value;
+}
+
+PyDoc_STRVAR(_asyncio_Task__wakeup__doc__,
+"_wakeup($self, /, fut)\n"
+"--\n"
+"\n");
+
+#define _ASYNCIO_TASK__WAKEUP_METHODDEF    \
+    {"_wakeup", (PyCFunction)_asyncio_Task__wakeup, METH_FASTCALL, _asyncio_Task__wakeup__doc__},
+
+static PyObject *
+_asyncio_Task__wakeup_impl(TaskObj *self, PyObject *fut);
+
+static PyObject *
+_asyncio_Task__wakeup(TaskObj *self, PyObject **args, Py_ssize_t nargs, PyObject *kwnames)
+{
+    PyObject *return_value = NULL;
+    static const char * const _keywords[] = {"fut", NULL};
+    static _PyArg_Parser _parser = {"O:_wakeup", _keywords, 0};
+    PyObject *fut;
+
+    if (!_PyArg_ParseStack(args, nargs, kwnames, &_parser,
+        &fut)) {
+        goto exit;
+    }
+    return_value = _asyncio_Task__wakeup_impl(self, fut);
+
+exit:
+    return return_value;
+}
+/*[clinic end generated code: output=f91906678dd48b79 input=a9049054013a1b77]*/
