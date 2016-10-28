@@ -2169,8 +2169,7 @@ task_step_impl(TaskObj *task, PyObject *exc)
         if (task_call_step_soon(task, NULL)) {
             goto fail;
         }
-        Py_DECREF(result);
-        Py_RETURN_NONE;
+        return result;
     }
 
     /* Check if `result` is a generator */
