@@ -211,6 +211,23 @@ _asyncio_Future__repr_info(FutureObj *self, PyObject *Py_UNUSED(ignored))
     return _asyncio_Future__repr_info_impl(self);
 }
 
+PyDoc_STRVAR(_asyncio_Future__schedule_callbacks__doc__,
+"_schedule_callbacks($self, /)\n"
+"--\n"
+"\n");
+
+#define _ASYNCIO_FUTURE__SCHEDULE_CALLBACKS_METHODDEF    \
+    {"_schedule_callbacks", (PyCFunction)_asyncio_Future__schedule_callbacks, METH_NOARGS, _asyncio_Future__schedule_callbacks__doc__},
+
+static PyObject *
+_asyncio_Future__schedule_callbacks_impl(FutureObj *self);
+
+static PyObject *
+_asyncio_Future__schedule_callbacks(FutureObj *self, PyObject *Py_UNUSED(ignored))
+{
+    return _asyncio_Future__schedule_callbacks_impl(self);
+}
+
 PyDoc_STRVAR(_asyncio_Task___init____doc__,
 "Task(coro, *, loop=None)\n"
 "--\n"
@@ -500,4 +517,4 @@ _asyncio_Task__wakeup(TaskObj *self, PyObject **args, Py_ssize_t nargs, PyObject
 exit:
     return return_value;
 }
-/*[clinic end generated code: output=f91906678dd48b79 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=8f036321bb083066 input=a9049054013a1b77]*/

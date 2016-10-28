@@ -1984,11 +1984,20 @@ class SubCTask_SubCFuture_Tests(BaseTaskTests, test_utils.TestCase):
     BaseTask = getattr(tasks, '_CTask', None)
     BaseFuture = getattr(futures, '_CFuture', None)
 
-    class Task(BaseTask):
+    class CommonFuture:
         def __init__(self, *args, **kwargs):
             self.calls = collections.defaultdict(lambda: 0)
             super().__init__(*args, **kwargs)
 
+        def _schedule_callbacks(self):
+            self.calls['_schedule_callbacks'] += 1
+            return super()._schedule_callbacks()
+
+        def add_done_callback(self, *args):
+            self.calls['add_done_callback'] += 1
+            return super().add_done_callback(*args)
+
+    class Task(CommonFuture, BaseTask):
         def _step(self, *args):
             self.calls['_step'] += 1
             return super()._step(*args)
@@ -1997,18 +2006,9 @@ class SubCTask_SubCFuture_Tests(BaseTaskTests, test_utils.TestCase):
             self.calls['_wakeup'] += 1
             return super()._wakeup(*args)
 
-        def add_done_callback(self, *args):
-            self.calls['add_done_callback'] += 1
-            return super().add_done_callback(*args)
 
-    class Future(BaseFuture):
-        def __init__(self, *args, **kwargs):
-            self.calls = collections.defaultdict(lambda: 0)
-            super().__init__(*args, **kwargs)
-
-        def add_done_callback(self, *args):
-            self.calls['add_done_callback'] += 1
-            return super().add_done_callback(*args)
+    class Future(CommonFuture, BaseFuture):
+        pass
 
     # Disable the "test_task_source_traceback" test
     # (the test is hardcoded for a particular call stack, which
@@ -2032,9 +2032,12 @@ class SubCTask_SubCFuture_Tests(BaseTaskTests, test_utils.TestCase):
 
         self.assertEqual(
             dict(task.calls),
-            {'_step': 2, '_wakeup': 1, 'add_done_callback': 1})
+            {'_step': 2, '_wakeup': 1, 'add_done_callback': 1,
+             '_schedule_callbacks': 1})
 
-        self.assertEqual(dict(fut.calls), {'add_done_callback': 1})
+        self.assertEqual(
+            dict(fut.calls),
+            {'add_done_callback': 1, '_schedule_callbacks': 1})
 
 
 @unittest.skipUnless(hasattr(futures, '_CFuture'),

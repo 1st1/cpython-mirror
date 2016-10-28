@@ -15,6 +15,7 @@ _Py_IDENTIFIER(cancel);
 _Py_IDENTIFIER(send);
 _Py_IDENTIFIER(throw);
 _Py_IDENTIFIER(_step);
+_Py_IDENTIFIER(_schedule_callbacks);
 _Py_IDENTIFIER(_wakeup);
 
 
@@ -84,7 +85,8 @@ class _asyncio.Future "FutureObj *" "&Future_Type"
 /*[clinic end generated code: output=da39a3ee5e6b4b0d input=00d3e4abca711e0f]*/
 
 /* Get FutureIter from Future */
-static PyObject* future_new_iter(PyObject *fut);
+static PyObject* future_new_iter(PyObject *);
+static inline int future_call_schedule_callbacks(FutureObj *);
 
 static int
 future_schedule_callbacks(FutureObj *fut)
@@ -185,7 +187,7 @@ future_set_result(FutureObj *fut, PyObject *res)
     fut->fut_result = res;
     fut->fut_state = STATE_FINISHED;
 
-    if (future_schedule_callbacks(fut) == -1) {
+    if (future_call_schedule_callbacks(fut) == -1) {
         return NULL;
     }
     Py_RETURN_NONE;
@@ -227,7 +229,7 @@ future_set_exception(FutureObj *fut, PyObject *exc)
     fut->fut_exception = exc_val;
     fut->fut_state = STATE_FINISHED;
 
-    if (future_schedule_callbacks(fut) == -1) {
+    if (future_call_schedule_callbacks(fut) == -1) {
         return NULL;
     }
 
@@ -308,7 +310,7 @@ future_cancel(FutureObj *fut)
     }
     fut->fut_state = STATE_CANCELLED;
 
-    if (future_schedule_callbacks(fut) == -1) {
+    if (future_call_schedule_callbacks(fut) == -1) {
         return NULL;
     }
 
@@ -723,6 +725,21 @@ _asyncio_Future__repr_info_impl(FutureObj *self)
         asyncio_future_repr_info_func, self, NULL);
 }
 
+/*[clinic input]
+_asyncio.Future._schedule_callbacks
+[clinic start generated code]*/
+
+static PyObject *
+_asyncio_Future__schedule_callbacks_impl(FutureObj *self)
+/*[clinic end generated code: output=5e8958d89ea1c5dc input=4f5f295f263f4a88]*/
+{
+    int ret = future_schedule_callbacks(self);
+    if (ret == -1) {
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
 static PyObject *
 FutureObj_repr(FutureObj *fut)
 {
@@ -853,6 +870,7 @@ static PyMethodDef FutureType_methods[] = {
     _ASYNCIO_FUTURE_CANCELLED_METHODDEF
     _ASYNCIO_FUTURE_DONE_METHODDEF
     _ASYNCIO_FUTURE__REPR_INFO_METHODDEF
+    _ASYNCIO_FUTURE__SCHEDULE_CALLBACKS_METHODDEF
     {NULL, NULL}        /* Sentinel */
 };
 
@@ -897,6 +915,25 @@ static PyTypeObject FutureType = {
 };
 
 #define Future_CheckExact(obj) (Py_TYPE(obj) == &FutureType)
+
+static inline int
+future_call_schedule_callbacks(FutureObj *fut)
+{
+    if (Future_CheckExact(fut)) {
+        return future_schedule_callbacks(fut);
+    }
+    else {
+        /* `fut` is a subclass of Future */
+        PyObject *ret = _PyObject_CallMethodId(
+            (PyObject*)fut, &PyId__schedule_callbacks, NULL);
+        if (ret == NULL) {
+            return -1;
+        }
+
+        Py_DECREF(ret);
+        return 0;
+    }
+}
 
 static void
 FutureObj_dealloc(PyObject *self)
