@@ -8,9 +8,9 @@ import logging
 import sys
 import traceback
 
+from . import base_futures
 from . import compat
 from . import events
-from . import base_futures
 
 
 CancelledError = base_futures.CancelledError

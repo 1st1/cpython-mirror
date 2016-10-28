@@ -1948,6 +1948,27 @@ class BaseTaskTests:
         self.assertFalse(gather_task.cancelled())
         self.assertEqual(gather_task.result(), [42])
 
+    @mock.patch('asyncio.base_events.logger')
+    def test_error_in_call_soon(self, m_log):
+        def call_soon(callback, *args):
+            raise ValueError
+        self.loop.call_soon = call_soon
+
+        @asyncio.coroutine
+        def coro():
+            pass
+
+        self.assertFalse(m_log.error.called)
+
+        with self.assertRaises(ValueError):
+            self.new_task(self.loop, coro())
+
+        self.assertTrue(m_log.error.called)
+        message = m_log.error.call_args[0][0]
+        self.assertIn('Task was destroyed but it is pending', message)
+
+        self.assertEqual(self.Task.all_tasks(self.loop), set())
+
 
 @unittest.skipUnless(hasattr(futures, '_CFuture'),
                      'requires the C _asyncio module')
