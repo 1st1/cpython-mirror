@@ -1971,18 +1971,12 @@ class BaseTaskTests:
         self.assertEqual(self.Task.all_tasks(self.loop), set())
 
 
-@unittest.skipUnless(hasattr(futures, '_CFuture'),
-                     'requires the C _asyncio module')
-class CTask_CFuture_Tests(BaseTaskTests, test_utils.TestCase):
-    Task = getattr(tasks, '_CTask', None)
-    Future = getattr(futures, '_CFuture', None)
+def add_subclass_tests(cls):
+    BaseTask = cls.Task
+    BaseFuture = cls.Future
 
-
-@unittest.skipUnless(hasattr(futures, '_CFuture'),
-                     'requires the C _asyncio module')
-class SubCTask_SubCFuture_Tests(BaseTaskTests, test_utils.TestCase):
-    BaseTask = getattr(tasks, '_CTask', None)
-    BaseFuture = getattr(futures, '_CFuture', None)
+    if BaseTask is None or BaseFuture is None:
+        return cls
 
     class CommonFuture:
         def __init__(self, *args, **kwargs):
@@ -2006,25 +2000,17 @@ class SubCTask_SubCFuture_Tests(BaseTaskTests, test_utils.TestCase):
             self.calls['_wakeup'] += 1
             return super()._wakeup(*args)
 
-
     class Future(CommonFuture, BaseFuture):
         pass
 
-    # Disable the "test_task_source_traceback" test
-    # (the test is hardcoded for a particular call stack, which
-    # is slightly different for Task subclasses)
-    test_task_source_traceback = None
-
     def test_subclasses_ctask_cfuture(self):
         fut = self.Future(loop=self.loop)
-        self.assertIsInstance(fut, asyncio.Future)
 
         async def func():
             self.loop.call_soon(lambda: fut.set_result('spam'))
             return await fut
 
         task = self.Task(func(), loop=self.loop)
-        self.assertIsInstance(task, asyncio.Task)
 
         result = self.loop.run_until_complete(task)
 
@@ -2038,6 +2024,35 @@ class SubCTask_SubCFuture_Tests(BaseTaskTests, test_utils.TestCase):
         self.assertEqual(
             dict(fut.calls),
             {'add_done_callback': 1, '_schedule_callbacks': 1})
+
+    # Add patched Task & Future back to the test case
+    cls.Task = Task
+    cls.Future = Future
+
+    # Add an extra unit-test
+    cls.test_subclasses_ctask_cfuture = test_subclasses_ctask_cfuture
+
+    # Disable the "test_task_source_traceback" test
+    # (the test is hardcoded for a particular call stack, which
+    # is slightly different for Task subclasses)
+    cls.test_task_source_traceback = None
+
+    return cls
+
+
+@unittest.skipUnless(hasattr(futures, '_CFuture'),
+                     'requires the C _asyncio module')
+class CTask_CFuture_Tests(BaseTaskTests, test_utils.TestCase):
+    Task = getattr(tasks, '_CTask', None)
+    Future = getattr(futures, '_CFuture', None)
+
+
+@unittest.skipUnless(hasattr(futures, '_CFuture'),
+                     'requires the C _asyncio module')
+@add_subclass_tests
+class CTask_CFuture_SubclassTests(BaseTaskTests, test_utils.TestCase):
+    Task = getattr(tasks, '_CTask', None)
+    Future = getattr(futures, '_CFuture', None)
 
 
 @unittest.skipUnless(hasattr(futures, '_CFuture'),
@@ -2055,6 +2070,12 @@ class PyTask_CFuture_Tests(BaseTaskTests, test_utils.TestCase):
 
 
 class PyTask_PyFuture_Tests(BaseTaskTests, test_utils.TestCase):
+    Task = tasks._PyTask
+    Future = futures._PyFuture
+
+
+@add_subclass_tests
+class PyTask_PyFuture_SubclassTests(BaseTaskTests, test_utils.TestCase):
     Task = tasks._PyTask
     Future = futures._PyFuture
 
